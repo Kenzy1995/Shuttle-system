@@ -14,14 +14,14 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout
       uses: actions/checkout@v3
 
     - name: Google Auth
       id: auth
-      uses: 'google-github-actions/auth@v1'
+      uses: google-github-actions/auth@v1
       with:
         credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
@@ -42,4 +42,5 @@ jobs:
           --timeout=300s
 
     - name: Show Service URL
-      run: echo "Service deployed at: https://${{ env.SERVICE }}-$(gcloud config get-value project).a.run.app"
+      run: |
+        echo "Service deployed at: https://${{ env.SERVICE }}-$(gcloud config get-value project).a.run.app"
