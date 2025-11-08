@@ -28,6 +28,10 @@ jobs:
     - name: Set project
       run: gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
 
+    - name: Configure Docker auth
+      run: |
+        gcloud auth configure-docker gcr.io --quiet
+
     - name: Build Docker image
       run: |
         cd booking-manager
