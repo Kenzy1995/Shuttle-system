@@ -31,10 +31,12 @@ jobs:
         service: ${{ env.SERVICE }}
         region: ${{ env.REGION }}
         source: ./booking-manager
-        memory: 2Gi
-        cpu: 2
-        max-instances: 10
-        timeout: 300s
+        flags: |
+          --memory=2Gi
+          --cpu=2
+          --max-instances=10
+          --allow-unauthenticated
+          --timeout=300s
 
     - name: Show Output
       run: echo ${{ steps.deploy.outputs.url }}
