@@ -1,23 +1,37 @@
-options:
-  logging: CLOUD_LOGGING_ONLY
+name: Deploy Booking API to Cloud Run
 
-steps:
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/forte-booking-system/booking-api', '.']
+on:
+  push:
+    paths:
+      - 'booking-api/**'
+    branches: [ main ]
 
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/forte-booking-system/booking-api']
+env:
+  PROJECT_ID: '${{ secrets.GCP_PROJECT_ID }}'
+  SERVICE: booking-api
+  REGION: asia-east1
+  SERVICE_ACCOUNT: forte-booking-system@forte-booking-system.iam.gserviceaccount.com
 
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'gcloud'
-    args:
-      [
-        'run', 'deploy', 'booking-api',
-        '--image', 'gcr.io/forte-booking-system/booking-api',
-        '--region', 'asia-east1',
-        '--platform', 'managed',
-        '--allow-unauthenticated'
-      ]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
 
-images:
-  - 'gcr.io/forte-booking-system/booking-api'
+    - name: Google Auth
+      id: auth
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+    - name: Deploy to Cloud Run
+      uses: google-github-actions/deploy-cloudrun@v1
+      with:
+        service: ${{ env.SERVICE }}
+        region: ${{ env.REGION }}
+        source: ./booking-api
+        flags: |
+          --allow-unauthenticated
+          --service-account=${{ env.SERVICE_ACCOUNT }}
