@@ -31,10 +31,13 @@ jobs:
         service: ${{ env.SERVICE }}
         region: ${{ env.REGION }}
         source: ./booking-api
-        memory: 2Gi
-        cpu: 2
-        max-instances: 10
-        timeout: 300s
+        # 移除不支援的參數：memory, cpu, max-instances
+        flags: |
+          --memory=2Gi
+          --cpu=2
+          --max-instances=10
+          --allow-unauthenticated
+          --timeout=300s
 
     - name: Show Output
       run: echo ${{ steps.deploy.outputs.url }}
