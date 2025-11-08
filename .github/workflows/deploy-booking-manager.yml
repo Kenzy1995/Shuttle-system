@@ -10,6 +10,7 @@ env:
   PROJECT_ID: '${{ secrets.GCP_PROJECT_ID }}'
   SERVICE: booking-manager
   REGION: asia-east1
+  SERVICE_ACCOUNT: forte-booking-system@forte-booking-system.iam.gserviceaccount.com
 
 jobs:
   deploy:
@@ -32,11 +33,5 @@ jobs:
         region: ${{ env.REGION }}
         source: ./booking-manager
         flags: |
-          --memory=2Gi
-          --cpu=2
-          --max-instances=10
           --allow-unauthenticated
-          --timeout=300s
-
-    - name: Show Output
-      run: echo ${{ steps.deploy.outputs.url }}
+          --service-account=${{ env.SERVICE_ACCOUNT }}
