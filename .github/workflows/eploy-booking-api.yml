@@ -1,0 +1,40 @@
+name: Deploy Booking API to Cloud Run
+
+on:
+  push:
+    paths:
+      - 'booking-api/**'
+    branches: [ main ]
+
+env:
+  PROJECT_ID: '${{ secrets.GCP_PROJECT_ID }}'
+  SERVICE: booking-api
+  REGION: asia-east1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Google Auth
+      id: auth
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+    - name: Deploy to Cloud Run
+      uses: google-github-actions/deploy-cloudrun@v1
+      with:
+        service: ${{ env.SERVICE }}
+        region: ${{ env.REGION }}
+        source: ./booking-api
+        memory: 2Gi
+        cpu: 2
+        max-instances: 10
+        timeout: 300s
+
+    - name: Show Output
+      run: echo ${{ steps.deploy.outputs.url }}
