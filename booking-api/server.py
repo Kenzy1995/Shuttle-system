@@ -5,8 +5,6 @@ from googleapiclient.discovery import build
 import json
 import os
 
-
-
 app = Flask(__name__)
 CORS(app)
 
