@@ -10,7 +10,6 @@ env:
   PROJECT_ID: '${{ secrets.GCP_PROJECT_ID }}'
   SERVICE: booking-manager
   REGION: asia-east1
-  SERVICE_ACCOUNT: forte-booking-system@forte-booking-system.iam.gserviceaccount.com
 
 jobs:
   deploy:
@@ -26,12 +25,21 @@ jobs:
       with:
         credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
+    - name: Set project
+      run: gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
+
     - name: Deploy to Cloud Run
-      uses: google-github-actions/deploy-cloudrun@v1
-      with:
-        service: ${{ env.SERVICE }}
-        region: ${{ env.REGION }}
-        source: ./booking-manager
-        flags: |
-          --allow-unauthenticated
-          --service-account=${{ env.SERVICE_ACCOUNT }}
+      run: |
+        gcloud run deploy ${{ env.SERVICE }} \
+          --source ./${{ env.SERVICE }} \
+          --region ${{ env.REGION }} \
+          --platform managed \
+          --allow-unauthenticated \
+          --service-account=forte-booking-system@forte-booking-system.iam.gserviceaccount.com \
+          --memory=2Gi \
+          --cpu=2 \
+          --max-instances=10 \
+          --timeout=300s
+
+    - name: Show Service URL
+      run: echo "Service deployed at: https://${{ env.SERVICE }}-$(gcloud config get-value project).a.run.app"
