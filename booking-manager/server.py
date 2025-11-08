@@ -27,7 +27,7 @@ app.add_middleware(
 # Google Sheets 設定
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SPREADSHEET_ID = "1xp54tKOczklmT8uacW-HMxwV8r0VOR2ui33jYcE2pUQ"
-SHEET_NAME = "預約審核(櫃台)(web)"
+SHEET_NAME = "預約審核(櫃台)"
 
 # 站點路線映射（循環路線）
 STATION_ROUTE_MAP = {
