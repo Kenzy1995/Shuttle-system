@@ -1,52 +1,17 @@
-name: Deploy Web to Cloud Run
+- name: Build Docker image
+  run: |
+    cd web
+    docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/hotel-web .
 
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'web/**'
-      - '.github/workflows/deploy-web.yml'
+- name: Push Docker image
+  run: |
+    docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/hotel-web
 
-jobs:
-  deploy:
-    name: Deploy to Cloud Run
-    runs-on: ubuntu-latest
-
-    steps:
-      # Step 1: 取得程式碼
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # Step 2: 登入 Google Cloud（使用 GCP_CREDENTIALS secret）
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
-
-      # Step 3: 設定 gcloud CLI
-      - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: forte-booking-system
-
-      # Step 4: 建立並推送 Docker 映像（注意 web 資料夾路徑）
-      - name: Build and push Docker image
-        run: |
-          gcloud builds submit web --tag asia-east1-docker.pkg.dev/forte-booking-system/hotel-web/web
-
-      # Step 5: 部署到 Cloud Run
-      - name: Deploy to Cloud Run
-        run: |
-          gcloud run deploy hotel-web \
-            --image=asia-east1-docker.pkg.dev/forte-booking-system/hotel-web/web \
-            --region=asia-east1 \
-            --platform=managed \
-            --allow-unauthenticated \
-            --port=8080
-
-      # Step 6: 顯示部署結果
-      - name: Output service URL
-        run: |
-          echo "✅ 部署完成"
-          gcloud run services describe hotel-web --region=asia-east1 --format='value(status.url)'
+- name: Deploy to Cloud Run
+  run: |
+    gcloud run deploy hotel-web \
+      --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/hotel-web \
+      --region asia-east1 \
+      --platform managed \
+      --allow-unauthenticated \
+      --port 8080
