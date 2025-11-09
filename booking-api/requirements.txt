@@ -1,6 +1,9 @@
-Flask
+fastapi
+uvicorn
 gunicorn
-google-api-python-client
+gspread
 google-auth
 google-auth-httplib2
-Flask-Cors
+google-auth-oauthlib
+google-api-python-client
+qrcode
