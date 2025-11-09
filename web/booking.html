@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="zh-Hant-TW">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title data-lang="pageTitle">飯店服務-免費接駁車預約</title>
+  <title>飯店服務-免費接駁車預約</title>
   <style>
     :root{
       --primary:#A98570;
@@ -17,25 +18,20 @@
       --shadow:0 2px 8px rgba(0,0,0,.08);
       --shadow-lg:0 10px 30px rgba(0,0,0,.15);
     }
-    
     *{box-sizing:border-box}
     html,body{height:100%}
-    html,body{overflow-x:hidden}
-    body{
+    html,body{
       margin:0;
-      background:var(--bg) url('/images/網頁底圖.jpg') no-repeat center center fixed;
-      background-size: cover;
+      background:var(--bg);
       color:var(--text);
       font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",Segoe UI,Roboto,Arial,sans-serif;
-      position: relative;
-      min-height: 100vh;
+      min-height:100vh;
+      overflow-x:hidden; /* 修正手機左右可滑動 */
+      -webkit-text-size-adjust:100%;
     }
-    body::before {
-      content: '';
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(255, 255, 255, 0.65); z-index: -1;
-    }
-    a{color:inherit;text-decoration:none}
+    img, iframe{max-width:100%;}
+    a{color:inherit; text-decoration:none}
+
     .navbar{
       position:sticky;top:0;z-index:50;
       display:flex;align-items:center;
@@ -44,24 +40,28 @@
     .brand{display:flex;align-items:center;gap:10px;margin-right: 30px;}
     .brand img{height:28px;width:auto;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
     .brand-title{font-weight:800;font-size:18px}
-    .nav-right{display:flex;align-items:center;gap:12px;margin-left: auto;}
+
+    .nav-right{display:flex;align-items:center;gap:12px;margin-left:auto}
     .nav-links{display:flex;gap:8px}
     .nav-links button{
       background:none;border:none;padding:8px 10px;border-radius:10px;cursor:pointer;
       font-size:14px
     }
     .nav-links button.active,.nav-links button:hover{color:var(--primary);background:#f3eee6}
-    .lang-wrap{display:flex;align-items:center;gap:6px;font-size:14px;color:#555}
+
     select{
       appearance:none;padding:8px 28px 8px 10px;border:1px solid #ddd;border-radius:10px;background:white url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="10" viewBox="0 0 24 24" fill="none" stroke="%23666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>') no-repeat right 8px center/14px
     }
+
     .page{display:none;padding:20px;max-width:980px;margin:0 auto}
     .page.active{display:block}
+
     .hero{
       max-width:840px;margin:18px auto 16px;background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:24px 20px;text-align:center
     }
     .hero h1{margin:0 0 12px;font-size:30px;font-weight:900}
     .hero p{margin:0;color:var(--muted)}
+
     .button{
       display:inline-block;min-width:160px;
       border:none;border-radius:14px;padding:14px 18px;font-size:16px;font-weight:700;cursor:pointer;background:var(--primary);color:#fff;
@@ -69,15 +69,24 @@
     }
     .button:active{transform:translateY(1px)}
     .btn-ghost{background:#eee;color:#333}
+
     .grid{display:grid;gap:14px}
-    .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:18px}
+    .card{
+      background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:18px
+    }
     .card h2{margin:0 0 12px;font-size:20px;font-weight:800;text-align:center}
+
     .field{margin:14px 0}
     .label{display:block;margin-bottom:6px;font-weight:700}
     .hint{font-size:12px;color:var(--muted)}
-    .input,.select,.readonly{width:100%;padding:12px 14px;border:1px solid #ddd;border-radius:12px;background:#fff;font-size:16px}
+
+    .input,.select,.readonly{
+      width:100%;padding:12px 14px;border:1px solid #ddd;border-radius:12px;background:#fff;font-size:16px
+    }
     .readonly{background:#f4f4f4;color:#666}
+
     .error{color:#b00020;font-size:13px;margin-top:6px;display:none}
+
     .options{display:flex;flex-direction:column;gap:10px}
     .opt-btn{
       text-align:left;padding:14px 16px;border:1px solid #e7e7e7;border-radius:12px;background:#fff;font-weight:700;color:var(--primary);cursor:pointer
@@ -85,39 +94,56 @@
     .opt-btn:hover{box-shadow:var(--shadow)}
     .opt-btn.active{outline:3px solid rgba(169,133,112,.25)}
     .opt-btn.disabled{color:#bbb;background:#f7f7f7;border-color:#eee;cursor:not-allowed}
+
     .actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:8px}
-    .overlay{position:fixed;inset:0;background:rgba(255,255,255,.94);display:none;align-items:center;justify-content:center;z-index:9999}
+    .actions.row{flex-direction:row}
+    .actions.col{flex-direction:column}
+
+    .overlay{
+      position:fixed;inset:0;background:rgba(255,255,255,.94);display:none;align-items:center;justify-content:center;z-index:9999
+    }
     .overlay.show{display:flex}
     .spinner{width:48px;height:48px;border-radius:50%;border:4px solid #eee;border-top:4px solid var(--primary);animation:spin 1s linear infinite;margin:0 auto 10px}
     @keyframes spin{to{transform:rotate(360deg)}}
     .overlay-card{background:#fff;border-radius:16px;box-shadow:var(--shadow-lg);padding:22px;max-width:560px;text-align:center}
     .overlay-card h3{margin:0 0 8px;font-size:20px}
-    @keyframes shake{0%,100%{transform:translateX(0)}10%,30%,50%,70%,90%{transform:translateX(-5px)}20%,40%,60%,80%{transform:translateX(5px)}}
+
+    @keyframes shake {0%,100%{transform:translateX(0)}10%,30%,50%,70%,90%{transform:translateX(-5px)}20%,40%,60%,80%{transform:translateX(5px)}}
     .shake{animation:shake .5s ease-in-out}
+
     .query-form{display:flex;flex-direction:column;gap:14px}
-    .query-form .field{margin:0}
+
     .footer{background:#f5f5f5;color:#666;text-align:center;padding:20px;margin-top:40px;border-top:1px solid #e0e0e0}
 
-    /* 手機底部導覽：主題色底+白字 */
-    .mobile-tabbar{position:fixed;left:0;right:0;bottom:0;display:none;z-index:40;background:var(--primary);border-top:1px solid #e9e9e9;box-shadow:0 -2px 12px rgba(0,0,0,.06)}
+    /* 手機底部導覽：主題色背景 + 白字 */
+    .mobile-tabbar{
+      position:fixed;left:0;right:0;bottom:0;display:none;z-index:40;
+      background:var(--primary);border-top:1px solid #e9e9e9;box-shadow:0 -2px 12px rgba(0,0,0,.06)
+    }
     .mobile-tabbar .bar{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
-    .mobile-tabbar button{appearance:none;border:none;background:none;padding:12px 6px;font-size:13px;color:#fff;font-weight:600}
-    .mobile-tabbar button.active{opacity:.9;text-decoration:underline}
+    .mobile-tabbar button{
+      appearance:none;border:none;background:none;padding:12px 6px;font-size:13px;color:#fff;font-weight:700;opacity:.8
+    }
+    .mobile-tabbar button.active{opacity:1;text-decoration:underline}
 
     #backToTop{position:fixed;right:18px;bottom:78px;z-index:45;display:none;width:44px;height:44px;border:none;border-radius:50%;cursor:pointer;background:#0009;color:#fff;font-size:22px;line-height:44px;text-align:center}
     #backToTop:hover{filter:brightness(1.2)}
 
-    /* Step6 與 成功卡片：手機上下排版 */
+    /* 確認班次資訊與成功頁：欄位上下排版，只有按鈕左右排列 */
+    #step6 .grid{grid-template-columns:1fr}
+    #successCard .grid{grid-template-columns:1fr}
+
+    /* 站點頁圖片 iframe 自適應 */
+    .station-img{width:100%;border-radius:14px;box-shadow:var(--shadow)}
+
     @media (max-width: 768px){
       .nav-links{display:none}
       .mobile-tabbar{display:block}
-      body{padding-bottom:64px}
-      .query-form .field{width:100%}
-      .navbar{justify-content:space-between}
-      .brand{margin-right:0}
-      #step6 .grid, #successCard .grid{grid-template-columns:1fr !important}
-      #step6 .actions, #successCard .actions{flex-wrap:nowrap; justify-content:center}
+      body{padding-bottom:70px} /* 預留底部導覽高度 */
+      .navbar{justify-content:space-between}.brand{margin-right:0}
+      .actions{justify-content:space-between}
     }
+
   </style>
 </head>
 <body>
@@ -125,14 +151,16 @@
   <header class="navbar">
     <div class="brand">
       <img src="/images/logo.png" alt="logo" />
-      <div class="brand-title" data-lang="brandTitle">飯店服務</div>
+      <div class="brand-title">飯店服務</div>
     </div>
+
     <div class="nav-links">
-      <button id="nav-reservation" class="active" onclick="showPage('reservation')" data-lang="navReservation">立即預約</button>
-      <button id="nav-check" onclick="showPage('check')" data-lang="navCheck">我的預約</button>
-      <button id="nav-station" onclick="showPage('station')" data-lang="navStation">停靠站點</button>
-      <button id="nav-contact" onclick="showPage('contact')" data-lang="navContact">回首頁</button>
+      <button id="nav-reservation" class="active" onclick="showPage('reservation')">立即預約</button>
+      <button id="nav-check" onclick="showPage('check')">我的預約</button>
+      <button id="nav-station" onclick="showPage('station')">停靠站點</button>
+      <button id="nav-contact" onclick="showPage('contact')">回首頁</button>
     </div>
+
     <div class="nav-right">
       <div class="lang-wrap">
         <span>Language</span>
@@ -149,10 +177,10 @@
   <!-- 手機底部導覽 -->
   <nav class="mobile-tabbar">
     <div class="bar">
-      <button id="m-reservation" class="active" onclick="showPage('reservation')" data-lang="navReservation">立即預約</button>
-      <button id="m-check" onclick="showPage('check')" data-lang="navCheck">我的預約</button>
-      <button id="m-station" onclick="showPage('station')" data-lang="navStation">停靠站點</button>
-      <button id="m-contact" onclick="showPage('contact')" data-lang="navContact">回首頁</button>
+      <button id="m-reservation" class="active" onclick="showPage('reservation')">立即預約</button>
+      <button id="m-check" onclick="showPage('check')">我的預約</button>
+      <button id="m-station" onclick="showPage('station')">停靠站點</button>
+      <button id="m-contact" onclick="showPage('contact')">回首頁</button>
     </div>
   </nav>
 
@@ -162,9 +190,9 @@
   <!-- 預約流程 -->
   <main id="reservation" class="page active">
     <section id="homeHero" class="hero">
-      <h1 data-lang="freeShuttle">免費接駁</h1>
+      <h1>免費接駁</h1>
       <div class="actions" style="margin-top:8px">
-        <button class="button" onclick="startBooking()" data-lang="bookNow">立即預約</button>
+        <button class="button" onclick="startBooking()">立即預約</button>
       </div>
       <div style="margin-top:16px">
         <img src="/images/時刻表.webp" alt="時刻表" style="width:100%;max-width:820px;border-radius:14px;box-shadow:var(--shadow)"/>
@@ -173,164 +201,162 @@
 
     <!-- Step 1：方向 -->
     <section id="step1" class="card" style="display:none">
-      <h2 data-lang="selectDirection">選擇方向</h2>
+      <h2>選擇方向</h2>
       <div class="field">
-        <label class="label" data-lang="selectDirectionRequired">請選擇方向<span style="color:#b00020">*</span></label>
+        <label class="label">請選擇方向<span style="color:#b00020">*</span></label>
         <div id="directionList" class="options"></div>
       </div>
-      <div class="hint" data-lang="directionHint">去程固定由飯店出發，回程終點為飯店</div>
+      <div class="hint">去程固定由飯店出發，回程終點為飯店</div>
       <div class="actions">
-        <button class="button btn-ghost" onclick="restart()" data-lang="restartQuery">重新查詢</button>
+        <button class="button btn-ghost" onclick="restart()">重新查詢</button>
       </div>
     </section>
 
     <!-- Step 2：日期 -->
     <section id="step2" class="card" style="display:none">
-      <h2 data-lang="selectDate">選擇日期</h2>
+      <h2>選擇日期</h2>
       <div class="field">
-        <label class="label" data-lang="selectDateRequired">請選擇日期<span style="color:#b00020">*</span></label>
+        <label class="label">請選擇日期<span style="color:#b00020">*</span></label>
         <div id="dateList" class="options"></div>
       </div>
       <div class="actions">
-        <button class="button btn-ghost" onclick="goStep(1)" data-lang="back">返回</button>
-        <button class="button btn-ghost" onclick="restart()" data-lang="restartQuery">重新查詢</button>
+        <button class="button btn-ghost" onclick="goStep(1)">返回</button>
+        <button class="button btn-ghost" onclick="restart()">重新查詢</button>
       </div>
     </section>
 
     <!-- Step 3：站點 -->
     <section id="step3" class="card" style="display:none">
-      <h2 data-lang="selectStation">選擇站點</h2>
+      <h2>選擇站點</h2>
       <div class="field">
-        <label class="label" data-lang="fixedStation">固定站點</label>
+        <label class="label">固定站點</label>
         <input id="fixedStation" class="readonly" type="text" readonly value="福泰大飯店 Forte Hotel" />
       </div>
       <div class="field">
-        <label class="label" data-lang="selectStationRequired">請選擇站點<span style="color:#b00020">*</span></label>
+        <label class="label">請選擇站點<span style="color:#b00020">*</span></label>
         <div id="stationList" class="options"></div>
       </div>
       <div class="actions">
-        <button class="button btn-ghost" onclick="goStep(2)" data-lang="back">返回</button>
-        <button class="button btn-ghost" onclick="restart()" data-lang="restartQuery">重新查詢</button>
+        <button class="button btn-ghost" onclick="goStep(2)">返回</button>
+        <button class="button btn-ghost" onclick="restart()">重新查詢</button>
       </div>
     </section>
 
     <!-- Step 4：班次 -->
     <section id="step4" class="card" style="display:none">
-      <h2 data-lang="selectSchedule">選擇班次</h2>
+      <h2>選擇班次</h2>
       <div class="field">
-        <label class="label" data-lang="selectScheduleRequired">請選擇班次<span style="color:#b00020">*</span></label>
+        <label class="label">請選擇班次<span style="color:#b00020">*</span></label>
         <div id="scheduleList" class="options"></div>
-        <div class="hint" data-lang="scheduleHint">點選班次以繼續</div>
+        <div class="hint">點選班次以繼續</div>
       </div>
       <div class="actions">
-        <button class="button btn-ghost" onclick="goStep(3)" data-lang="back">返回</button>
-        <button id="btnStep4Restart" class="button btn-ghost" onclick="restart()" data-lang="restartQuery">重新查詢</button>
+        <button class="button btn-ghost" onclick="goStep(3)">返回</button>
+        <button id="btnStep4Restart" class="button btn-ghost" onclick="restart()">重新查詢</button>
       </div>
     </section>
 
     <!-- Step 5：旅客資料 -->
     <section id="step5" class="card" style="display:none">
-      <h2 data-lang="passengerInfo">旅客資料填寫</h2>
+      <h2>旅客資料填寫</h2>
       <div class="field">
-        <label class="label" data-lang="selectIdentityRequired">請選擇您的身分<span style="color:#b00020">*</span></label>
+        <label class="label">請選擇您的身分<span style="color:#b00020">*</span></label>
         <select id="identitySelect" class="select" onchange="onIdentityChange()">
-          <option value="hotel" selected data-lang="hotelGuest">住宿貴賓</option>
-          <option value="dining" data-lang="diningGuest">用餐貴賓</option>
+          <option value="hotel" selected>住宿貴賓</option>
+          <option value="dining">用餐貴賓</option>
         </select>
-        <div id="identityErr" class="error" data-lang="identityError">請選擇您的身分</div>
+        <div id="identityErr" class="error">請選擇您的身分</div>
       </div>
 
       <div id="hotelDates" class="field" style="display:none">
-        <label class="label" data-lang="checkInDateRequired">入住日期<span style="color:#b00020">*</span></label>
+        <label class="label">入住日期<span style="color:#b00020">*</span></label>
         <input id="checkInDate" type="date" class="input" />
       </div>
       <div id="hotelDates2" class="field" style="display:none">
-        <label class="label" data-lang="checkOutDateRequired">退房日期<span style="color:#b00020">*</span></label>
+        <label class="label">退房日期<span style="color:#b00020">*</span></label>
         <input id="checkOutDate" type="date" class="input" />
       </div>
 
       <div id="diningDateDiv" class="field" style="display:none">
-        <label class="label" data-lang="diningDateRequired">用餐日期<span style="color:#b00020">*</span></label>
+        <label class="label">用餐日期<span style="color:#b00020">*</span></label>
         <input id="diningDate" type="date" class="input" />
       </div>
 
       <div id="roomNumberDiv" class="field" style="display:none">
-        <label class="label" data-lang="roomNumberRequired">房號<span style="color:#b00020">*</span></label>
+        <label class="label">房號<span style="color:#b00020">*</span></label>
         <input id="roomNumber" type="text" class="input" placeholder="" />
-        <div id="roomErr" class="error" data-lang="roomError">請填寫正確的房號</div>
-        <div class="hint" data-lang="roomHint">尚未 CHECK IN 請輸入0000</div>
+        <div id="roomErr" class="error">請填寫正確的房號</div>
+        <div class="hint">尚未 CHECK IN 請輸入0000</div>
       </div>
 
       <div class="field">
-        <label class="label" data-lang="guestNameRequired">貴賓姓名<span style="color:#b00020">*</span></label>
-        <input id="guestName" type="text" class="input" />
-        <div id="nameErr" class="error" data-lang="nameError">請填寫姓名</div>
+        <label class="label">貴賓姓名<span style="color:#b00020">*</span></label>
+        <input id="guestName" type="text" class="input" oninput="validateName(this)" />
+        <div id="nameErr" class="error">請填寫姓名</div>
       </div>
-
       <div class="field">
-        <label class="label" data-lang="phoneRequired">手機<span style="color:#b00020">*</span></label>
+        <label class="label">手機<span style="color:#b00020">*</span></label>
         <input id="guestPhone" type="tel" class="input" placeholder="+886921234567" />
-        <div id="phoneErr" class="error" data-lang="phoneError">請輸入正確的手機號碼</div>
-        <div class="hint" data-lang="phoneHint">請輸入正確的手機號碼（可填寫非台灣手機號碼）</div>
+        <div id="phoneErr" class="error">請輸入正確的手機號碼</div>
+        <div class="hint">請輸入正確的手機號碼（可填寫非台灣手機號碼）</div>
       </div>
-
       <div class="field">
-        <label class="label" data-lang="emailRequired">信箱<span style="color:#b00020">*</span></label>
+        <label class="label">信箱<span style="color:#b00020">*</span></label>
         <input id="guestEmail" type="email" class="input" placeholder="name@example.com" />
-        <div id="emailErr" class="error" data-lang="emailError">請填寫正確的郵箱</div>
+        <div id="emailErr" class="error">請填寫正確的郵箱</div>
       </div>
 
       <div class="actions">
-        <button class="button btn-ghost" onclick="goStep(4)" data-lang="back">返回</button>
-        <button class="button btn-ghost" onclick="restart()" data-lang="restartQuery">重新查詢</button>
-        <button class="button" onclick="toStep6()" data-lang="next">下一步</button>
+        <button class="button btn-ghost" onclick="goStep(4)">返回</button>
+        <button class="button btn-ghost" onclick="restart()">重新查詢</button>
+        <button class="button" onclick="toStep6()">下一步</button>
       </div>
     </section>
 
     <!-- Step 6：確認與送出 -->
     <section id="step6" class="card" style="display:none">
-      <h2 data-lang="confirmInfo">確認班次資訊</h2>
-      <div class="grid" style="grid-template-columns:1fr 1fr">
-        <div class="field"><label class="label" data-lang="direction">方向</label><input id="cf_direction" class="readonly" readonly/></div>
-        <div class="field"><label class="label" data-lang="date">日期</label><input id="cf_date" class="readonly" readonly/></div>
-        <div class="field"><label class="label" data-lang="pickupStation">上車站點</label><input id="cf_pick" class="readonly" readonly/></div>
-        <div class="field"><label class="label" data-lang="dropoffStation">下車站點</label><input id="cf_drop" class="readonly" readonly/></div>
-        <div class="field"><label class="label" data-lang="schedule">班次</label><input id="cf_time" class="readonly" readonly/></div>
-        <div class="field"><label class="label" data-lang="name">姓名</label><input id="cf_name" class="readonly" readonly/></div>
+      <h2>確認班次資訊</h2>
+      <div class="grid">
+        <div class="field"><label class="label">方向</label><input id="cf_direction" class="readonly" readonly/></div>
+        <div class="field"><label class="label">日期</label><input id="cf_date" class="readonly" readonly/></div>
+        <div class="field"><label class="label">上車站點</label><input id="cf_pick" class="readonly" readonly/></div>
+        <div class="field"><label class="label">下車站點</label><input id="cf_drop" class="readonly" readonly/></div>
+        <div class="field"><label class="label">班次</label><input id="cf_time" class="readonly" readonly/></div>
+        <div class="field"><label class="label">姓名</label><input id="cf_name" class="readonly" readonly/></div>
       </div>
       <div class="field">
-        <label class="label" data-lang="passengerCountRequired">預約人數（請選擇）<span style="color:#b00020">*</span></label>
+        <label class="label">預約人數（請選擇）<span style="color:#b00020">*</span></label>
         <select id="passengers" class="select"></select>
         <div id="passengersHint" class="hint"></div>
-        <div id="passengersErr" class="error" data-lang="passengerError">請選擇正確的人數（不可超過可預約人數或4人）</div>
+        <div id="passengersErr" class="error">請選擇正確的人數（不可超過可預約人數或4人）</div>
       </div>
-      <div class="actions">
-        <button class="button btn-ghost" onclick="goStep(5)" data-lang="back">返回</button>
-        <button class="button" onclick="submitBooking()" data-lang="submitBooking">提交預約</button>
+      <div class="actions row">
+        <button class="button btn-ghost" onclick="goStep(5)">返回</button>
+        <button class="button" onclick="submitBooking()">提交預約</button>
       </div>
     </section>
 
     <!-- 成功卡片 -->
     <section id="successCard" class="card" style="display:none">
-      <h2 data-lang="bookingComplete">預約完成</h2>
-      <div class="grid" style="grid-template-columns:1fr 2fr;align-items:center">
+      <h2>預約完成</h2>
+      <div id="ticketCard" class="grid" style="grid-template-columns:1fr;align-items:center;background:#fff">
         <div id="qrBox" style="text-align:center">
-          <img id="qrImg" src="" alt="QR" style="width:160px;height:160px;border-radius:8px;border:1px solid #eee"/>
+          <img id="qrImg" src="" alt="QR" style="width:160px;height:160px;border-radius:8px;border:1px solid #eee;background:#fff"/>
         </div>
         <div>
-          <div class="field"><label class="label" data-lang="bookingId">預約編號</label><input id="succBookingId" class="readonly" readonly/></div>
-          <div class="field"><label class="label" data-lang="schedule">班次</label><input id="succSchedule" class="readonly" readonly/></div>
-          <div class="field"><label class="label" data-lang="direction">方向</label><input id="succDirection" class="readonly" readonly/></div>
-          <div class="field"><label class="label" data-lang="pickupStation">上車地點</label><input id="succPick" class="readonly" readonly/></div>
-          <div class="field"><label class="label" data-lang="dropoffStation">下車地點</label><input id="succDrop" class="readonly" readonly/></div>
-          <div class="field"><label class="label" data-lang="name">姓名</label><input id="succName" class="readonly" readonly/></div>
-          <div class="field"><label class="label" data-lang="phone">手機</label><input id="succPhone" class="readonly" readonly/></div>
-          <div class="field"><label class="label" data-lang="email">信箱</label><input id="succEmail" class="readonly" readonly/></div>
-          <div class="actions" style="justify-content:flex-start">
-            <button id="downloadTicket" class="button" onclick="downloadTicketImage()" data-lang="downloadTicket">下載車票</button>
-            <button class="button btn-ghost" onclick="backToHome()" data-lang="backToHome">回到首頁</button>
-          </div>
+          <div class="field"><label class="label">預約編號</label><input id="succBookingId" class="readonly" readonly/></div>
+          <div class="field"><label class="label">班次</label><input id="succSchedule" class="readonly" readonly/></div>
+          <div class="field"><label class="label">方向</label><input id="succDirection" class="readonly" readonly/></div>
+          <div class="field"><label class="label">上車地點</label><input id="succPick" class="readonly" readonly/></div>
+          <div class="field"><label class="label">下車地點</label><input id="succDrop" class="readonly" readonly/></div>
+          <div class="field"><label class="label">姓名</label><input id="succName" class="readonly" readonly/></div>
+          <div class="field"><label class="label">手機</label><input id="succPhone" class="readonly" readonly/></div>
+          <div class="field"><label class="label">信箱</label><input id="succEmail" class="readonly" readonly/></div>
         </div>
+      </div>
+      <div class="actions row" style="justify-content:flex-start;margin-top:10px">
+        <button class="button" id="downloadTicketBtn">下載車票</button>
+        <button class="button btn-ghost" onclick="restart()">回到首頁</button>
       </div>
     </section>
   </main>
@@ -338,60 +364,26 @@
   <!-- 我的預約 -->
   <main id="check" class="page">
     <div class="card">
-      <h2 data-lang="queryOrder">查詢訂單(已預約/刪除/修改)</h2>
+      <h2>查詢訂單(已預約/刪除/修改)</h2>
       <div class="card" style="margin:0 0 12px;background:#fff7ea">
         <div style="font-size:14px;color:#6b4b22;line-height:1.6">
-          <span data-lang="orderHint1">※ 須於發車前一小時完成【預約／刪改】，座位有限，約滿為止。</span><br/>
-          <span data-lang="orderHint2">※ 房客、用餐客人可享免費預約搭乘。</span>
+          <span>※ 須於發車前一小時完成【預約／刪改】，座位有限，約滿為止。</span><br/>
+          <span>※ 房客、用餐客人可享免費預約搭乘。</span>
         </div>
       </div>
-      <div class="query-form">
-        <div class="field"><label class="label" data-lang="bookingId">預約編號</label><input id="qBookId" class="input" placeholder="例：1109001"/></div>
-        <div class="field"><label class="label" data-lang="phone">預約電話</label><input id="qPhone" class="input" placeholder="+8869..."/></div>
-        <div class="field"><label class="label" data-lang="email">預約信箱</label><input id="qEmail" class="input" placeholder="name@example.com"/></div>
-        <div class="field" style="display:flex;align-items:flex-end;gap:8px">
-          <button class="button" onclick="queryOrders()" data-lang="query">查詢</button>
-          <button class="button btn-ghost" onclick="resetQuery()" data-lang="clear">清除</button>
-        </div>
-      </div>
-      <div id="queryHint" style="margin-top:6px;font-weight:800;color:#b00020" data-lang="queryHint">*請擇一輸入</div>
-      <div id="queryResult" style="margin-top:14px" class="grid"></div>
-    </div>
 
-    <!-- 編輯訂單 Overlay -->
-    <div id="editOverlay" class="overlay">
-      <div class="overlay-card" style="max-width:680px;text-align:left">
-        <h3>修改預約</h3>
-        <div class="grid" style="grid-template-columns:1fr 1fr">
-          <div class="field">
-            <label class="label">方向</label>
-            <select id="editDirection" class="select">
-              <option value="去程">去程</option>
-              <option value="回程">回程</option>
-            </select>
-          </div>
-          <div class="field">
-            <label class="label">日期</label>
-            <select id="editDate" class="select"></select>
-          </div>
-          <div class="field">
-            <label class="label">站點</label>
-            <select id="editStation" class="select"></select>
-          </div>
-          <div class="field">
-            <label class="label">班次</label>
-            <select id="editTime" class="select"></select>
-          </div>
-          <div class="field">
-            <label class="label">人數</label>
-            <select id="editPassengers" class="select"></select>
-          </div>
-        </div>
-        <div class="actions">
-          <button class="button btn-ghost" onclick="closeEdit()">取消</button>
-          <button class="button" onclick="submitEdit()">確認修改</button>
+      <div class="query-form">
+        <div class="field"><label class="label">預約編號</label><input id="qBookId" class="input" placeholder="例：1109001"/></div>
+        <div class="field"><label class="label">預約電話</label><input id="qPhone" class="input" placeholder="+8869..."/></div>
+        <div class="field"><label class="label">預約信箱</label><input id="qEmail" class="input" placeholder="name@example.com"/></div>
+        <div class="field" style="display:flex;align-items:flex-end;gap:8px">
+          <button class="button" onclick="queryOrders()">查詢</button>
+          <button class="button btn-ghost" onclick="resetQuery()">清除</button>
         </div>
       </div>
+      <div id="queryHint" style="margin-top:6px;font-weight:800;color:#b00020">*請擇一輸入</div>
+
+      <div id="queryResult" style="margin-top:14px" class="grid"></div>
     </div>
   </main>
 
@@ -400,28 +392,28 @@
     <div class="grid">
       <section class="card">
         <h2>福泰大飯店發車-側門出口 / Forte Hotel Xizhi Departure - Side Entrance</h2>
-        <img src="/images/飯店1.jpg" style="width:100%;border-radius:14px;box-shadow:var(--shadow)" alt="飯店發車點"/>
+        <img src="/images/飯店1.jpg" class="station-img" alt="飯店發車點"/>
         <div style="margin-top:12px">
           <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5965295503805!2d121.631097!3d25.054899!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzE3LjQiTiAxMjHCsDM3JzUyLjEiRQ!5e0!3m2!1szh-TW!2sus!4v1762533754549!5m2!1szh-TW!2sus" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
         </div>
       </section>
       <section class="card">
         <h2>南港展覽館-捷運3號出口 / Nangang Exhibition Center - MRT Exit 3</h2>
-        <img src="/images/捷運站1.jpg" style="width:100%;border-radius:14px;box-shadow:var(--shadow)" alt="捷運3號出口"/>
+        <img src="/images/捷運站1.jpg" class="station-img" alt="捷運3號出口"/>
         <div style="margin-top:12px">
           <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5957185825895!2d121.61843600000002!3d25.055009!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzE4LjEiTiAxMjHCsDM3JzA1LjUiRQ!5e0!3m2!1szh-TW!2sus!4v1762600714030!5m2!1szh-TW!2sus" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
         </div>
       </section>
       <section class="card">
         <h2>南港火車站 / Nangang Train Station</h2>
-        <img src="/images/火車站1.jpg" style="width:100%;border-radius:14px;box-shadow:var(--shadow)" alt="南港火車站"/>
+        <img src="/images/火車站1.jpg" class="station-img" alt="南港火車站"/>
         <div style="margin-top:12px">
           <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.6109052447401!2d121.60801199999999!3d25.052949!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzEwLjMiTiAxMjHCsDM2JzI4LjAiRQ!5e0!3m2!1szh-TW!2sus!4v1762600699115!5m2!1szh-TW!2sus" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
         </div>
       </section>
       <section class="card">
         <h2>南港 LaLaport Shopping Park</h2>
-        <img src="/images/商場1.jpg" style="width:100%;border-radius:14px;box-shadow:var(--shadow)" alt="LaLaport"/>
+        <img src="/images/商場1.jpg" class="station-img" alt="LaLaport"/>
         <div style="margin-top:12px">
           <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5851167154738!2d121.617376!3d25.056447!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzIyLjciTiAxMjHCsDM3JzAxLjQiRQ!5e0!3m2!1szh-TW!2sus!4v1762600680118!5m2!1szh-TW!2sus" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
         </div>
@@ -432,943 +424,745 @@
   <!-- 回首頁 -->
   <main id="contact" class="page">
     <div class="hero">
-      <h1><a href="https://www.fortehotelxizhi.com.tw/" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;" data-lang="backToHome">回首頁</a></h1>
+      <h1><a href="https://www.fortehotelxizhi.com.tw/" target="_blank" rel="noopener">回首頁</a></h1>
     </div>
   </main>
 
-  <!-- 底部橫幅 -->
+  <!-- 底部 -->
   <footer class="footer">
-    © 2025. Forte Hotel XiZhi汐止福泰大飯店. <a href="https://kz-tech.netlify.app/" target="_blank" style="color:inherit;">Design</a>
+    © 2025. Forte Hotel XiZhi汐止福泰大飯店. <a href="https://kz-tech.netlify.app/" target="_blank">Design</a>
   </footer>
 
   <!-- Loading / Overlay -->
   <div id="loading" class="overlay">
     <div>
       <div class="spinner"></div>
-      <div style="text-align:center;color:var(--primary);font-weight:700" data-lang="loading">資料讀取中…</div>
+      <div style="text-align:center;color:var(--primary);font-weight:700">資料讀取中…</div>
     </div>
   </div>
   <div id="loadingConfirm" class="overlay">
     <div>
       <div class="spinner"></div>
-      <div style="text-align:center;color:var(--primary);font-weight:700" data-lang="confirming">資料確認中…</div>
+      <div style="text-align:center;color:var(--primary);font-weight:700">資料確認中…</div>
     </div>
   </div>
   <div id="expiredOverlay" class="overlay">
     <div class="overlay-card">
-      <h3 data-lang="expiredTitle">班次已過期或目前不可預約</h3>
-      <p data-lang="expiredMessage">請重新查詢可預約班次</p>
+      <h3>班次已過期或目前不可預約</h3>
+      <p>請重新查詢可預約班次</p>
       <div class="actions" style="margin-top:8px">
-        <button id="overlayBackBtn" class="button" onclick="overlayRestart()" data-lang="restartQuery">重新查詢</button>
+        <button id="overlayBackBtn" class="button" onclick="overlayRestart()">重新查詢</button>
       </div>
     </div>
   </div>
 
-  <!-- html2canvas for ticket download -->
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <!-- dom-to-image 用於下載卡片成圖片 -->
+  <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3.3.6/dist/dom-to-image-more.min.js"></script>
 
   <script>
-  /* ====== 語言包 ====== */
-  const languagePacks = {
-    zh: {
-      pageTitle: "飯店服務-免費接駁車預約",
-      brandTitle: "飯店服務",
-      navReservation: "立即預約",
-      navCheck: "我的預約",
-      navStation: "停靠站點",
-      navContact: "回首頁",
-      freeShuttle: "免費接駁",
-      bookNow: "立即預約",
-      selectDirection: "選擇方向",
-      selectDirectionRequired: "請選擇方向",
-      directionHint: "去程固定由飯店出發，回程終點為飯店",
-      restartQuery: "重新查詢",
-      selectDate: "選擇日期",
-      selectDateRequired: "請選擇日期",
-      back: "返回",
-      selectStation: "選擇站點",
-      fixedStation: "固定站點",
-      selectStationRequired: "請選擇站點",
-      selectSchedule: "選擇班次",
-      selectScheduleRequired: "請選擇班次",
-      scheduleHint: "點選班次以繼續",
-      passengerInfo: "旅客資料填寫",
-      selectIdentityRequired: "請選擇您的身分",
-      hotelGuest: "住宿貴賓",
-      diningGuest: "用餐貴賓",
-      identityError: "請選擇您的身分",
-      checkInDateRequired: "入住日期",
-      checkOutDateRequired: "退房日期",
-      diningDateRequired: "用餐日期",
-      roomNumberRequired: "房號",
-      roomError: "請填寫正確的房號",
-      roomHint: "尚未 CHECK IN 請輸入0000",
-      guestNameRequired: "貴賓姓名",
-      nameError: "請填寫姓名",
-      phoneRequired: "手機",
-      phoneError: "請輸入正確的手機號碼",
-      phoneHint: "請輸入正確的手機號碼（可填寫非台灣手機號碼）",
-      emailRequired: "信箱",
-      emailError: "請填寫正確的郵箱",
-      next: "下一步",
-      confirmInfo: "確認班次資訊",
-      direction: "方向",
-      date: "日期",
-      pickupStation: "上車站點",
-      dropoffStation: "下車站點",
-      schedule: "班次",
-      name: "姓名",
-      passengerCountRequired: "預約人數（請選擇）",
-      passengerError: "請選擇正確的人數（不可超過可預約人數或4人）",
-      submitBooking: "提交預約",
-      bookingComplete: "預約完成",
-      bookingId: "預約編號",
-      phone: "手機",
-      email: "信箱",
-      downloadTicket: "下載車票",
-      backToHome: "回到首頁",
-      queryOrder: "查詢訂單(已預約/刪除/修改)",
-      orderHint1: "※ 須於發車前一小時完成【預約／刪改】，座位有限，約滿為止。",
-      orderHint2: "※ 房客、用餐客人可享免費預約搭乘。",
-      query: "查詢",
-      clear: "清除",
-      queryHint: "*請擇一輸入",
-      loading: "資料讀取中…",
-      confirming: "資料確認中…",
-      expiredTitle: "班次已過期或目前不可預約",
-      expiredMessage: "請重新查詢可預約班次",
-      departureOption: "去程（飯店出發）",
-      returnOption: "回程（前往飯店）",
-      dataUpdateFailed: "資料更新失敗，請稍後再試",
-      noSeatsAvailable: "此班次已無座位",
-      checkInOutRequired: "請填寫入住和退房日期",
-      diningDateRequired: "請填寫用餐日期"
-    },
-    en: {
-      pageTitle: "Hotel Service - Free Shuttle Reservation",
-      brandTitle: "Hotel Service",
-      navReservation: "Book Now",
-      navCheck: "My Booking",
-      navStation: "Stations",
-      navContact: "Home",
-      freeShuttle: "Free Shuttle",
-      bookNow: "Book Now",
-      selectDirection: "Select Direction",
-      selectDirectionRequired: "Please select direction",
-      directionHint: "Departure from hotel, return to hotel",
-      restartQuery: "Restart Query",
-      selectDate: "Select Date",
-      selectDateRequired: "Please select date",
-      back: "Back",
-      selectStation: "Select Station",
-      fixedStation: "Fixed Station",
-      selectStationRequired: "Please select station",
-      selectSchedule: "Select Schedule",
-      selectScheduleRequired: "Please select schedule",
-      scheduleHint: "Click schedule to continue",
-      passengerInfo: "Passenger Information",
-      selectIdentityRequired: "Please select your identity",
-      hotelGuest: "Hotel Guest",
-      diningGuest: "Dining Guest",
-      identityError: "Please select your identity",
-      checkInDateRequired: "Check-in Date",
-      checkOutDateRequired: "Check-out Date",
-      diningDateRequired: "Dining Date",
-      roomNumberRequired: "Room Number",
-      roomError: "Please enter correct room number",
-      roomHint: "Enter 0000 if not checked in yet",
-      guestNameRequired: "Guest Name",
-      nameError: "Please enter name",
-      phoneRequired: "Phone",
-      phoneError: "Please enter correct phone number",
-      phoneHint: "Please enter correct phone number (non-Taiwan numbers accepted)",
-      emailRequired: "Email",
-      emailError: "Please enter correct email",
-      next: "Next",
-      confirmInfo: "Confirm Schedule Information",
-      direction: "Direction",
-      date: "Date",
-      pickupStation: "Pickup Station",
-      dropoffStation: "Dropoff Station",
-      schedule: "Schedule",
-      name: "Name",
-      passengerCountRequired: "Passenger Count (Please select)",
-      passengerError: "Please select correct passenger count (cannot exceed available seats or 4)",
-      submitBooking: "Submit Booking",
-      bookingComplete: "Booking Complete",
-      bookingId: "Booking ID",
-      phone: "Phone",
-      email: "Email",
-      downloadTicket: "Download Ticket",
-      backToHome: "Back to Home",
-      queryOrder: "Query Order (Booked/Cancelled/Modified)",
-      orderHint1: "※ Reservation/cancellation/modification must be completed 1 hour before departure. Limited seats available.",
-      orderHint2: "※ Hotel guests and dining guests can reserve for free.",
-      query: "Query",
-      clear: "Clear",
-      queryHint: "*Please enter one of them",
-      loading: "Loading data...",
-      confirming: "Confirming data...",
-      expiredTitle: "Schedule expired or not available",
-      expiredMessage: "Please query available schedules again",
-      departureOption: "Departure (From Hotel)",
-      returnOption: "Return (To Hotel)",
-      dataUpdateFailed: "Data update failed, please try again later",
-      noSeatsAvailable: "No seats available for this schedule",
-      checkInOutRequired: "Please fill in check-in and check-out dates",
-      diningDateRequired: "Please fill in dining date"
-    },
-    ja: {
-      pageTitle: "ホテルサービス - 無料シャトルバス予約",
-      brandTitle: "ホテルサービス",
-      navReservation: "今すぐ予約",
-      navCheck: "予約確認",
-      navStation: "停留所",
-      navContact: "ホームページへ",
-      freeShuttle: "無料シャトルバス",
-      bookNow: "今すぐ予約",
-      selectDirection: "方向を選択",
-      selectDirectionRequired: "方向を選択してください",
-      directionHint: "行きはホテル発、帰りはホテル行き",
-      restartQuery: "再検索",
-      selectDate: "日付を選択",
-      selectDateRequired: "日付を選択してください",
-      back: "戻る",
-      selectStation: "停留所を選択",
-      fixedStation: "固定停留所",
-      selectStationRequired: "停留所を選択してください",
-      selectSchedule: "便を選択",
-      selectScheduleRequired: "便を選択してください",
-      scheduleHint: "便をクリックして続行",
-      passengerInfo: "旅客情報入力",
-      selectIdentityRequired: "身分を選択してください",
-      hotelGuest: "宿泊客",
-      diningGuest: "食事客",
-      identityError: "身分を選択してください",
-      checkInDateRequired: "チェックイン日",
-      checkOutDateRequired: "チェックアウト日",
-      diningDateRequired: "食事日",
-      roomNumberRequired: "部屋番号",
-      roomError: "正しい部屋番号を入力してください",
-      roomHint: "未チェックインの場合は0000を入力",
-      guestNameRequired: "氏名",
-      nameError: "氏名を入力してください",
-      phoneRequired: "携帯電話",
-      phoneError: "正しい携帯番号を入力してください",
-      phoneHint: "正しい携帯番号を入力してください（台湾以外の番号も可）",
-      emailRequired: "メール",
-      emailError: "正しいメールアドレスを入力してください",
-      next: "次へ",
-      confirmInfo: "便情報確認",
-      direction: "方向",
-      date: "日付",
-      pickupStation: "乗車場所",
-      dropoffStation: "降車場所",
-      schedule: "便",
-      name: "氏名",
-      passengerCountRequired: "予約人数（選択してください）",
-      passengerError: "正しい人数を選択してください（利用可能人数または4人を超えることはできません）",
-      submitBooking: "予約を送信",
-      bookingComplete: "予約完了",
-      bookingId: "予約番号",
-      phone: "携帯電話",
-      email: "メール",
-      downloadTicket: "チケットをダウンロード",
-      backToHome: "ホームに戻る",
-      queryOrder: "予約照会（予約済み/削除/変更）",
-      orderHint1: "※ 出発1時間前までに【予約／削除・変更】を完了してください。座席数に限りがあります。",
-      orderHint2: "※ 宿泊客、食事客は無料で予約できます。",
-      query: "照会",
-      clear: "クリア",
-      queryHint: "*いずれかを入力してください",
-      loading: "データ読み込み中…",
-      confirming: "データ確認中…",
-      expiredTitle: "便が期限切れまたは現在予約不可",
-      expiredMessage: "予約可能な便を再検索してください",
-      departureOption: "行き（ホテル発）",
-      returnOption: "帰り（ホテル行き）",
-      dataUpdateFailed: "データ更新に失敗しました。後ほど再試行してください",
-      noSeatsAvailable: "この便には空席がありません",
-      checkInOutRequired: "チェックイン日とチェックアウト日を入力してください",
-      diningDateRequired: "食事日を入力してください"
-    },
-    ko: {
-      pageTitle: "호텔 서비스 - 무료 셔틀버스 예약",
-      brandTitle: "호텔 서비스",
-      navReservation: "즉시 예약",
-      navCheck: "내 예약",
-      navStation: "정류장",
-      navContact: "홈페이지로",
-      freeShuttle: "무료 셔틀",
-      bookNow: "즉시 예약",
-      selectDirection: "방향 선택",
-      selectDirectionRequired: "방향을 선택해주세요",
-      directionHint: "편도는 호텔 출발, 복귀는 호텔 도착",
-      restartQuery: "다시 검색",
-      selectDate: "날짜 선택",
-      selectDateRequired: "날짜를 선택해주세요",
-      back: "뒤로",
-      selectStation: "정류장 선택",
-      fixedStation: "고정 정류장",
-      selectStationRequired: "정류장을 선택해주세요",
-      selectSchedule: "배차 선택",
-      selectScheduleRequired: "배차를 선택해주세요",
-      scheduleHint: "배차를 클릭하여 계속",
-      passengerInfo: "승객 정보 작성",
-      selectIdentityRequired: "신분을 선택해주세요",
-      hotelGuest: "숙박 고객",
-      diningGuest: "식사 고객",
-      identityError: "신분을 선택해주세요",
-      checkInDateRequired: "체크인 날짜",
-      checkOutDateRequired: "체크아웃 날짜",
-      diningDateRequired: "식사 날짜",
-      roomNumberRequired: "객실 번호",
-      roomError: "올바른 객실 번호를 입력해주세요",
-      roomHint: "체크인 전에는 0000 입력",
-      guestNameRequired: "고객 성명",
-      nameError: "성명을 입력해주세요",
-      phoneRequired: "휴대폰",
-      phoneError: "올바른 휴대폰 번호를 입력해주세요",
-      phoneHint: "올바른 휴대폰 번호를 입력해주세요 (한국 번호도 가능)",
-      emailRequired: "이메일",
-      emailError: "올바른 이메일을 입력해주세요",
-      next: "다음",
-      confirmInfo: "배차 정보 확인",
-      direction: "방향",
-      date: "날짜",
-      pickupStation: "탑승 장소",
-      dropoffStation: "하차 장소",
-      schedule: "배차",
-      name: "성명",
-      passengerCountRequired: "예약 인원 (선택해주세요)",
-      passengerError: "올바른 인원을 선택해주세요 (예약 가능 인원 또는 4명을 초과할 수 없음)",
-      submitBooking: "예약 제출",
-      bookingComplete: "예약 완료",
-      bookingId: "예약 번호",
-      phone: "휴대폰",
-      email: "이메일",
-      downloadTicket: "티켓 다운로드",
-      backToHome: "홈으로 돌아가기",
-      queryOrder: "예약 조회 (예약/삭제/수정)",
-      orderHint1: "※ 출발 1시간 전까지 [예약/삭제·수정]을 완료해주세요. 좌석 한정.",
-      orderHint2: "※ 숙박 고객, 식사 고객은 무료 예약 가능합니다.",
-      query: "조회",
-      clear: "지우기",
-      queryHint: "*하나만 입력해주세요",
-      loading: "데이터 로딩 중…",
-      confirming: "데이터 확인 중…",
-      expiredTitle: "배차 기간 만료 또는 현재 예약 불가",
-      expiredMessage: "예약 가능한 배차를 다시 검색해주세요",
-      departureOption: "편도 (호텔 출발)",
-      returnOption: "복귀 (호텔 도착)",
-      dataUpdateFailed: "데이터 업데이트 실패, 나중에 다시 시도해주세요",
-      noSeatsAvailable: "이 배차에는 빈 좌석이 없습니다",
-      checkInOutRequired: "체크인 및 체크아웃 날짜를 입력해주세요",
-      diningDateRequired: "식사 날짜를 입력해주세요"
-    }
-  };
+    /* ====== 常數（API） ====== */
+    const API_URL = "https://booking-api-995728097341.asia-east1.run.app/api/sheet"; // 讀取班次（不改）
+    const OPS_URL = "http://127.0.0.1:8080/api/ops"; // 新的寫入/查詢/修改/刪除 API
+    const QR_ORIGIN = "http://127.0.0.1:8080"; // 供拼接 qr_url 相對位址時使用
 
-/* ====== 設定（依部署調整） ====== */
-// ✅ 讀班次 → booking-api 服務的 GET /api/sheet
-const API_URL   = "https://booking-api-995728097341.asia-east1.run.app/api/sheet";
+    /* ====== 狀態 ====== */
+    let allRows = [];
+    let selectedDirection = "";
+    let selectedDateRaw = "";
+    let selectedStationRaw = "";
+    let selectedScheduleTime = "";
+    let selectedAvailableSeats = 0;
+    let lastDataUpdate = 0;
+    const UPDATE_INTERVAL = 30000;
 
-// ✅ 建單/查詢/改單/刪單 → booking-manager 服務的 POST 端點
-const BOOK_URL  = "https://booking-manager-995728097341.asia-east1.run.app/api/book";
-const QUERY_URL = "https://booking-manager-995728097341.asia-east1.run.app/api/query-orders";
-const UPDATE_URL= "https://booking-manager-995728097341.asia-east1.run.app/api/modify";
-const DELETE_URL= "https://booking-manager-995728097341.asia-east1.run.app/api/delete";
+    /* ====== 工具 ====== */
+    function showPage(id){
+      document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
 
-  /* ====== 狀態 ====== */
-  let allRows = [];
-  let selectedDirection = "";
-  let selectedDateRaw = "";
-  let selectedStationRaw = "";
-  let selectedScheduleTime = "";
-  let selectedAvailableSeats = 0;
-  let lastDataUpdate = 0;
-  const UPDATE_INTERVAL = 30000;
+      document.querySelectorAll(".nav-links button").forEach(b=>b.classList.remove("active"));
+      const navId = id==='reservation'?'nav-reservation':id==='check'?'nav-check':id==='station'?'nav-station':'nav-contact';
+      const navEl = document.getElementById(navId); if(navEl) navEl.classList.add("active");
 
-  /* ====== 語言系統 ====== */
-  let currentLanguage = 'zh';
-  let currentLanguagePack = languagePacks.zh;
+      document.querySelectorAll(".mobile-tabbar button").forEach(b=>b.classList.remove("active"));
+      const mId = id==='reservation'?'m-reservation':id==='check'?'m-check':id==='station'?'m-station':'m-contact';
+      const mEl = document.getElementById(mId); if(mEl) mEl.classList.add("active");
 
-  function onLanguageChange(lang) {
-    currentLanguage = lang;
-    currentLanguagePack = languagePacks[lang] || languagePacks.zh;
-    updatePageLanguage();
-  }
+      if(id==='contact'){ window.open('https://www.fortehotelxizhi.com.tw/','_blank'); }
+      window.scrollTo({top:0,behavior:'smooth'});
 
-  function updatePageLanguage() {
-    document.querySelectorAll('[data-lang]').forEach(el => {
-      const key = el.getAttribute('data-lang');
-      if (currentLanguagePack[key]) {
-        if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
-          if (el.placeholder !== undefined) {
-            el.placeholder = currentLanguagePack[key];
-          } else {
-            el.textContent = currentLanguagePack[key];
-          }
-        } else {
-          el.textContent = currentLanguagePack[key];
-        }
+      if(id==='reservation'){
+        document.getElementById('homeHero').style.display = '';
+        ['step1','step2','step3','step4','step5','step6','successCard'].forEach(s=>{
+          const el = document.getElementById(s); if(el) el.style.display='none';
+        });
       }
-    });
-    if (currentLanguagePack.pageTitle) document.title = currentLanguagePack.pageTitle;
-    if (document.getElementById('directionList') && document.getElementById('directionList').innerHTML !== '') {
-      buildStep1();
     }
-  }
+    function showLoading(s=true){document.getElementById('loading').classList.toggle('show',s)}
+    function showVerifyLoading(s=true){document.getElementById('loadingConfirm').classList.toggle('show',s)}
+    function showExpiredOverlay(s=true){document.getElementById('expiredOverlay').classList.toggle('show',s)}
+    function overlayRestart(){ showExpiredOverlay(false); restart(); }
 
-  /* ====== 工具函數 ====== */
-  function showPage(id){
-    document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
-    document.getElementById(id).classList.add("active");
-    document.querySelectorAll(".nav-links button").forEach(b=>b.classList.remove("active"));
-    const navId = id==='reservation'?'nav-reservation':id==='check'?'nav-check':id==='station'?'nav-station':'nav-contact';
-    document.getElementById(navId).classList.add("active");
-    document.querySelectorAll(".mobile-tabbar button").forEach(b=>b.classList.remove("active"));
-    const mId = id==='reservation'?'m-reservation':id==='check'?'m-check':id==='station'?'m-station':'m-contact';
-    document.getElementById(mId).classList.add("active");
-    if(id==='contact'){ window.open('https://www.fortehotelxizhi.com.tw/','_blank'); }
-    window.scrollTo({top:0,behavior:'smooth'});
-    if(id==='reservation'){
-      document.getElementById('homeHero').style.display = '';
-      ['step1','step2','step3','step4','step5','step6','successCard'].forEach(s=>{
-        const el = document.getElementById(s);
-        if(el) el.style.display='none';
+    // 日期/時間格式
+    function fmtDateLabel(v){
+      if(!v) return "";
+      const s = String(v).trim();
+      if(/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0,10);
+      if(/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(s)){
+        const [y,m,d]=s.split('/');
+        return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      }
+      if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)){
+        const [m,d,y]=s.split('/');
+        return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      }
+      if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      return s;
+    }
+    function fmtTimeLabel(v){
+      if(v==null) return "";
+      const s = String(v).trim().replace('：',':');
+      if(/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(11,16);
+      if(/^\d{1,2}:\d{1,2}/.test(s)){
+        const [h,m]=s.split(':');
+        return `${String(h).padStart(2,'0')}:${String(m).slice(0,2).padStart(2,'0')}`;
+      }
+      return s;
+    }
+    function onlyDigits(t){return (t||'').replace(/\D/g,'')}
+
+    // Shake 與錯誤提示
+    function shake(el){ if(!el) return; el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'),500); }
+
+    // 姓名驗證：限中英文
+    function validateName(input){
+      const value = input.value || "";
+      const regex = /^[\u4e00-\u9fa5a-zA-Z\s]*$/;
+      const nameErr = document.getElementById('nameErr');
+      if(!regex.test(value)){
+        input.value = value.replace(/[^\u4e00-\u9fa5a-zA-Z\s]/g,'');
+        if(nameErr){ nameErr.textContent = '限輸入中文或英文'; nameErr.style.display='block'; }
+        shake(input); input.style.borderColor='#b00020';
+        setTimeout(()=>{ input.style.borderColor='#ddd'; if(nameErr) nameErr.style.display='none'; }, 2000);
+      }else{
+        if(nameErr) nameErr.style.display='none';
+      }
+    }
+
+    function todayISO(){
+      const t = new Date();
+      const y = t.getFullYear();
+      const m = String(t.getMonth()+1).padStart(2,'0');
+      const d = String(t.getDate()).padStart(2,'0');
+      return `${y}-${m}-${d}`;
+    }
+
+    /* ====== 資料處理 ====== */
+    async function refreshDataIfNeeded(force=false){
+      const now = Date.now();
+      if(!force && (now-lastDataUpdate)<=UPDATE_INTERVAL) return false;
+      showLoading(true);
+      try{
+        const res = await fetch(API_URL);
+        const raw = await res.json();
+        const headers = raw[0];
+        const rows = raw.slice(1);
+        allRows = rows.map(r=>{
+          const o={}; headers.forEach((h,i)=>o[h]=r[i]); return o;
+        }).filter(r=>r["去程 / 回程"]&&r["日期"]&&r["班次"]&&r["站點"]);
+        lastDataUpdate = now;
+        return true;
+      }catch(e){
+        alert("資料更新失敗，請稍後再試");
+        return false;
+      }finally{
+        showLoading(false);
+      }
+    }
+
+    /* ====== 預約流程 ====== */
+    async function startBooking(){
+      document.getElementById('homeHero').style.display='none';
+      await refreshDataIfNeeded(true);
+      buildStep1();
+      document.getElementById('step1').style.display='';
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+    function goStep(n){
+      ['step1','step2','step3','step4','step5','step6'].forEach(id=>{
+        const el = document.getElementById(id); if(el) el.style.display='none';
+      });
+      const target = document.getElementById('step'+n);
+      if(target) target.style.display='';
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+    function restart(){
+      selectedDirection="";selectedDateRaw="";selectedStationRaw="";selectedScheduleTime="";selectedAvailableSeats=0;
+      document.getElementById('homeHero').style.display='';
+      ['directionList','dateList','stationList','scheduleList'].forEach(id=>{
+        const el=document.getElementById(id); if(el) el.innerHTML='';
+      });
+      // 隱藏所有步驟和成功卡
+      ['step1','step2','step3','step4','step5','step6','successCard'].forEach(id=>{
+        const el=document.getElementById(id); if(el) el.style.display='none';
+      });
+      // 回首頁頁籤
+      showPage('reservation');
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+
+    function buildStep1(){
+      const list = document.getElementById('directionList');
+      list.innerHTML='';
+      const items=[
+        {zh:'去程', label:'去程（飯店出發）'},
+        {zh:'回程', label:'回程（前往飯店）'},
+      ];
+      items.forEach(opt=>{
+        const btn=document.createElement('button');
+        btn.type='button'; btn.className='opt-btn'; btn.textContent=opt.label;
+        btn.onclick=()=>{ selectedDirection = opt.zh; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); toStep2(); };
+        list.appendChild(btn);
       });
     }
-  }
-  function showLoading(s=true){document.getElementById('loading').classList.toggle('show',s)}
-  function showVerifyLoading(s=true){document.getElementById('loadingConfirm').classList.toggle('show',s)}
-  function showExpiredOverlay(s=true){
-    document.getElementById('expiredOverlay').classList.toggle('show',s);
-    const btn = document.getElementById('btnStep4Restart');
-    if(btn) btn.textContent = currentLanguagePack.restartQuery || '重新查詢';
-  }
-  function overlayRestart(){ showExpiredOverlay(false); restart(); }
 
-  // 輸入震動提示
-  function shake(el){ el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'), 500); }
-  function showError(errEl, msg){ if(!errEl) return; errEl.textContent = msg; errEl.style.display='block'; setTimeout(()=>{errEl.style.display='none'}, 2000); }
-
-  function fmtDateLabel(v){
-    if(!v) return "";
-    const s = String(v).trim();
-    if(/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0,10);
-    if(/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(s)){
-      const [y,m,d]=s.split('/');
-      return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    function toStep2(){
+      if(!selectedDirection){ alert('請選擇方向'); return; }
+      const dateSet = new Set(
+        allRows.filter(r=>String(r["去程 / 回程"]).trim()===selectedDirection)
+              .map(r=>fmtDateLabel(r["日期"]))
+      );
+      const sorted=[...dateSet].sort((a,b)=>new Date(a)-new Date(b));
+      const list = document.getElementById('dateList');
+      list.innerHTML='';
+      sorted.forEach(dateStr=>{
+        const btn=document.createElement('button');
+        btn.type='button'; btn.className='opt-btn'; btn.textContent=dateStr;
+        btn.onclick=()=>{ selectedDateRaw=dateStr; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); toStep3(); };
+        list.appendChild(btn);
+      });
+      goStep(2);
     }
-    if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)){
-      const [m,d,y]=s.split('/');
-      return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+    function toStep3(){
+      if(!selectedDateRaw){ alert('請選擇日期'); return; }
+      document.getElementById('fixedStation').value = '福泰大飯店 Forte Hotel';
+      const stations = new Set(
+        allRows.filter(r=>String(r["去程 / 回程"]).trim()===selectedDirection && fmtDateLabel(r["日期"])===selectedDateRaw)
+               .map(r=>String(r["站點"]).trim())
+      );
+      const list = document.getElementById('stationList');
+      list.innerHTML='';
+      [...stations].forEach(st=>{
+        const btn=document.createElement('button');
+        btn.type='button'; btn.className='opt-btn'; btn.textContent=st;
+        btn.onclick=()=>{ selectedStationRaw=st; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); toStep4(); };
+        list.appendChild(btn);
+      });
+      goStep(3);
     }
-    return s;
-  }
-  function fmtTimeLabel(v){
-    if(v==null) return "";
-    const s = String(v).trim().replace('：',':');
-    if(/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(11,16);
-    if(/^\d{1,2}:\d{1,2}/.test(s)){
-      let [h,m]=s.split(':');
-      return `${String(h).padStart(2,'0')}:${String(m).slice(0,2).padStart(2,'0')}`;
-    }
-    return s;
-  }
-  function onlyDigits(t){return (t||'').replace(/\D/g,'')}
 
-  function showSystemAlert(key){
-    const msg = currentLanguagePack[key] || key;
-    alert(msg);
-  }
-
-  /* ====== 資料處理 ====== */
-  async function refreshDataIfNeeded(force=false){
-    const now = Date.now();
-    if(!force && (now-lastDataUpdate)<=UPDATE_INTERVAL) return false;
-    showLoading(true);
-    try{
-      const res = await fetch(API_URL);
-      const raw = await res.json();
-      const headers = raw[0];
-      const rows = raw.slice(1);
-      allRows = rows.map(r=>{
-        const o={}; headers.forEach((h,i)=>o[h]=r[i]); return o;
-      }).filter(r=>r["去程 / 回程"]&&r["日期"]&&r["班次"]&&r["站點"]);
-      lastDataUpdate = now;
-      return true;
-    }catch(e){
-      showSystemAlert('dataUpdateFailed'); return false;
-    }finally{ showLoading(false); }
-  }
-
-  /* ====== 預約流程 ====== */
-  async function startBooking(){
-    document.getElementById('homeHero').style.display='none';
-    await refreshDataIfNeeded(true);
-    buildStep1();
-    document.getElementById('step1').style.display='';
-    window.scrollTo({top:0,behavior:'smooth'});
-  }
-  function goStep(n){
-    ['step1','step2','step3','step4','step5','step6'].forEach(id=>{
-      const el = document.getElementById(id); if(el) el.style.display='none';
-    });
-    const target = document.getElementById('step'+n);
-    if(target) target.style.display='';
-    window.scrollTo({top:0,behavior:'smooth'});
-  }
-  function restart(){
-    selectedDirection="";selectedDateRaw="";selectedStationRaw="";selectedScheduleTime="";selectedAvailableSeats=0;
-    document.getElementById('homeHero').style.display='';
-    ['directionList','dateList','stationList','scheduleList'].forEach(id=>{
-      const el=document.getElementById(id); if(el) el.innerHTML='';
-    });
-    goStep(0);
-  }
-
-  function buildStep1(){
-    const list = document.getElementById('directionList'); list.innerHTML='';
-    const opts = [
-      {key:'go', value: currentLanguagePack.departureOption || '去程（飯店出發）', zh:'去程'},
-      {key:'back', value: currentLanguagePack.returnOption || '回程（前往飯店）', zh:'回程'},
-    ];
-    opts.forEach(opt=>{
-      const btn=document.createElement('button');
-      btn.type='button'; btn.className='opt-btn'; btn.textContent=opt.value;
-      btn.onclick=()=>{selectedDirection = opt.zh; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); toStep2();};
-      list.appendChild(btn);
-    });
-  }
-  function toStep2(){
-    if(!selectedDirection){showSystemAlert('selectDirectionRequired');return;}
-    const dateSet = new Set(
-      allRows.filter(r=>String(r["去程 / 回程"]).trim()===selectedDirection).map(r=>fmtDateLabel(r["日期"]))
-    );
-    const sorted=[...dateSet].sort((a,b)=>new Date(a)-new Date(b));
-    const list = document.getElementById('dateList'); list.innerHTML='';
-    sorted.forEach(dateStr=>{
-      const btn=document.createElement('button');
-      btn.type='button'; btn.className='opt-btn'; btn.textContent=dateStr;
-      btn.onclick=()=>{selectedDateRaw=dateStr; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); toStep3();};
-      list.appendChild(btn);
-    });
-    goStep(2);
-  }
-  function toStep3(){
-    if(!selectedDateRaw){showSystemAlert('selectDateRequired');return;}
-    document.getElementById('fixedStation').value = '福泰大飯店 Forte Hotel';
-    const stations = new Set(
-      allRows.filter(r=>String(r["去程 / 回程"]).trim()===selectedDirection && fmtDateLabel(r["日期"])===selectedDateRaw).map(r=>String(r["站點"]).trim())
-    );
-    const list = document.getElementById('stationList'); list.innerHTML='';
-    [...stations].forEach(st=>{
-      const btn=document.createElement('button');
-      btn.type='button'; btn.className='opt-btn'; btn.textContent=st;
-      btn.onclick=()=>{selectedStationRaw=st; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); toStep4();};
-      list.appendChild(btn);
-    });
-    goStep(3);
-  }
-  function toStep4(){
-    if(!selectedStationRaw){showSystemAlert('selectStationRequired');return;}
-    const list=document.getElementById('scheduleList'); list.innerHTML='';
-    const entries = allRows.filter(r=>
-      String(r["去程 / 回程"]).trim()===selectedDirection &&
-      fmtDateLabel(r["日期"])===selectedDateRaw &&
-      String(r["站點"]).trim()===selectedStationRaw
-    ).sort((a,b)=>fmtTimeLabel(a["班次"]).localeCompare(fmtTimeLabel(b["班次"])));
-    if(entries.length===0){ showExpiredOverlay(true); return; }
-    entries.forEach(r=>{
-      const time=fmtTimeLabel(r["班次"]);
-      const availText=String(r["可預約人數"]||r["可約人數 / Available"]||'').trim();
-      const avail=Number(onlyDigits(availText))||0;
-      const btn=document.createElement('button');
-      btn.type='button'; btn.className='opt-btn';
-      if(avail<=0){
-        btn.classList.add('disabled');
-        btn.innerHTML = `<span style="color:#999;font-weight:700">${time}</span> <span style="color:#999;font-size:13px">(${currentLanguage === 'zh' ? '已額滿' : 'Full'})</span>`;
-      }else{
-        btn.innerHTML = `<span style="color:var(--primary);font-weight:700">${time}</span> <span style="color:#777;font-size:13px">(${currentLanguage === 'zh' ? '可預約：' : 'Available: '}${avail} ${currentLanguage === 'zh' ? '人' : 'seats'})</span>`;
-        btn.onclick=()=>{
-          selectedScheduleTime=time; selectedAvailableSeats=avail;
-          list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active'));
-          btn.classList.add('active'); toStep5();
-        };
-      }
-      list.appendChild(btn);
-    });
-    goStep(4);
-  }
-
-  function onIdentityChange(){
-    const v=document.getElementById('identitySelect').value;
-    const showHotel = v==='hotel';
-    document.getElementById('hotelDates').style.display = showHotel?'block':'none';
-    document.getElementById('hotelDates2').style.display = showHotel?'block':'none';
-    document.getElementById('roomNumberDiv').style.display = showHotel?'block':'none';
-    document.getElementById('diningDateDiv').style.display = !showHotel?'block':'none';
-    // 預設今天
-    const today = new Date(); const t = today.toISOString().slice(0,10);
-    if(showHotel){
-      document.getElementById('checkInDate').value = t;
-      document.getElementById('checkOutDate').value = t;
-    }else{
-      document.getElementById('diningDate').value = t;
-    }
-  }
-
-  const phoneRegex=/^\+?\d{1,3}?\d{7,}$/;
-  const emailRegex=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const roomRegex=/^(0000|[5-9]\d{2}|10\d{2}|11\d{2}|12\d{2}|13\d{2})$/;
-
-  function validateStep5(){
-    const id=document.getElementById('identitySelect').value;
-    const name=(document.getElementById('guestName').value||'').trim();
-    const phone=(document.getElementById('guestPhone').value||'').trim();
-    const email=(document.getElementById('guestEmail').value||'').trim();
-    if(!id){const e=document.getElementById('identityErr'); showError(e,currentLanguagePack.identityError); shake(document.getElementById('identitySelect')); return false;}
-    if(!name){const e=document.getElementById('nameErr'); showError(e,currentLanguagePack.nameError); shake(document.getElementById('guestName')); return false;}
-    if(!phoneRegex.test(phone)){const e=document.getElementById('phoneErr'); showError(e,currentLanguagePack.phoneError); shake(document.getElementById('guestPhone')); return false;}
-    if(!emailRegex.test(email)){const e=document.getElementById('emailErr'); showError(e,currentLanguagePack.emailError); shake(document.getElementById('guestEmail')); return false;}
-    if(id==='hotel'){
-      const cin=document.getElementById('checkInDate').value;
-      const cout=document.getElementById('checkOutDate').value;
-      if(!cin||!cout){showSystemAlert('checkInOutRequired'); return false;}
-      const room=(document.getElementById('roomNumber').value||'').trim();
-      if(!roomRegex.test(room)){const e=document.getElementById('roomErr'); showError(e,currentLanguagePack.roomError); shake(document.getElementById('roomNumber')); return false;}
-    }else{
-      const din=document.getElementById('diningDate').value;
-      if(!din){showSystemAlert('diningDateRequired'); return false;}
-    }
-    return true;
-  }
-
-  function toStep5(){
-    if(!selectedScheduleTime){showSystemAlert('selectScheduleRequired');return;}
-    onIdentityChange();
-    // 名稱輸入僅允許中英文 + 震動
-    const nameInput = document.getElementById('guestName');
-    nameInput.oninput = (e)=>{
-      const regex = /^[\u4e00-\u9fa5a-zA-Z\s]*$/;
-      const v = e.target.value;
-      if(!regex.test(v)){
-        e.target.value = v.replace(/[^\u4e00-\u9fa5a-zA-Z\s]/g, '');
-        showError(document.getElementById('nameErr'), currentLanguage==='zh'?'限輸入中文或英文':(currentLanguage==='en'?'Chinese or English only':(currentLanguage==='ja'?'中国語または英語のみ入力可能':'중국어 또는 영어만 입력 가능')));
-        shake(e.target);
-      }
-    };
-    goStep(5);
-  }
-
-  async function toStep6(){
-    if(!validateStep5())return;
-    showVerifyLoading(true);
-    try{
-      const res = await fetch(API_URL);
-      const raw = await res.json();
-      const headers=raw[0];
-      const rows=raw.slice(1);
-      allRows = rows.map(r=>{const o={};headers.forEach((h,i)=>o[h]=r[i]);return o;})
-        .filter(r=>r["去程 / 回程"]&&r["日期"]&&r["班次"]&&r["站點"]);
-      const found = allRows.find(r=>
+    function toStep4(){
+      if(!selectedStationRaw){ alert('請選擇站點'); return; }
+      const list=document.getElementById('scheduleList');
+      list.innerHTML='';
+      const entries = allRows.filter(r=>
         String(r["去程 / 回程"]).trim()===selectedDirection &&
         fmtDateLabel(r["日期"])===selectedDateRaw &&
-        String(r["站點"]).trim()===selectedStationRaw &&
-        fmtTimeLabel(r["班次"])===selectedScheduleTime
-      );
-      if(!found){showVerifyLoading(false);showExpiredOverlay(true);return;}
-      const availableText=found["可預約人數"]||found["可約人數 / Available"]||"0";
-      selectedAvailableSeats = Number(onlyDigits(availableText))||0;
-      if(selectedAvailableSeats<=0){showVerifyLoading(false);showSystemAlert('noSeatsAvailable');showExpiredOverlay(true);return;}
+        String(r["站點"]).trim()===selectedStationRaw
+      ).sort((a,b)=>fmtTimeLabel(a["班次"]).localeCompare(fmtTimeLabel(b["班次"])));
+      if(entries.length===0){ showExpiredOverlay(true); return; }
 
-      document.getElementById('cf_direction').value = selectedDirection;
-      document.getElementById('cf_date').value = selectedDateRaw;
-      const pick = selectedDirection==='回程'?selectedStationRaw:'福泰大飯店 Forte Hotel';
-      const drop = selectedDirection==='回程'?'福泰大飯店 Forte Hotel':selectedStationRaw;
-      document.getElementById('cf_pick').value = pick;
-      document.getElementById('cf_drop').value = drop;
-      document.getElementById('cf_time').value = selectedScheduleTime;
-      document.getElementById('cf_name').value = (document.getElementById('guestName').value||'').trim();
-
-      const sel=document.getElementById('passengers'); sel.innerHTML='';
-      const maxPassengers = Math.min(4, Math.max(0, selectedAvailableSeats));
-      if(maxPassengers<=0){
-        const opt=document.createElement('option');opt.value='';opt.textContent='0';sel.appendChild(opt);sel.disabled=true;
-      }else{
-        sel.disabled=false;
-        for(let i=1;i<=maxPassengers;i++){const opt=document.createElement('option');opt.value=String(i);opt.textContent=String(i);sel.appendChild(opt);}
-        sel.value='1';
-      }
-      document.getElementById('passengersHint').textContent = currentLanguage === 'zh'
-        ? `此班次可預約：${selectedAvailableSeats} 人；單筆最多 4 人`
-        : `Available seats: ${selectedAvailableSeats}; Max 4 per booking`;
-      goStep(6);
-    }catch(e){
-      console.error(e); showExpiredOverlay(true);
-    }finally{showVerifyLoading(false);}
-  }
-
-  async function submitBooking(){
-    const pSel=document.getElementById('passengers');
-    const p=Number(pSel.value||0);
-    if(!p || p<1 || p>4 || p>selectedAvailableSeats){document.getElementById('passengersErr').style.display='block';shake(pSel);return;}
-    document.getElementById('passengersErr').style.display='none';
-    const identity=document.getElementById('identitySelect').value;
-    const payload={
-      direction:selectedDirection,
-      date:selectedDateRaw, station:selectedStationRaw, time:selectedScheduleTime,
-      identity,
-      checkIn: identity==='hotel'? (document.getElementById('checkInDate').value||null):null,
-      checkOut: identity==='hotel'? (document.getElementById('checkOutDate').value||null):null,
-      diningDate: identity==='dining'? (document.getElementById('diningDate').value||null):null,
-      roomNumber: identity==='hotel'? (document.getElementById('roomNumber').value||null):null,
-      name:(document.getElementById('guestName').value||'').trim(),
-      phone:(document.getElementById('guestPhone').value||'').trim(),
-      email:(document.getElementById('guestEmail').value||'').trim(),
-      passengers:p,
-      dropLocation:selectedDirection==='回程'?'福泰大飯店 Forte Hotel':selectedStationRaw,
-      pickLocation:selectedDirection==='回程'?selectedStationRaw:'福泰大飯店 Forte Hotel',
-    };
-    showVerifyLoading(true);
-    try{
-      const res = await fetch(BOOK_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      const result = await res.json();
-      if(result.status==='success'){
-        document.getElementById('qrImg').src = result.qr_url || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><rect width="160" height="160" fill="%23eee"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="14" fill="%23999">QR</text></svg>';
-        document.getElementById('succBookingId').value = result.booking_id || '';
-        document.getElementById('succSchedule').value = `${selectedDateRaw} ${selectedScheduleTime}`;
-        document.getElementById('succDirection').value = selectedDirection;
-        document.getElementById('succPick').value = payload.pickLocation;
-        document.getElementById('succDrop').value = payload.dropLocation;
-        document.getElementById('succName').value = payload.name;
-        document.getElementById('succPhone').value = payload.phone;
-        document.getElementById('succEmail').value = payload.email;
-        ['step6'].forEach(id=>document.getElementById(id).style.display='none');
-        document.getElementById('successCard').style.display='';
-        window.scrollTo({top:0,behavior:'smooth'});
-      }else{
-        alert(result.message || (currentLanguage === 'zh' ? '預約失敗，請稍後再試' : 'Booking failed, please try again later'));
-      }
-    }catch(e){
-      alert((currentLanguage === 'zh' ? '提交失敗：' : 'Submission failed: ') + e.message);
-    }finally{ showVerifyLoading(false); }
-  }
-
-  function backToHome(){
-    // 完整刷新，確保票券消失並重置狀態
-    window.location.href = window.location.pathname;
-  }
-
-  async function downloadTicketImage(){
-    const card = document.getElementById('successCard');
-    // 只擷取卡片區域
-    const canvas = await html2canvas(card, {useCORS:true, backgroundColor:'#ffffff', scale:2});
-    const dataURL = canvas.toDataURL('image/png');
-    const a = document.createElement('a');
-    const id = (document.getElementById('succBookingId').value||'ticket');
-    a.href = dataURL; a.download = `ticket_${id}.png`; a.click();
-  }
-
-  /* ====== 我的預約：查詢/修改/刪除 ====== */
-  function resetQuery(){
-    document.getElementById('qBookId').value='';
-    document.getElementById('qPhone').value='';
-    document.getElementById('qEmail').value='';
-    document.getElementById('queryResult').innerHTML='';
-  }
-  function withinOneMonth(dateStr){
-    const d = new Date((dateStr||'').replaceAll('/','-')+'T00:00:00');
-    const now = new Date(); const pastLimit = new Date(now); pastLimit.setMonth(now.getMonth()-1);
-    return d >= pastLimit;
-  }
-  function isExpired(dateStr, timeStr){
-    const d = new Date(dateStr+'T'+(timeStr||'00:00')+':00'); return d.getTime() < Date.now();
-  }
-
-  async function queryOrders(){
-    const id=(document.getElementById('qBookId').value||'').trim();
-    const phone=(document.getElementById('qPhone').value||'').trim();
-    const email=(document.getElementById('qEmail').value||'').trim();
-    const queryHint = document.getElementById('queryHint');
-    if(!id && !phone && !email){ shake(queryHint); return; }
-    showLoading(true);
-    try{
-      const res = await fetch(QUERY_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({booking_id:id, phone, email})});
-      const data = await res.json();
-      const wrap = document.getElementById('queryResult'); wrap.innerHTML='';
-      (Array.isArray(data)?data:[]).forEach(row=>{
-        const date = String(row["日期"]||'');
-        const time = String(row["車次"]||'').replace(/^'/,'');
-        const status = String(row["預約狀態"]||'已預約');
-        const name = String(row["姓名"]||'');
-        const phone = String(row["手機"]||'');
-        const email = String(row["信箱"]||'');
-        const rb = String(row["往返"]||'');
-        const pick = String(row["上車地點"]||'');
-        const drop = String(row["下車地點"]||'');
-        const audit = String(row["櫃台審核"]||'');
-        const note = String(row["備註"]||'');
-        const qr = String(row["QR編碼"]||'');
-        const bookingId = String(row["預約編號"]||'');
-        const expired = false; // 僅顯示最近一個月，不強制灰化
-
-        // 卡片
-        const card = document.createElement('div'); card.className='card'; if(expired) card.style.opacity='.6';
-
-        const header = document.createElement('div'); header.style.display='flex'; header.style.justifyContent='space-between'; header.style.alignItems='center';
-        header.innerHTML = `<div style="font-weight:800">${date} ${time}（${rb||'單程'}）</div> <div style="font-size:14px">${status}</div>`;
-        card.appendChild(header);
-
-        const line = document.createElement('div'); line.style.margin='10px 0'; line.style.borderTop='1px dashed #e6e6e6'; card.appendChild(line);
-
-        const grid = document.createElement('div'); grid.className='grid'; grid.style.gridTemplateColumns='1fr 1fr';
-        grid.innerHTML = `
-          <div><div class="label">${currentLanguage === 'zh' ? '預約編號' : 'Booking ID'}</div><div>${bookingId}</div></div>
-          <div><div class="label">${currentLanguage === 'zh' ? '方向' : 'Direction'}</div><div>${rb||'-'}</div></div>
-          <div><div class="label">${currentLanguage === 'zh' ? '上車' : 'Pickup'}</div><div>${pick||'-'}</div></div>
-          <div><div class="label">${currentLanguage === 'zh' ? '下車' : 'Dropoff'}</div><div>${drop||'-'}</div></div>
-          <div><div class="label">${currentLanguage === 'zh' ? '姓名' : 'Name'}</div><div>${name||'-'}</div></div>
-          <div><div class="label">${currentLanguage === 'zh' ? '人數' : 'Passengers'}</div><div>${row["預約人數"]||'-'}</div></div>
-          <div><div class="label">${currentLanguage === 'zh' ? '電話' : 'Phone'}</div><div>${phone||'-'}</div></div>
-          <div><div class="label">${currentLanguage === 'zh' ? '信箱' : 'Email'}</div><div>${email||'-'}</div></div>
-        `;
-        card.appendChild(grid);
-
-        // QR 圖示（簡易產生）
-        if(qr){
-          const small = document.createElement('div'); small.style.marginTop='10px'; small.style.fontSize='12px'; small.textContent='QR: '+qr;
-          card.appendChild(small);
-        }
-
-        // 審核 N 就灰不可改
-        if(audit==='N'){
-          const warn=document.createElement('div'); warn.style.marginTop='10px'; warn.style.color='#b00020'; warn.style.fontWeight='700';
-          warn.textContent = (currentLanguage === 'zh' ? '已拒絕' : 'Rejected') + (note?`：${note}`:'');
-          card.appendChild(warn);
-        }else{
-          // 修改／刪除
-          const actions = document.createElement('div'); actions.className='actions'; actions.style.justifyContent='flex-end';
-          const btnEdit = document.createElement('button'); btnEdit.className='button btn-ghost'; btnEdit.textContent='修改';
-          btnEdit.onclick=()=>openEdit({bookingId, rb, pick, drop, date, time, passengers: Number(row["預約人數"]||1)});
-          const btnDel = document.createElement('button'); btnDel.className='button btn-ghost'; btnDel.textContent='刪除';
-          btnDel.onclick=()=>deleteOrder(bookingId);
-          actions.appendChild(btnEdit); actions.appendChild(btnDel);
-          card.appendChild(actions);
-        }
-
-        document.getElementById('queryResult').appendChild(card);
-      });
-      if(!document.getElementById('queryResult').children.length){
-        document.getElementById('queryResult').innerHTML = `<div class="card"><div style="text-align:center;color:#666">${currentLanguage === 'zh' ? '查無符合條件的紀錄（僅顯示近一個月）' : 'No matching records found (only last month)'}</div></div>`;
-      }
-    }catch(e){
-      alert((currentLanguage === 'zh' ? '查詢失敗：' : 'Query failed: ') + e.message);
-    }finally{ showLoading(false); }
-  }
-
-  // 編輯流程（簡化的選單版）
-  let editingBookingId = null;
-  async function openEdit(info){
-    editingBookingId = info.bookingId;
-    await refreshDataIfNeeded(true);
-
-    const dirSel = document.getElementById('editDirection');
-    const dateSel = document.getElementById('editDate');
-    const stSel = document.getElementById('editStation');
-    const timeSel = document.getElementById('editTime');
-    const paxSel = document.getElementById('editPassengers');
-
-    dirSel.value = info.rb || '去程';
-    fillEditDates();
-    function fillEditDates(){
-      const set = new Set(allRows.filter(r=>String(r["去程 / 回程"]).trim()===dirSel.value).map(r=>fmtDateLabel(r["日期"])));
-      dateSel.innerHTML=''; [...set].sort((a,b)=>new Date(a)-new Date(b)).forEach(d=>{
-        const o=document.createElement('option'); o.value=d; o.textContent=d; dateSel.appendChild(o);
-      });
-      dateSel.value = info.date || dateSel.value;
-      fillEditStations();
-    }
-    function fillEditStations(){
-      const set = new Set(allRows.filter(r=>String(r["去程 / 回程"]).trim()===dirSel.value && fmtDateLabel(r["日期"])===dateSel.value).map(r=>String(r["站點"]).trim()));
-      stSel.innerHTML=''; [...set].forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;stSel.appendChild(o)});
-      stSel.value = info.rb==='回程' ? info.pick : info.drop; // 回程選單站點是上車點
-      fillEditTimes();
-    }
-    function fillEditTimes(){
-      const entries = allRows.filter(r=> String(r["去程 / 回程"]).trim()===dirSel.value && fmtDateLabel(r["日期"])===dateSel.value && String(r["站點"]).trim()===stSel.value)
-        .sort((a,b)=>fmtTimeLabel(a["班次"]).localeCompare(fmtTimeLabel(b["班次"])));
-      timeSel.innerHTML='';
-      let maxAvail=0;
       entries.forEach(r=>{
-        const t = fmtTimeLabel(r["班次"]);
+        const time=fmtTimeLabel(r["班次"]);
         const availText=String(r["可預約人數"]||r["可約人數 / Available"]||'').trim();
         const avail=Number(onlyDigits(availText))||0;
-        const o=document.createElement('option'); o.value=t; o.textContent=`${t}（${avail}）`; o.dataset.avail = String(avail);
-        timeSel.appendChild(o);
-        maxAvail=Math.max(maxAvail,avail);
+        const btn=document.createElement('button');
+        btn.type='button'; btn.className='opt-btn';
+        if(avail<=0){
+          btn.classList.add('disabled');
+          btn.innerHTML = `<span style="color:#999;font-weight:700">${time}</span> <span style="color:#999;font-size:13px">(已額滿)</span>`;
+        }else{
+          btn.innerHTML = `<span style="color:var(--primary);font-weight:700">${time}</span> <span style="color:#777;font-size:13px">(可預約：${avail} 人)</span>`;
+          btn.onclick=()=>{
+            selectedScheduleTime=time; selectedAvailableSeats=avail;
+            list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+            toStep5();
+          };
+        }
+        list.appendChild(btn);
       });
-      timeSel.value = info.time || timeSel.value;
-      paxSel.innerHTML=''; const chosen = timeSel.selectedOptions[0]; const avail = Number(chosen?.dataset?.avail||0);
-      const maxP = Math.min(4, Math.max(1, avail));
-      for(let i=1;i<=maxP;i++){const o=document.createElement('option');o.value=String(i);o.textContent=String(i);paxSel.appendChild(o);}
-      paxSel.value = String(Math.min(info.passengers||1, maxP));
+      goStep(4);
     }
 
-    dirSel.onchange=fillEditDates; dateSel.onchange=fillEditStations; stSel.onchange=fillEditTimes; timeSel.onchange=fillEditTimes;
+    function onIdentityChange(){
+      const v=document.getElementById('identitySelect').value;
+      const today = todayISO();
+      document.getElementById('hotelDates').style.display = v==='hotel'?'block':'none';
+      document.getElementById('hotelDates2').style.display = v==='hotel'?'block':'none';
+      document.getElementById('roomNumberDiv').style.display = v==='hotel'?'block':'none';
+      document.getElementById('diningDateDiv').style.display = v==='dining'?'block':'none';
+      // 預設日期
+      if(v==='hotel'){
+        const ci = document.getElementById('checkInDate');
+        const co = document.getElementById('checkOutDate');
+        if(ci && !ci.value) ci.value = today;
+        if(co && !co.value) co.value = today;
+      }
+    }
 
-    document.getElementById('editOverlay').classList.add('show');
-  }
-  function closeEdit(){ document.getElementById('editOverlay').classList.remove('show'); editingBookingId=null; }
+    const phoneRegex=/^\+?\d{1,3}?\d{7,}$/;
+    const emailRegex=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const roomRegex=/^(0000|[5-9]\d{2}|10\d{2}|11\d{2}|12\d{2}|13\d{2})$/;
 
-  async function submitEdit(){
-    if(!editingBookingId) return;
-    const dir = document.getElementById('editDirection').value;
-    const date = document.getElementById('editDate').value;
-    const st = document.getElementById('editStation').value;
-    const time = document.getElementById('editTime').value;
-    const pax = Number(document.getElementById('editPassengers').value||1);
+    function toStep5(){
+      if(!selectedScheduleTime){ alert('請選擇班次'); return; }
+      onIdentityChange();
+      goStep(5);
+    }
 
-    const pick = dir==='回程'? st : '福泰大飯店 Forte Hotel';
-    const drop = dir==='回程'? '福泰大飯店 Forte Hotel' : st;
+    function validateStep5(){
+      const id=document.getElementById('identitySelect').value;
+      const name=(document.getElementById('guestName').value||'').trim();
+      const phone=(document.getElementById('guestPhone').value||'').trim();
+      const email=(document.getElementById('guestEmail').value||'').trim();
 
-    showLoading(true);
-    try{
-      const res = await fetch(UPDATE_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-        booking_id: editingBookingId, direction: dir, date, time, pickLocation: pick, dropLocation: drop, passengers: pax
-      })});
-      const result = await res.json();
-      if(result.status==='success'){ closeEdit(); queryOrders(); }
-      else alert(result.detail || '修改失敗');
-    }catch(e){ alert('修改失敗：'+e.message); }
-    finally{ showLoading(false); }
-  }
+      if(!id){document.getElementById('identityErr').style.display='block'; return false} else document.getElementById('identityErr').style.display='none';
+      if(!name){document.getElementById('nameErr').style.display='block'; shake(document.getElementById('guestName')); return false}else document.getElementById('nameErr').style.display='none';
+      if(!phoneRegex.test(phone)){document.getElementById('phoneErr').style.display='block'; shake(document.getElementById('guestPhone')); return false}else document.getElementById('phoneErr').style.display='none';
+      if(!emailRegex.test(email)){document.getElementById('emailErr').style.display='block'; shake(document.getElementById('guestEmail')); return false}else document.getElementById('emailErr').style.display='none';
 
-  async function deleteOrder(bookingId){
-    if(!confirm('確認刪除此訂單？')) return;
-    showLoading(true);
-    try{
-      const res = await fetch(DELETE_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({booking_id: bookingId})});
-      const result = await res.json();
-      if(result.status==='success'){ queryOrders(); } else alert(result.detail||'刪除失敗');
-    }catch(e){ alert('刪除失敗：'+e.message); }
-    finally{ showLoading(false); }
-  }
+      if(id==='hotel'){
+        const cin=document.getElementById('checkInDate').value;
+        const cout=document.getElementById('checkOutDate').value;
+        if(!cin||!cout){ alert('請填寫入住和退房日期'); shake(document.getElementById('checkInDate')); shake(document.getElementById('checkOutDate')); return false; }
+        const room=(document.getElementById('roomNumber').value||'').trim();
+        if(!roomRegex.test(room)){document.getElementById('roomErr').style.display='block'; shake(document.getElementById('roomNumber')); return false}else document.getElementById('roomErr').style.display='none';
+      }else{
+        const din=document.getElementById('diningDate').value;
+        if(!din){ alert('請填寫用餐日期'); shake(document.getElementById('diningDate')); return false; }
+      }
+      return true;
+    }
 
-  /* ====== 捲動監聽 ====== */
-  window.addEventListener('scroll',()=>{
-    const btn = document.getElementById('backToTop');
-    btn.style.display = window.scrollY>400 ? 'block':'none';
-  });
+    async function toStep6(){
+      if(!validateStep5())return;
+      showVerifyLoading(true);
+      try{
+        // 再驗座位
+        const res = await fetch(API_URL);
+        const raw = await res.json();
+        const headers=raw[0]; const rows=raw.slice(1);
+        allRows = rows.map(r=>{const o={};headers.forEach((h,i)=>o[h]=r[i]);return o;})
+                      .filter(r=>r["去程 / 回程"]&&r["日期"]&&r["班次"]&&r["站點"]);
+        const found = allRows.find(r=>
+          String(r["去程 / 回程"]).trim()===selectedDirection &&
+          fmtDateLabel(r["日期"])===selectedDateRaw &&
+          String(r["站點"]).trim()===selectedStationRaw &&
+          fmtTimeLabel(r["班次"])===selectedScheduleTime
+        );
+        if(!found){ showVerifyLoading(false); showExpiredOverlay(true); return; }
+        const availableText=found["可預約人數"]||found["可約人數 / Available"]||"0";
+        selectedAvailableSeats = Number(onlyDigits(availableText))||0;
+        if(selectedAvailableSeats<=0){ showVerifyLoading(false); alert('此班次已無座位'); showExpiredOverlay(true); return; }
 
-  /* ====== 初始化 ====== */
-  function init() {
-    updatePageLanguage();
-    refreshDataIfNeeded(true);
-    setInterval(()=>refreshDataIfNeeded(false).catch(()=>{}), 15*60*1000);
-  }
-  document.addEventListener('DOMContentLoaded', init);
+        document.getElementById('cf_direction').value = selectedDirection;
+        document.getElementById('cf_date').value = selectedDateRaw;
+        const pick = selectedDirection==='回程'?selectedStationRaw:'福泰大飯店 Forte Hotel';
+        const drop = selectedDirection==='回程'?'福泰大飯店 Forte Hotel':selectedStationRaw;
+        document.getElementById('cf_pick').value = pick;
+        document.getElementById('cf_drop').value = drop;
+        document.getElementById('cf_time').value = selectedScheduleTime;
+        document.getElementById('cf_name').value = (document.getElementById('guestName').value||'').trim();
+
+        const sel=document.getElementById('passengers');
+        sel.innerHTML='';
+        const maxPassengers = Math.min(4, Math.max(0, selectedAvailableSeats));
+        if(maxPassengers<=0){
+          const opt=document.createElement('option');opt.value='';opt.textContent='0';sel.appendChild(opt);sel.disabled=true;
+        }else{
+          sel.disabled=false;
+          for(let i=1;i<=maxPassengers;i++){const opt=document.createElement('option');opt.value=String(i);opt.textContent=String(i);sel.appendChild(opt);}
+          sel.value='1';
+        }
+        document.getElementById('passengersHint').textContent = `此班次可預約：${selectedAvailableSeats} 人；單筆最多 4 人`;
+        goStep(6);
+      }catch(e){
+        console.error(e); showExpiredOverlay(true);
+      }finally{
+        showVerifyLoading(false);
+      }
+    }
+
+    async function submitBooking(){
+      const pSel=document.getElementById('passengers');
+      const p=Number(pSel.value||0);
+      if(!p || p<1 || p>4 || p>selectedAvailableSeats){document.getElementById('passengersErr').style.display='block';return;}
+      document.getElementById('passengersErr').style.display='none';
+
+      const identity=document.getElementById('identitySelect').value;
+      const payload={
+        direction:selectedDirection,
+        date:selectedDateRaw,
+        station:selectedStationRaw,
+        time:selectedScheduleTime,
+        identity,
+        checkIn: identity==='hotel'? (document.getElementById('checkInDate').value||null):null,
+        checkOut: identity==='hotel'? (document.getElementById('checkOutDate').value||null):null,
+        diningDate: identity==='dining'? (document.getElementById('diningDate').value||null):null,
+        roomNumber: identity==='hotel'? (document.getElementById('roomNumber').value||null):null,
+        name:(document.getElementById('guestName').value||'').trim(),
+        phone:(document.getElementById('guestPhone').value||'').trim(),
+        email:(document.getElementById('guestEmail').value||'').trim(),
+        passengers:p,
+        dropLocation:selectedDirection==='回程'?'福泰大飯店 Forte Hotel':selectedStationRaw,
+        pickLocation:selectedDirection==='回程'?selectedStationRaw:'福泰大飯店 Forte Hotel',
+      };
+      showVerifyLoading(true);
+      try{
+        const res = await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'book', data:payload})});
+        const result = await res.json();
+        if(result.status==='success'){
+          const qr = result.qr_url.startsWith('http') ? result.qr_url : (QR_ORIGIN + result.qr_url);
+          document.getElementById('qrImg').src = qr;
+          document.getElementById('succBookingId').value = result.booking_id || '';
+          document.getElementById('succSchedule').value = `${selectedDateRaw} ${selectedScheduleTime}`;
+          document.getElementById('succDirection').value = selectedDirection;
+          document.getElementById('succPick').value = payload.pickLocation;
+          document.getElementById('succDrop').value = payload.dropLocation;
+          document.getElementById('succName').value = payload.name;
+          document.getElementById('succPhone').value = payload.phone;
+          document.getElementById('succEmail').value = payload.email;
+
+          // 顯示成功卡
+          ['step6'].forEach(id=>document.getElementById(id).style.display='none');
+          document.getElementById('successCard').style.display='';
+          window.scrollTo({top:0,behavior:'smooth'});
+        }else{
+          alert(result.detail || result.message || '預約失敗，請稍後再試');
+        }
+      }catch(e){
+        alert('提交失敗：' + e.message);
+      }finally{
+        showVerifyLoading(false);
+      }
+    }
+
+    // 下載車票為圖片
+    async function downloadTicketAsImage(){
+      const node = document.getElementById('ticketCard');
+      const scale = 2;
+      const style = {filter:'none', transform:'none', background:'#fff'};
+      try{
+        const dataUrl = await domtoimage.toPng(node, {bgcolor:'#ffffff', style, width: node.scrollWidth, height: node.scrollHeight, quality:1, pixelRatio:scale});
+        const a = document.createElement('a');
+        a.href = dataUrl; a.download = `ticket_${document.getElementById('succBookingId').value||'booking'}.png`;
+        a.click();
+      }catch(e){
+        alert('下載失敗：' + e.message);
+      }
+    }
+    document.addEventListener('click', (e)=>{
+      if(e.target && e.target.id==='downloadTicketBtn'){ downloadTicketAsImage(); }
+    });
+
+    /* ====== 我的預約：查詢 / 修改 / 刪除 ====== */
+    function resetQuery(){
+      document.getElementById('qBookId').value='';
+      document.getElementById('qPhone').value='';
+      document.getElementById('qEmail').value='';
+      document.getElementById('queryResult').innerHTML='';
+    }
+    function withinOneMonth(dateStr){
+      try{
+        const d = new Date(dateStr+'T00:00:00');
+        const now = new Date();
+        const pastLimit = new Date(now); pastLimit.setMonth(now.getMonth()-1);
+        return d >= pastLimit;
+      }catch(e){ return true; }
+    }
+    function isExpired(dateStr, timeStr){
+      const t = (timeStr||'00:00').slice(0,5);
+      let m=timeStr; // 若傳入 'M/D HH:mm' 直接用 dateStr
+      const d = new Date(dateStr + 'T' + t + ':00');
+      return d.getTime() < Date.now();
+    }
+
+    async function queryOrders(){
+      const id=(document.getElementById('qBookId').value||'').trim();
+      const phone=(document.getElementById('qPhone').value||'').trim();
+      const email=(document.getElementById('qEmail').value||'').trim();
+      const queryHint = document.getElementById('queryHint');
+      if(!id && !phone && !email){
+        shake(queryHint); return;
+      }
+      showLoading(true);
+      try{
+        const res = await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'query', data:{booking_id:id, phone, email}})});
+        const data = await res.json();
+        const wrap = document.getElementById('queryResult');
+        wrap.innerHTML='';
+        const arr = Array.isArray(data)?data:[];
+        if(!arr.length){
+          wrap.innerHTML = `<div class="card"><div style="text-align:center;color:#666">查無符合條件的紀錄（僅顯示近一個月）</div></div>`;
+          return;
+        }
+        arr.forEach(row=>{
+          if(!withinOneMonth(String(row["日期"]||''))) return;
+          const date = String(row["日期"]||'');
+          const time = String(row["班次"]||row["車次"]||'');
+          const status = String(row["預約狀態"]||'');
+          const name = String(row["姓名"]||'');
+          const phone = String(row["手機"]||'');
+          const email = String(row["信箱"]||'');
+          const rb = String(row["往返"]||'');
+          const pick = String(row["上車地點"]||'');
+          const drop = String(row["下車地點"]||'');
+          const audit = String(row["櫃台審核"]||'');
+          const bookingId = String(row["預約編號"]||'');
+          const qrCodeContent = String(row["QRCode編碼"]||'');
+          const expired = isExpired(date, time);
+
+          const card = document.createElement('div');
+          card.className='card';
+          if(audit==='N'){ card.style.opacity='.6'; }
+
+          const header = document.createElement('div');
+          header.style.display='flex';
+          header.style.justifyContent='space-between';
+          header.style.alignItems='center';
+          header.innerHTML = `<div style="font-weight:800">${date} ${time}（${rb||'單程'}）</div> <div style="font-size:14px">${audit==='N'?'已拒絕':'已預約'}</div>`;
+          card.appendChild(header);
+
+          const line = document.createElement('div');
+          line.style.margin='10px 0'; line.style.borderTop='1px dashed #e6e6e6'; card.appendChild(line);
+
+          // 票卡樣式（含 QR 與下載、修改、刪除）
+          const inner = document.createElement('div');
+          inner.className='grid';
+          inner.style.gridTemplateColumns='1fr';
+          inner.innerHTML = `
+            <div style="text-align:center">
+              <img src="${qrCodeContent ? (QR_ORIGIN + '/api/qr/' + encodeURIComponent(qrCodeContent)) : ''}" alt="QR" style="width:140px;height:140px;border-radius:8px;border:1px solid #eee;background:#fff"/>
+            </div>
+            <div>
+              <div class="field"><label class="label">預約編號</label><input class="readonly" readonly value="${bookingId}"/></div>
+              <div class="field"><label class="label">班次</label><input class="readonly" readonly value="${date} ${time}"/></div>
+              <div class="field"><label class="label">方向</label><input class="readonly" readonly value="${rb}"/></div>
+              <div class="field"><label class="label">上車地點</label><input class="readonly" readonly value="${pick}"/></div>
+              <div class="field"><label class="label">下車地點</label><input class="readonly" readonly value="${drop}"/></div>
+              <div class="field"><label class="label">姓名</label><input class="readonly" readonly value="${name}"/></div>
+              <div class="field"><label class="label">手機</label><input class="readonly" readonly value="${phone}"/></div>
+              <div class="field"><label class="label">信箱</label><input class="readonly" readonly value="${email}"/></div>
+            </div>
+          `;
+          card.appendChild(inner);
+
+          const actions = document.createElement('div');
+          actions.className='actions row';
+          const dlBtn = document.createElement('button');
+          dlBtn.className='button'; dlBtn.textContent='下載車票';
+          dlBtn.onclick = ()=>{
+            // 即時建立一個卡片節點導出圖片
+            domtoimage.toPng(inner,{bgcolor:'#fff', pixelRatio:2}).then((dataUrl)=>{
+              const a=document.createElement('a'); a.href=dataUrl; a.download=`ticket_${bookingId}.png`; a.click();
+            });
+          };
+          actions.appendChild(dlBtn);
+
+          const mdBtn = document.createElement('button');
+          mdBtn.className='button btn-ghost'; mdBtn.textContent='修改';
+          mdBtn.disabled = (audit==='N');
+          mdBtn.onclick = ()=> openModifyDialog({bookingId, direction:rb, date, pick, drop, time});
+          actions.appendChild(mdBtn);
+
+          const delBtn = document.createElement('button');
+          delBtn.className='button btn-ghost'; delBtn.textContent='刪除';
+          delBtn.disabled = (audit==='N');
+          delBtn.onclick = async ()=>{
+            if(!confirm(`刪除預約 ${bookingId} ？`)) return;
+            showLoading(true);
+            try{
+              const r = await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'delete', data:{booking_id:bookingId}})});
+              const j = await r.json();
+              if(j.status==='success'){
+                alert('已刪除');
+                queryOrders();
+              }else{
+                alert(j.detail || '刪除失敗');
+              }
+            }catch(e){ alert('刪除失敗：'+e.message); }finally{ showLoading(false); }
+          };
+          actions.appendChild(delBtn);
+
+          card.appendChild(actions);
+          document.getElementById('queryResult').appendChild(card);
+        });
+      }catch(e){
+        alert('查詢失敗：' + e.message);
+      }finally{
+        showLoading(false);
+      }
+    }
+
+    // 修改對話框（簡易版）
+    async function openModifyDialog({bookingId, direction, date, pick, drop, time}){
+      // 讀取可選資料
+      await refreshDataIfNeeded(true);
+
+      const ov = document.createElement('div');
+      ov.className='overlay show';
+      ov.innerHTML = `
+        <div class="overlay-card" style="text-align:left;max-width:640px">
+          <h3>修改預約 ${bookingId}</h3>
+          <div class="field">
+            <label class="label">方向</label>
+            <select id="md_dir" class="select">
+              <option value="去程" ${direction==='去程'?'selected':''}>去程</option>
+              <option value="回程" ${direction==='回程'?'selected':''}>回程</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="label">日期</label>
+            <div id="md_dates" class="options"></div>
+          </div>
+          <div class="field">
+            <label class="label">站點</label>
+            <div id="md_stations" class="options"></div>
+          </div>
+          <div class="field">
+            <label class="label">班次</label>
+            <div id="md_schedules" class="options"></div>
+          </div>
+          <div class="field">
+            <label class="label">人數</label>
+            <select id="md_pax" class="select"></select>
+          </div>
+          <div class="actions row" style="justify-content:flex-end">
+            <button class="button btn-ghost" id="md_cancel">取消</button>
+            <button class="button" id="md_save">儲存</button>
+          </div>
+        </div>`;
+      document.body.appendChild(ov);
+
+      let mdDirection = direction;
+      let mdDate = date;
+      let mdStation = (direction==='回程') ? pick : drop; // 與下方邏輯一致，顯示非飯店站
+      let mdTime = time;
+      let mdAvail = 0;
+
+      function buildDateOptions(){
+        const dateSet = new Set(
+          allRows.filter(r=>String(r["去程 / 回程"]).trim()===mdDirection)
+                 .map(r=>fmtDateLabel(r["日期"]))
+        );
+        const sorted=[...dateSet].sort((a,b)=>new Date(a)-new Date(b));
+        const list = ov.querySelector('#md_dates');
+        list.innerHTML='';
+        sorted.forEach(dateStr=>{
+          const btn=document.createElement('button');
+          btn.type='button'; btn.className='opt-btn'; btn.textContent=dateStr;
+          if(dateStr===mdDate) btn.classList.add('active');
+          btn.onclick=()=>{ mdDate=dateStr; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); buildStationOptions(); };
+          list.appendChild(btn);
+        });
+      }
+      function buildStationOptions(){
+        const stations = new Set(
+          allRows.filter(r=>String(r["去程 / 回程"]).trim()===mdDirection && fmtDateLabel(r["日期"])===mdDate)
+                .map(r=>String(r["站點"]).trim())
+        );
+        const list = ov.querySelector('#md_stations');
+        list.innerHTML='';
+        [...stations].forEach(st=>{
+          const btn=document.createElement('button');
+          btn.type='button'; btn.className='opt-btn'; btn.textContent=st;
+          if(st===mdStation) btn.classList.add('active');
+          btn.onclick=()=>{ mdStation=st; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); buildScheduleOptions(); };
+          list.appendChild(btn);
+        });
+        buildScheduleOptions();
+      }
+      function buildScheduleOptions(){
+        const list=ov.querySelector('#md_schedules');
+        list.innerHTML='';
+        const entries = allRows.filter(r=>
+          String(r["去程 / 回程"]).trim()===mdDirection &&
+          fmtDateLabel(r["日期"])===mdDate &&
+          String(r["站點"]).trim()===mdStation
+        ).sort((a,b)=>fmtTimeLabel(a["班次"]).localeCompare(fmtTimeLabel(b["班次"])));
+        entries.forEach(r=>{
+          const time=fmtTimeLabel(r["班次"]);
+          const availText=String(r["可預約人數"]||r["可約人數 / Available"]||'').trim();
+          const avail=Number(onlyDigits(availText))||0;
+          const btn=document.createElement('button');
+          btn.type='button'; btn.className='opt-btn';
+          if(time===mdTime) btn.classList.add('active');
+          btn.innerHTML = `<span style="color:var(--primary);font-weight:700">${time}</span> <span style="color:#777;font-size:13px">(可預約：${avail} 人)</span>`;
+          btn.onclick=()=>{ mdTime=time; mdAvail=avail; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); buildPax(); };
+          list.appendChild(btn);
+        });
+        buildPax();
+      }
+      function buildPax(){
+        const sel=ov.querySelector('#md_pax');
+        sel.innerHTML='';
+        const maxPassengers = Math.min(4, Math.max(0, mdAvail||4));
+        for(let i=1;i<=maxPassengers;i++){const opt=document.createElement('option');opt.value=String(i);opt.textContent=String(i);sel.appendChild(opt);}
+      }
+
+      ov.querySelector('#md_dir').addEventListener('change', (e)=>{
+        mdDirection = e.target.value;
+        // 方向改變時預設站點修正
+        mdStation = (mdDirection==='回程') ? pick : drop;
+        buildDateOptions();
+      });
+      ov.querySelector('#md_cancel').onclick = ()=>{ document.body.removeChild(ov); };
+      ov.querySelector('#md_save').onclick = async ()=>{
+        const passengers = Number(ov.querySelector('#md_pax').value||'1');
+        const payload = {
+          booking_id: bookingId,
+          direction: mdDirection,
+          date: mdDate,
+          time: mdTime,
+          passengers,
+          // 方向：回程 pick=非飯店站，drop=飯店；去程 pick=飯店，drop=非飯店站
+          pickLocation: mdDirection==='回程' ? mdStation : '福泰大飯店 Forte Hotel',
+          dropLocation: mdDirection==='回程' ? '福泰大飯店 Forte Hotel' : mdStation,
+        };
+        showLoading(true);
+        try{
+          const r = await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'modify', data:payload})});
+          const j = await r.json();
+          if(j.status==='success'){ alert('已更新'); document.body.removeChild(ov); queryOrders(); }
+          else { alert(j.detail || '更新失敗'); }
+        }catch(e){ alert('更新失敗：'+e.message); }
+        finally{ showLoading(false); }
+      };
+
+      // 初始化
+      buildDateOptions();
+    }
+
+    /* ====== 捲動監聽 ====== */
+    window.addEventListener('scroll',()=>{
+      const btn = document.getElementById('backToTop');
+      btn.style.display = window.scrollY>400 ? 'block':'none';
+    });
+
+    /* ====== 初始化 ====== */
+    async function init() {
+      // 設定預設入住/退房日期
+      const t = todayISO();
+      const ci = document.getElementById('checkInDate');
+      const co = document.getElementById('checkOutDate');
+      if(ci) ci.value = t;
+      if(co) co.value = t;
+      await refreshDataIfNeeded(true);
+      // 維持首頁
+      showPage('reservation');
+    }
+    document.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
 </html>
