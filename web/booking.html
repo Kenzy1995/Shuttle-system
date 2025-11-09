@@ -769,14 +769,14 @@
   };
 
 /* ====== 設定（依部署調整） ====== */
-const READ_API_URL = "https://booking-api-995728097341.asia-east1.run.app/api/book";  // 讀取班次資料
-const WRITE_API_BASE = "https://booking-manager-995728097341.asia-east1.run.app";     // 寫入 API 基礎網址
+// ✅ 讀班次 → booking-api 服務的 GET /api/sheet
+const API_URL   = "https://booking-api-995728097341.asia-east1.run.app/api/sheet";
 
-// 寫入操作的具體端點
-const BOOK_URL = WRITE_API_BASE + "/api/book";           // 新增預約
-const QUERY_URL = WRITE_API_BASE + "/api/query-orders";  // 查詢訂單
-const UPDATE_URL = WRITE_API_BASE + "/api/update-order"; // 修改訂單
-const DELETE_URL = WRITE_API_BASE + "/api/delete-order"; // 刪除訂單
+// ✅ 建單/查詢/改單/刪單 → booking-manager 服務的 POST 端點
+const BOOK_URL  = "https://booking-manager-995728097341.asia-east1.run.app/api/book";
+const QUERY_URL = "https://booking-manager-995728097341.asia-east1.run.app/api/query-orders";
+const UPDATE_URL= "https://booking-manager-995728097341.asia-east1.run.app/api/modify";
+const DELETE_URL= "https://booking-manager-995728097341.asia-east1.run.app/api/delete";
 
   /* ====== 狀態 ====== */
   let allRows = [];
