@@ -16,30 +16,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: 抓取最新程式碼
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Step 2: 登入 Google Cloud（沿用你現有的 GCP_CREDENTIALS secret）
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
-      # Step 3: 安裝 gcloud CLI 並設定專案
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: forte-booking-system
-          install_components: 'beta,run'
 
-      # Step 4: 建立並推送 Docker 映像
       - name: Build and push Docker image
         working-directory: ./web
         run: |
           gcloud builds submit --tag asia-east1-docker.pkg.dev/forte-booking-system/hotel-web/web .
 
-      # Step 5: 部署到 Cloud Run
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy hotel-web \
@@ -49,7 +43,6 @@ jobs:
             --allow-unauthenticated \
             --port=8080
 
-      # Step 6: 輸出網址
       - name: Output service URL
         run: |
           echo "✅ 部署完成！"
