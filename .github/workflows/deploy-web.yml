@@ -13,42 +13,47 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: 取得程式碼
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Step 2: 登入 Google Cloud（使用 GitHub Secret）
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
-      # Step 3: 設定 gcloud CLI
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: '${{ secrets.GCP_PROJECT_ID }}'
 
-      # Step 4: 設定 Docker 登入 Artifact Registry
       - name: Configure Docker to use Artifact Registry
         run: |
           gcloud auth configure-docker asia-east1-docker.pkg.dev --quiet
 
-      # Step 5: 建立 Docker 映像
       - name: Build Docker image
         run: |
           cd web
           docker build -t asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/hotel-web/web .
 
-      # Step 6: 推送 Docker 映像
       - name: Push Docker image
         run: |
           docker push asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/hotel-web/web
 
-      # Step 7: 部署到 Cloud Run（指定服務帳號）
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy hotel-web \
             --image=asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/hotel-web/web \
             --region=asia-east1 \
-            --platform=manage
+            --platform=managed \
+            --allow-unauthenticated \
+            --service-account=forte-booking-system@forte-booking-system.iam.gserviceaccount.com \
+            --port=8080 \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Show URL
+        run: |
+          echo "✅ 部署完成"
+          gcloud run services describe hotel-web \
+            --region=asia-east1 \
+            --format='value(status.url)' \
+            --project=${{ secrets.GCP_PROJECT_ID }}
