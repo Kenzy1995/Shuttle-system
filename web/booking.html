@@ -768,13 +768,15 @@
     }
   };
 
-  /* ====== 設定（依部署調整） ====== */
-  const API_URL = "https://booking-api-995728097341.asia-east1.run.app/api/book"; // 讀取班次（既有，不改）
-  const BOOK_URL = "https://booking-manager-995728097341.asia-east1.run.app/api/book";    // 新增預約（booking-api）
-  const QUERY_BASE = "http://127.0.0.1:8081";           // manager API base
-  const QUERY_URL = QUERY_BASE + "https://booking-manager-995728097341.asia-east1.run.app/api/query-orders";
-  const UPDATE_URL = QUERY_BASE + "https://booking-manager-995728097341.asia-east1.run.app//api/update-order";
-  const DELETE_URL = QUERY_BASE + "https://booking-manager-995728097341.asia-east1.run.app//api/delete-order";
+/* ====== 設定（依部署調整） ====== */
+const READ_API_URL = "https://booking-api-995728097341.asia-east1.run.app/api/book";  // 讀取班次資料
+const WRITE_API_BASE = "https://booking-manager-995728097341.asia-east1.run.app";     // 寫入 API 基礎網址
+
+// 寫入操作的具體端點
+const BOOK_URL = WRITE_API_BASE + "/api/book";           // 新增預約
+const QUERY_URL = WRITE_API_BASE + "/api/query-orders";  // 查詢訂單
+const UPDATE_URL = WRITE_API_BASE + "/api/update-order"; // 修改訂單
+const DELETE_URL = WRITE_API_BASE + "/api/delete-order"; // 刪除訂單
 
   /* ====== 狀態 ====== */
   let allRows = [];
