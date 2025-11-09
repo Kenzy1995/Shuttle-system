@@ -1,7 +1,9 @@
-fastapi==0.115.0
-uvicorn==0.30.0
-gunicorn==23.0.0
-gspread==6.1.4
-google-auth==2.35.0
-qrcode==7.4.2
-pillow==10.3.0
+fastapi
+uvicorn
+gunicorn
+gspread
+google-auth
+google-auth-httplib2
+google-auth-oauthlib
+qrcode
+pillow
