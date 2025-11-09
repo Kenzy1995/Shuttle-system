@@ -24,28 +24,34 @@ jobs:
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: forte-booking-system
+          project_id: '${{ secrets.GCP_PROJECT_ID }}'
+
+      - name: Configure Docker to use Artifact Registry
+        run: |
+          gcloud auth configure-docker asia-east1-docker.pkg.dev --quiet
 
       - name: Build Docker image
         run: |
           cd web
-          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/hotel-web .
+          docker build -t asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/hotel-web/web .
 
       - name: Push Docker image
         run: |
-          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/hotel-web
+          docker push asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/hotel-web/web
 
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy hotel-web \
-            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/hotel-web \
-            --region asia-east1 \
-            --platform managed \
+            --image=asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/hotel-web/web \
+            --region=asia-east1 \
+            --platform=managed \
             --allow-unauthenticated \
-            --port 8080
+            --port=8080 \
+            --project='${{ secrets.GCP_PROJECT_ID }}'
 
       - name: Show URL
         run: |
           gcloud run services describe hotel-web \
             --region=asia-east1 \
-            --format='value(status.url)'
+            --format='value(status.url)' \
+            --project='${{ secrets.GCP_PROJECT_ID }}'
