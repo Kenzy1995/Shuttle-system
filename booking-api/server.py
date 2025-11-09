@@ -16,7 +16,6 @@ import qrcode
 # ---------- Config ----------
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID", "1xp54tKOczklmT8uacW-HMxwV8r0VOR2ui33jYcE2pUQ")
 ORDERS_SHEET_NAME = os.getenv("ORDERS_SHEET_NAME", "預約審核(櫃台)")
-SCHEDULE_SHEET_NAME = os.getenv("SCHEDULE_SHEET_NAME", "接駁時刻表")  # 若有班次表可使用
 
 # ---------- FastAPI ----------
 app = FastAPI(title="Hotel Shuttle - Booking API")
@@ -148,12 +147,6 @@ def set_by_header(row: list, header_map: Dict[str, int], key: str, value: Any):
     row[idx] = "" if value is None else str(value)
 
 # ---------- Routes ----------
-@app.get("/api/sheet")
-def get_sheet():
-    """供前端取得接駁時刻表資料"""
-    ws = _open_ws(SCHEDULE_SHEET_NAME)
-    rows = ws.get_all_values()
-    return rows
 
 @app.post("/api/book")
 def book(payload: Dict[str, Any]):
