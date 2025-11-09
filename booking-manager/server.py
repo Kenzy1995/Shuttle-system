@@ -321,7 +321,8 @@ async def query_orders(query_data: Dict[str, Any]):
             })
         
         # 獲取所有記錄
-        records = sheet.get_all_records()
+        records = sheet.get_all_records(head=2)
+
         results = []
         
         for record in records:
@@ -424,7 +425,8 @@ async def update_booking(update_data: Dict[str, Any]):
             raise HTTPException(status_code=400, detail="缺少必要參數")
         
         # 查找預約記錄
-        records = sheet.get_all_records()
+        records = sheet.get_all_records(head=2)
+
         for i, record in enumerate(records, start=2):  # 從第2行開始（跳過標題）
             if str(record.get("預約編號", "")) == str(booking_id):
                 # 檢查是否被拒絕
@@ -462,7 +464,8 @@ async def cancel_booking(cancel_data: Dict[str, Any]):
             raise HTTPException(status_code=400, detail="缺少預約編號")
         
         # 查找預約記錄
-        records = sheet.get_all_records()
+        records = sheet.get_all_records(head=2)
+
         for i, record in enumerate(records, start=2):
             if str(record.get("預約編號", "")) == str(booking_id):
                 # 更新預約狀態為取消
