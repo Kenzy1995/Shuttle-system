@@ -1,0 +1,24 @@
+steps:
+  # 1. 建立 Docker 映像
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/hotel-web', '.']
+
+  # 2. 推送到 Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/hotel-web']
+
+  # 3. 部署到 Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      [
+        'run', 'deploy', 'hotel-web',
+        '--image', 'gcr.io/$PROJECT_ID/hotel-web',
+        '--platform', 'managed',
+        '--region', 'asia-east1',
+        '--allow-unauthenticated',
+        '--port', '8080'
+      ]
+
+images:
+  - 'gcr.io/$PROJECT_ID/hotel-web'
