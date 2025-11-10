@@ -313,23 +313,23 @@
           justify-content: space-between !important;
         }
 
-  /* 三個按鈕：前兩個左右排列，第三個置下方置中 */
-  .actions:has(button:nth-child(3)):not(.col) {
-    flex-wrap: wrap !important;
-    flex-direction: row !important;
-    justify-content: space-between !important;
-  }
-  .actions:has(button:nth-child(3)) button {
-    flex: 1 1 45%;
-  }
-  .actions:has(button:nth-child(3)) button:nth-child(3) {
-    flex: 1 1 100%;
-    margin-top: 10px;
-    align-self: center;
-  }
+        /* 三個按鈕：前兩個左右排列，第三個置下方置中 */
+        .actions:has(button:nth-child(3)):not(.col) {
+          flex-wrap: wrap !important;
+          flex-direction: row !important;
+          justify-content: space-between !important;
+        }
+        .actions:has(button:nth-child(3)) button {
+          flex: 1 1 45%;
+        }
+        .actions:has(button:nth-child(3)) button:nth-child(3) {
+          flex: 1 1 100%;
+          margin-top: 10px;
+          align-self: center;
+        }
 
-  /* 其他樣式不變 */
-}
+        /* 其他樣式不變 */
+      }
 
 
         .actions:has(button:nth-child(3)) button {
@@ -382,6 +382,30 @@
         flex-direction: row-reverse;
       }
     }
+/* === 修正手機版車票寬度與排版 === */
+@media (max-width: 768px) {
+  .ticket-card {
+    width: 95vw;        /* 卡片接近滿版 */
+    max-width: 95vw;    /* 防止超出畫面 */
+    overflow: hidden;   /* 隱藏超出內容，避免左右滾動 */
+  }
+
+  .ticket-content {
+    display: flex;
+    flex-direction: column; /* 改成上下排：QR 在上，資料在下 */
+    align-items: center;    /* 水平置中 */
+    gap: 12px;              /* 元素間距 */
+  }
+
+  .ticket-info {
+    width: 100%;            /* 讓右側資訊自動換行 */
+  }
+
+  .ticket-qr img {
+    width: 160px;
+    height: 160px;
+  }
+}
 
 #step6 .field {
   margin: 4px 0;       /* 原本為 8px，這裡縮小垂直間距 */
@@ -1252,8 +1276,8 @@
         try {
             // 根據螢幕寬度決定下載尺寸
             const isMobile = window.innerWidth <= 768;
-            const width = isMobile ? 380  : 600 ; // 手機版350px，電腦版600px
-            const height = isMobile ? 650 * 2 : 500 * 2; // 手機版較高，電腦版較矮
+            const width = isMobile ? 380  : 510 ; // 手機版350px，電腦版600px
+            const height = isMobile ? 650 * 2 : 650 * 2; // 手機版較高，電腦版較矮
             
             const dataUrl = await domtoimage.toPng(ticketCard, {
                 bgcolor: '#ffffff',
