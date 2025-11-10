@@ -174,13 +174,19 @@ def _find_rows_by_pred(ws: gspread.Worksheet, pred) -> List[int]:
     values = _read_all_rows(ws)
     if not values:
         return []
+    # 第2列是標題列（跳過第1列合併儲存格）
     headers = values[HEADER_ROW - 1] if len(values) >= HEADER_ROW else []
     result = []
+    # 從第3列（HEADER_ROW + 1）開始搜尋資料
     for i, row in enumerate(values[HEADER_ROW:], start=HEADER_ROW + 1):
+        # 跳過完全空白的列
+        if not any(row):
+            continue
         d = {headers[j]: row[j] if j < len(row) else "" for j in range(len(headers))}
         if pred(d):
             result.append(i)
     return result
+
 
 
 def _get_max_seq_for_date(ws: gspread.Worksheet, date_iso: str) -> int:
