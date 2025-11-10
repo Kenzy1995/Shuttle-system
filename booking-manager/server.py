@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 import io
 import os
@@ -53,7 +54,7 @@ HEADER_KEYS = {
     "預約人數",
     "櫃台審核",
     "預約狀態",
-    "訂單狀態",   # ★ 新增：配合需求 10
+    "訂單狀態",   # ★ 需求 10
     "乘車狀態",
     "身分",
     "房號",
@@ -64,7 +65,7 @@ HEADER_KEYS = {
     "下車索引",
     "涉及路段範圍",
     "QRCode編碼",
-    "備註",       # ★ 新增：配合需求 10
+    "備註",       # ★ 需求 10
 }
 
 # 站點索引（精準雙語字串）
@@ -133,7 +134,7 @@ def _norm_date(s: str) -> str:
     return s
 
 def _digits(n: str) -> int:
-    m = re.findall(r"\d+", str(n or ""))
+    m = re.findall(r"\\d+", str(n or ""))
     return int("".join(m)) if m else 0
 
 # ========== Google Sheets ==========
@@ -383,7 +384,7 @@ def ops(req: OpsRequest):
         if action == "book":
             p = BookPayload(**data)
 
-            # ★ 需求 1：提交前「再次」檢查容量（含本次）
+            # ★ 再次檢查容量
             time_hm = _time_hm_from_any(p.time)
             _check_capacity_for_booking(p.direction, _norm_date(p.date), time_hm, p.pickLocation, p.dropLocation, int(p.passengers))
 
@@ -491,7 +492,7 @@ def ops(req: OpsRequest):
                 old_pax = 0
             new_pax = int(p.passengers if p.passengers is not None else old_pax)
 
-            # ★ 需求 1：修改時再次檢查容量（同班次可含本人）
+            # ★ 修改時再次檢查容量（同班次可含本人）
             _check_capacity_for_modify(ws, hmap, rowno, new_direction, new_date, time_hm, new_pick, new_drop, new_pax)
 
             car_display = _display_trip_str(new_date, time_hm)
