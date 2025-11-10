@@ -293,48 +293,6 @@
       flex-direction: row-reverse;
     }
 
-      @media (max-width: 768px){
-        .nav-links{display:none}
-        .mobile-tabbar{display:block}
-        body{padding-bottom:70px}
-        .navbar{justify-content:space-between}.brand{margin-right:0}
-
-        .actions{
-          justify-content:center;
-          width:100%;
-        }
-        .actions.row,
-        #step1 .actions,
-        #step2 .actions,
-        #step3 .actions,
-        #step4 .actions,
-        #step6 .actions {
-          flex-direction: row !important;
-          justify-content: space-between !important;
-        }
-
-        /* 手機版：三個按鈕上下排列且置中 */
-        .actions.has-three {
-          flex-direction: column !important;
-          align-items: center !important;
-          justify-content: center !important;
-        }
-        .actions.has-three button {
-          width: 80%;
-          max-width: 320px;
-        }
-        .actions.has-three button + button {
-          margin-top: 10px;
-        }
-
-      }
-
-      
-      /* 手機版預約班次按鈕左右排列 */
-      #step4 .actions {
-        flex-direction: row !important;
-        justify-content: space-between !important;
-      }
       
       .hero .actions {
         justify-content: center !important; /* 手機版立即預約按鈕置中 */
@@ -400,6 +358,31 @@
 #step6 .label,
 #step6 .readonly {
   line-height: 1.2;     /* 壓縮欄內文字間距 */
+}
+    
+/* === 修正版：手機版按鈕垂直置中 === */
+@media (max-width: 768px) {
+  .nav-links { display: none; }
+  .mobile-tabbar { display: block; }
+  body { padding-bottom: 70px; }
+  .navbar { justify-content: space-between; }
+  .brand { margin-right: 0; }
+
+  .actions {
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100%;
+  }
+
+  .actions button {
+    width: 80%;
+    max-width: 320px;
+  }
+
+  .actions button + button {
+    margin-top: 10px;
+  }
 }
 
   </style>
