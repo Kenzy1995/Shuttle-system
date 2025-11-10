@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
 import gspread
 import google.auth
-import hashlib 
+import hashlib
 
 
 # ========== 常數與工具 ==========
@@ -24,86 +24,73 @@ SPREADSHEET_ID = "1xp54tKOczklmT8uacW-HMxwV8r0VOR2ui33jYcE2pUQ"
 SHEET_NAME = "預約審核(櫃台)"
 BASE_URL = "https://booking-manager-995728097341.asia-east1.run.app"
 
-# 表頭實際位於第幾列（1-based）
+# 表頭列（1-based）
 HEADER_ROW = 2
 
 # 狀態固定字串
 BOOKED_TEXT = "✔️ 已預約 Booked"
 CANCELLED_TEXT = "❌ 已取消 Cancelled"
 
-# 統一欄位名稱映射
-HEADER_ALIASES = {
-    "申請日期": {"申請日期", "建立時間"},
-    "最後操作時間": {"最後操作時間", "最後更新時間"},
-    "預約編號": {"預約編號", "訂單編號"},
-    "往返": {"往返", "方向"},
-    "日期": {"日期", "出發日期"},
-    "班次": {"班次", "時間"},
-    "車次": {"車次", "顯示車次"},
-    "上車地點": {"上車地點", "上車站點"},
-    "下車地點": {"下車地點", "下車站點"},
-    "姓名": {"姓名", "name"},
-    "手機": {"手機", "電話"},
-    "信箱": {"信箱", "email"},
-    "預約人數": {"預約人數", "人數"},
-    "櫃台審核": {"櫃台審核", "審核"},
-    "預約狀態": {"預約狀態", "狀態"},
-    "乘車狀態": {"乘車狀態", "乘車"},
-    "身分": {"身分"},
-    "房號": {"房號"},
-    "入住日期": {"入住日期"},
-    "退房日期": {"退房日期"},
-    "用餐日期": {"用餐日期"},
-    "上車索引": {"上車索引"},
-    "下車索引": {"下車索引"},
-    "涉及路段範圍": {"涉及路段範圍"},
-    "QRCode編碼": {"QRCode編碼", "QR內容"},
+# 僅允許精準欄位名稱（不做別名）
+HEADER_KEYS = {
+    "申請日期",
+    "最後操作時間",
+    "預約編號",
+    "往返",
+    "日期",
+    "班次",
+    "車次",
+    "上車地點",
+    "下車地點",
+    "姓名",
+    "手機",
+    "信箱",
+    "預約人數",
+    "櫃台審核",
+    "預約狀態",
+    "乘車狀態",
+    "身分",
+    "房號",
+    "入住日期",
+    "退房日期",
+    "用餐日期",
+    "上車索引",
+    "下車索引",
+    "涉及路段範圍",
+    "QRCode編碼",
 }
 
-STOP_ALIASES = {
-    "福泰大飯店": {"福泰大飯店", "Forte Hotel"},
-    "南港展覽館-捷運3號出口": {"南港展覽館-捷運3號出口", "南港展覽館捷運站"},
-    "南港火車站": {"南港火車站"},
-    "南港 LaLaport Shopping Park": {"南港 LaLaport Shopping Park", "LaLaport"},
+# 站點索引（精準雙語字串，完全相同才匹配）
+PICK_INDEX_MAP_EXACT = {
+    "福泰大飯店 Forte Hotel": 1,
+    "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": 2,
+    "南港火車站 Nangang Train Station": 3,
+    "南港 LaLaport Shopping Park": 4,
+}
+DROP_INDEX_MAP_EXACT = {
+    "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": 2,
+    "南港火車站 Nangang Train Station": 3,
+    "南港 LaLaport Shopping Park": 4,
+    "福泰大飯店 Forte Hotel": 5,
 }
 
-# 上車/下車索引查表（不需判斷方向）
-PICK_INDEX_MAP = {
-    "福泰大飯店": 1,
-    "南港展覽館-捷運3號出口": 2,
-    "南港火車站": 3,
-    "南港 LaLaport Shopping Park": 4,
-}
-DROP_INDEX_MAP = {
-    "南港展覽館-捷運3號出口": 2,
-    "南港火車站": 3,
-    "南港 LaLaport Shopping Park": 4,
-    "福泰大飯店": 5,
-}
 
 def _email_hash6(email: str) -> str:
     return hashlib.sha256((email or "").encode("utf-8")).hexdigest()[:6]
 
-def _normalize_stop(name: str) -> str:
-    raw = (name or "").strip()
-    for key, aliases in STOP_ALIASES.items():
-        if raw in aliases:
-            return key
-        for a in aliases:
-            if raw.lower() == a.lower():
-                return key
-    return raw
-
 
 def _tz_now_str() -> str:
-    # yyyy/m/d HH:MM（月份與日期不補零，時分補零）
+    """
+    回傳 YYYY-MM-DD HH:MM:SS（Asia/Taipei）。
+    用 USER_ENTERED 寫入 Google Sheets，會被辨識為日期時間格式，而非純文字。
+    """
     os.environ.setdefault("TZ", "Asia/Taipei")
     try:
         time.tzset()
     except Exception:
         pass
     t = time.localtime()
-    return f"{t.tm_year}/{t.tm_mon}/{t.tm_mday} {t.tm_hour:02d}:{t.tm_min:02d}"
+    return f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
 
 
 def _time_hm_from_any(s: str) -> str:
@@ -128,22 +115,25 @@ def _mmdd_prefix(date_iso: str) -> str:
 
 def _compute_indices_and_segments(pickup: str, dropoff: str):
     """
-    直接查表：
-      上車索引：飯店=1, 捷運站=2, 火車站=3, LaLaport=4
-      下車索引：捷運站=2, 火車站=3, LaLaport=4, 飯店=5
-    涉及路段範圍 = [上車索引, 下車索引)（不含下車索引）
-    """
-    p = _normalize_stop(pickup)
-    d = _normalize_stop(dropoff)
+    只做精準匹配：
+      上車索引：福泰=1, 展館=2, 火車站=3, LaLaport=4
+      下車索引：展館=2, 火車站=3, LaLaport=4, 福泰=5
 
-    pick_idx = PICK_INDEX_MAP.get(p, 0)
-    drop_idx = DROP_INDEX_MAP.get(d, 0)
+    涉及路段範圍：
+      取 [上車索引, 下車索引)（不含下車）。不額外加入 5。
+    """
+    ps = (pickup or "").strip()
+    ds = (dropoff or "").strip()
+
+    pick_idx = PICK_INDEX_MAP_EXACT.get(ps, 0)
+    drop_idx = DROP_INDEX_MAP_EXACT.get(ds, 0)
 
     if pick_idx == 0 or drop_idx == 0 or drop_idx <= pick_idx:
         return pick_idx, drop_idx, ""
 
-    segs = ",".join(str(i) for i in range(pick_idx, drop_idx))
-    return pick_idx, drop_idx, segs
+    segs = list(range(pick_idx, drop_idx))  # [pick, drop)
+    seg_str = ",".join(str(i) for i in segs)
+    return pick_idx, drop_idx, seg_str
 
 
 # ========== Google Sheets ==========
@@ -164,16 +154,15 @@ def _sheet_headers(ws: gspread.Worksheet) -> List[str]:
 
 
 def header_map(ws: gspread.Worksheet) -> Dict[str, int]:
+    """
+    僅對 HEADER_KEYS 做精準比對。欄名需與試算表一致。
+    """
     row = _sheet_headers(ws)
     m: Dict[str, int] = {}
     for idx, name in enumerate(row, start=1):
         name = (name or "").strip()
-        if not name:
-            continue
-        for std, aliases in HEADER_ALIASES.items():
-            if name == std or name in aliases:
-                if std not in m:
-                    m[std] = idx
+        if name in HEADER_KEYS and name not in m:
+            m[name] = idx
     return m
 
 
@@ -270,7 +259,7 @@ class OpsRequest(BaseModel):
 
 
 # ========== FastAPI ==========
-app = FastAPI(title="Shuttle Ops API", version="1.0.5")
+app = FastAPI(title="Shuttle Ops API", version="1.0.7")
 
 app.add_middleware(
     CORSMiddleware,
@@ -325,17 +314,19 @@ def ops(req: OpsRequest):
             booking_id = f"{_mmdd_prefix(p.date)}{last_seq + 1:03d}"
 
             car_display = _display_trip_str(p.date, _time_hm_from_any(p.time))
+
+            # 精準索引與路段
             pk_idx, dp_idx, seg_str = _compute_indices_and_segments(
                 p.pickLocation, p.dropLocation
             )
-            
+
             em6 = _email_hash6(p.email)
             qr_content = f"FT:{booking_id}:{em6}"
             qr_url = f"{BASE_URL}/api/qr/{urllib.parse.quote(qr_content)}"
 
             newrow = [""] * len(headers)
 
-            # 申請日期（文字形式 yyyy/m/d HH:MM 由 USER_ENTERED 判定）
+            # 申請日期（YYYY-MM-DD HH:MM:SS）
             setv(newrow, "申請日期", _tz_now_str())
 
             # 預約狀態
