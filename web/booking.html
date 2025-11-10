@@ -293,35 +293,44 @@
       flex-direction: row-reverse;
     }
 
-    @media (max-width: 768px){
-      .nav-links{display:none}
-      .mobile-tabbar{display:block}
-      body{padding-bottom:70px}
-      .navbar{justify-content:space-between}.brand{margin-right:0}
-      
-      /* 手機版按鈕置中 */
-      .actions{
-        justify-content:center;
-        width:100%;
-      }
-      /* 手機版兩個按鈕左右排列 */
-      .actions.row,
-      #step1 .actions,
-      #step2 .actions,
-      #step3 .actions,
-      #step4 .actions,
-      #step6 .actions {
-        flex-direction: row !important;
-        justify-content: space-between !important;
-      }
-      
-      @media (max-width: 768px) {
-        /* 三個按鈕：前兩個左右排列，第三個置下方置中 */
-        .actions:has(button:nth-child(3)):not(.col) {
-          flex-wrap: wrap !important;
+      @media (max-width: 768px){
+        .nav-links{display:none}
+        .mobile-tabbar{display:block}
+        body{padding-bottom:70px}
+        .navbar{justify-content:space-between}.brand{margin-right:0}
+
+        .actions{
+          justify-content:center;
+          width:100%;
+        }
+        .actions.row,
+        #step1 .actions,
+        #step2 .actions,
+        #step3 .actions,
+        #step4 .actions,
+        #step6 .actions {
           flex-direction: row !important;
           justify-content: space-between !important;
         }
+
+  /* 三個按鈕：前兩個左右排列，第三個置下方置中 */
+  .actions:has(button:nth-child(3)):not(.col) {
+    flex-wrap: wrap !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+  }
+  .actions:has(button:nth-child(3)) button {
+    flex: 1 1 45%;
+  }
+  .actions:has(button:nth-child(3)) button:nth-child(3) {
+    flex: 1 1 100%;
+    margin-top: 10px;
+    align-self: center;
+  }
+
+  /* 其他樣式不變 */
+}
+
 
         .actions:has(button:nth-child(3)) button {
           flex: 1 1 45%;
