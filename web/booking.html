@@ -1,459 +1,178 @@
 <!DOCTYPE html>
-<html lang="zh-Hant-TW">
+<html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>飯店服務-免費接駁車預約</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>飯店接駁車預約</title>
+
   <style>
-    :root{
-      --primary:#A98570;
-      --secondary:#8f7147;
-      --bg:#f9f5ef;
-      --card:#fff;
-      --text:#333;
-      --muted:#777;
-      --disabled:#c7c7c7;
-      --radius:14px;
-      --shadow:0 2px 8px rgba(0,0,0,.08);
-      --shadow-lg:0 10px 30px rgba(0,0,0,.15);
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    html,body{
-      margin:0;
-      background:var(--bg);
-      color:var(--text);
-      font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",Segoe UI,Roboto,Arial,sans-serif;
-      min-height:100vh;
-      overflow-x:hidden;
-      -webkit-text-size-adjust:100%;
-      display: flex;
-      flex-direction: column;
-    }
-    img, iframe{max-width:100%;}
-    a{color:inherit; text-decoration:none}
-
-    .navbar{
-      position:sticky;top:0;z-index:50;
-      display:flex;align-items:center;
-      padding:12px 16px;background:var(--card);box-shadow:0 1px 4px rgba(0,0,0,.06)
-    }
-    .brand{display:flex;align-items:center;gap:10px;margin-right: 30px;}
-    .brand img{height:28px;width:auto;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-    .brand-title{font-weight:800;font-size:18px}
-
-    .nav-right{display:flex;align-items:center;gap:12px;margin-left:auto}
-    .lang-wrap span {
-      font-size: 12px; /* Language 字體變小 */
-    }
-    .nav-links{display:flex;gap:8px}
-    .nav-links button{
-      background:none;border:none;padding:8px 10px;border-radius:10px;cursor:pointer;
-      font-size:14px
-    }
-    .nav-links button.active,.nav-links button:hover{color:var(--primary);background:#f3eee6}
-
-    select{
-      appearance:none;padding:8px 28px 8px 10px;border:1px solid #ddd;border-radius:10px;background:white url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="10" viewBox="0 0 24 24" fill="none" stroke="%23666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>') no-repeat right 8px center/14px
-    }
-
-    .page{display:none;padding:20px;max-width:980px;margin:0 auto;flex:1}
-    .page.active{display:block}
-
-    .hero{
-      max-width:840px;margin:18px auto 16px;background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:24px 20px;text-align:center
-    }
-    .hero h1{margin:0 0 12px;font-size:30px;font-weight:900}
-    .hero p{margin:0;color:var(--muted)}
-
-    .button{
-      display:inline-block;min-width:160px;
-      border:none;border-radius:14px;padding:14px 18px;font-size:16px;font-weight:700;cursor:pointer;background:var(--primary);color:#fff;
-      transition:transform .06s ease,filter .2s ease
-    }
-    .button:active{transform:translateY(1px)}
-    .btn-ghost{background:#eee;color:#333}
-
-    .grid{display:grid;gap:14px}
-    .card{
-      background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:18px
-    }
-    .card h2{margin:0 0 12px;font-size:20px;font-weight:800;text-align:center}
-    .station-page .card h2 {
-      text-align: left; /* 停靠站點標題置左 */
-    }
-
-    .field{margin:8px 0}
-    .label{display:block;margin-bottom:6px;font-weight:700}
-    .hint{font-size:12px;color:var(--muted)}
-
-    .input,.select,.readonly{
-      width:100%;padding:12px 14px;border:1px solid #ddd;border-radius:12px;background:#fff;font-size:16px
-    }
-    .readonly{background:#f4f4f4;color:#666}
-
-    .error{color:#b00020;font-size:13px;margin-top:6px;display:none}
-
-    .options{display:flex;flex-direction:column;gap:10px}
-    .opt-btn{
-      text-align:left;padding:14px 16px;border:1px solid #e7e7e7;border-radius:12px;background:#fff;font-weight:700;color:var(--primary);cursor:pointer
-    }
-    .opt-btn:hover{box-shadow:var(--shadow)}
-    .opt-btn.active{outline:3px solid rgba(169,133,112,.25)}
-    .opt-btn.disabled{color:#bbb;background:#f7f7f7;border-color:#eee;cursor:not-allowed}
-
-    .actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:8px}
-    .actions.row{flex-direction:row}
-    .actions.col{flex-direction:column}
-
-    .overlay{
-      position:fixed;inset:0;background:rgba(255,255,255,.94);display:none;align-items:center;justify-content:center;z-index:9999
-    }
-    .overlay.show{display:flex}
-    .spinner{width:48px;height:48px;border-radius:50%;border:4px solid #eee;border-top:4px solid var(--primary);animation:spin 1s linear infinite;margin:0 auto 10px}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .overlay-card{background:#fff;border-radius:16px;box-shadow:var(--shadow-lg);padding:22px;max-width:560px;text-align:center}
-    .overlay-card h3{margin:0 0 8px;font-size:20px}
-
-    @keyframes shake {0%,100%{transform:translateX(0)}10%,30%,50%,70%,90%{transform:translateX(-5px)}20%,40%,60%,80%{transform:translateX(5px)}}
-    .shake{animation:shake .5s ease-in-out}
-
-    .query-form{display:flex;flex-direction:column;gap:14px}
-
-    .footer{
-      background:#f5f5f5;
-      color:#666;
-      text-align:center;
-      padding:20px;
-      margin-top:auto;
-      border-top:1px solid #e0e0e0;
-      width:100%;
-    }
-
-    /* 手機底部導覽：主題色背景 + 白字 */
-    .mobile-tabbar{
-      position:fixed;left:0;right:0;bottom:0;display:none;z-index:40;
-      background:var(--primary);border-top:1px solid #e9e9e9;box-shadow:0 -2px 12px rgba(0,0,0,.06)
-    }
-    .mobile-tabbar .bar{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
-    .mobile-tabbar button{
-      appearance:none;border:none;background:none;padding:12px 6px;
-      font-size:18px; /* 手機版底部菜單字體變大為18px */
-      color:#fff;font-weight:700;opacity:.8
-    }
-    .mobile-tabbar button.active{opacity:1;text-decoration:underline}
-
-    #backToTop{position:fixed;right:18px;bottom:78px;z-index:45;display:none;width:44px;height:44px;border:none;border-radius:50%;cursor:pointer;background:#0009;color:#fff;font-size:22px;line-height:44px;text-align:center}
-    #backToTop:hover{filter:brightness(1.2)}
-
-    /* 確認班次資訊與成功頁：欄位上下排版，只有按鈕左右排列 */
-    #step6 .grid{grid-template-columns:1fr}
-    #successCard .grid{grid-template-columns:1fr}
-
-    /* 站點頁圖片 iframe 自適應 */
-    .station-img{width:100%;border-radius:14px;box-shadow:var(--shadow)}
-
-    /* 成功動畫 */
-    .success-animation {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 10000;
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 16px;
-      padding: 30px;
-      box-shadow: var(--shadow-lg);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-    }
-    .success-animation.show {
-      display: flex;
-      animation: fadeInOut 2s ease-in-out;
-    }
-    .checkmark {
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      display: block;
-      stroke-width: 2;
-      stroke: #4CAF50;
-      stroke-miterlimit: 10;
-      margin: 20px auto;
-      box-shadow: inset 0px 0px 0px #4CAF50;
-      animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
-    }
-    .checkmark__circle {
-      stroke-dasharray: 166;
-      stroke-dashoffset: 166;
-      stroke-width: 2;
-      stroke-miterlimit: 10;
-      stroke: #4CAF50;
-      fill: none;
-      animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
-    }
-    .checkmark__check {
-      transform-origin: 50% 50%;
-      stroke-dasharray: 48;
-      stroke-dashoffset: 48;
-      animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
-    }
-    @keyframes stroke {
-      100% { stroke-dashoffset: 0; }
-    }
-    @keyframes scale {
-      0%, 100% { transform: none; }
-      50% { transform: scale3d(1.1, 1.1, 1); }
-    }
-    @keyframes fill {
-      100% { box-shadow: inset 0px 0px 0px 40px #4CAF50; }
-    }
-    @keyframes fadeInOut {
-      0% { opacity: 0; }
-      20% { opacity: 1; }
-      80% { opacity: 1; }
-      100% { opacity: 0; }
-    }
-
-    /* 車票卡片樣式 */
-    .ticket-card {
-      background: white;
-      border-radius: 16px;
-      box-shadow: var(--shadow-lg);
-      padding: 20px;
-      margin: 20px auto;
-      max-width: 600px;
-      width: 100%;
-    }
-    .ticket-header {
-      text-align: center;
-      margin-bottom: 24px;
-      border-bottom: 2px solid var(--primary);
-      padding-bottom: 16px;
-    }
-    .ticket-header h2 {
-      margin: 0;
-      font-size: 28px;
-      font-weight: 900;
-      color: var(--primary);
-    }
-    .ticket-content {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      align-items: start;
-    }
-    .ticket-qr {
-      text-align: center;
-      padding: 20px;
-      background: #f9f9f9;
-      border-radius: 12px;
-    }
-    .ticket-qr img {
-      width: 200px;
-      height: 200px;
-      border-radius: 8px;
-      border: 1px solid #eee;
-      background: #fff;
-    }
-    .ticket-info {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .ticket-field {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 0;
-      border-bottom: 1px solid #f0f0f0;
-    }
-    .ticket-field:last-child {
-      border-bottom: none;
-    }
-    .ticket-label {
-      font-weight: 800;
-      color: var(--text);
-      min-width: 120px;
-      font-size: 16px;
-    }
-    .ticket-value {
-      flex: 1;
-      text-align: right;
-      color: var(--muted);
-      font-size: 16px;
-    }
-    .ticket-actions {
-      margin-top: 24px;
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      flex-direction: row-reverse;
-    }
-
-      
-      .hero .actions {
-        justify-content: center !important; /* 手機版立即預約按鈕置中 */
-      }
-      
-      .footer {
-        font-size: 70%; /* 手機版版權文字縮小30% */
-        padding: 15px 10px;
-      }
-      
-      .ticket-content {
-        grid-template-columns: 1fr;
-      }
-      .ticket-qr {
-        order: -1;
-      }
-      .ticket-qr img {
-        width: 180px; /* 手機版QR code 尺寸 */
-        height: 180px;
-      }
-      .ticket-field {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 4px;
-      }
-      .ticket-value {
-        text-align: left;
-        width: 100%;
-      }
-      .ticket-actions {
-        flex-direction: row-reverse;
-      }
-    }
-/* === 修正手機版車票寬度與排版 === */
-@media (max-width: 768px) {
-  .ticket-card {
-    width: 95vw;        /* 卡片接近滿版 */
-    max-width: 95vw;    /* 防止超出畫面 */
-    overflow: hidden;   /* 隱藏超出內容，避免左右滾動 */
-  }
-
-  .ticket-content {
-    display: flex;
-    flex-direction: column; /* 改成上下排：QR 在上，資料在下 */
-    align-items: center;    /* 水平置中 */
-    gap: 12px;              /* 元素間距 */
-  }
-
-  .ticket-info {
-    width: 100%;            /* 讓右側資訊自動換行 */
-  }
-
-  .ticket-qr img {
-    width: 160px;
-    height: 160px;
-  }
-}
-
-#step6 .field {
-  margin: 4px 0;       /* 原本為 8px，這裡縮小垂直間距 */
-}
-
-#step6 .label,
-#step6 .readonly {
-  line-height: 1.2;     /* 壓縮欄內文字間距 */
-}
-    
-/* === 修正手機版車票寬度與排版 === */
-@media (max-width: 768px) {
+  /* === 全域樣式 === */
   html, body {
-    overflow-x: hidden; /* 防止手機橫向滾動 */
+    margin: 0;
+    padding: 0;
+    font-family: "Noto Sans TC", "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    background: #f8f9fa;
+    color: #333;
+    overflow-x: hidden;
   }
 
-  .ticket-card {
-    width: 95vw;        /* 卡片接近滿版 */
-    max-width: 95vw;    /* 防止超出畫面 */
-    overflow: hidden;   /* 隱藏多餘內容 */
-    margin: 0 auto;     /* 置中 */
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    background: #0078d7;
+    color: #fff;
+    padding: 10px 18px;
+    font-size: 16px;
+    transition: background 0.2s;
   }
+  button:hover { background: #005fa3; }
+  button.secondary { background: #ccc; color: #333; }
+  button.secondary:hover { background: #aaa; }
 
-  .ticket-content {
+  /* === 卡片與欄位 === */
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin: 20px auto;
+    max-width: 600px;
+    width: 100%;
+  }
+  .card h2 {
+    font-size: 20px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .input, .readonly {
+    width: 100%;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 16px;
+    box-sizing: border-box;
+  }
+  .readonly { background: #f1f1f1; }
+
+  /* === 動作按鈕 === */
+  .actions {
     display: flex;
-    flex-direction: column; /* 改成上下排：QR 在上，資訊在下 */
+    justify-content: space-between;
     align-items: center;
+    margin-top: 20px;
+  }
+  .actions button {
+    flex: 1;
+    margin: 0 5px;
+  }
+
+  /* === 成功車票樣式 === */
+  .ticket-card {
+    display: block;
+    margin: 40px auto;
+    width: 420px;
+    max-width: 95vw;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    padding: 24px;
+    overflow: hidden;
+  }
+  .ticket-header {
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .ticket-header h2 {
+    margin: 0;
+    font-size: 22px;
+    color: #0078d7;
+  }
+  .ticket-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 12px;
+    align-items: start;
   }
-
   .ticket-info {
-    width: 100%; /* 讓右側資訊自動換行 */
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
   }
-
+  .ticket-field {
+    display: flex;
+    justify-content: space-between;
+    font-size: 16px;
+  }
+  .ticket-label { font-weight: 600; }
+  .ticket-value { text-align: right; }
   .ticket-qr img {
-    width: 160px;
-    height: 160px;
+    width: 180px;
+    height: 180px;
+    display: block;
+    margin: auto;
   }
 
-  /* 修正我的預約卡片在手機上超出螢幕問題 */
+  /* === 我的預約 === */
   #check .card {
     max-width: 95vw;
     margin: 0 auto;
     overflow-x: hidden;
   }
-
   #check img {
     max-width: 100%;
     height: auto;
   }
-}
 
-/* === 修正版：手機版按鈕垂直置中 === */
-@media (max-width: 768px) {
-  .nav-links { display: none; }
-  .mobile-tabbar { display: block; }
-  body { padding-bottom: 70px; }
-  .navbar { justify-content: space-between; }
-  .brand { margin-right: 0; }
+  /* === 響應式（手機） === */
+  @media (max-width: 768px) {
+    html, body { overflow-x: hidden; }
 
-  .actions {
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: 100%;
+    /* 手機版卡片與票卡 */
+    .ticket-card {
+      width: 95vw;
+      max-width: 95vw;
+      margin: 0 auto;
+    }
+    .ticket-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .ticket-qr img {
+      width: 160px;
+      height: 160px;
+    }
+
+    /* 手機按鈕左右排列 */
+    .actions {
+      flex-direction: row !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      width: 100%;
+    }
+    .actions button {
+      flex: none;
+      width: 45%;
+      max-width: none;
+    }
+
+    /* 我的預約 */
+    #check .card {
+      max-width: 95vw;
+      margin: 0 auto;
+      overflow-x: hidden;
+    }
   }
-
-  .actions button {
-    width: 80%;
-    max-width: 320px;
-  }
-
-  .actions button + button {
-    margin-top: 10px;
-  }
-}
-/* === 修正版：手機版按鈕左右排列 === */
-@media (max-width: 768px) {
-  .nav-links { display: none; }
-  .mobile-tabbar { display: block; }
-  body { padding-bottom: 70px; }
-  .navbar { justify-content: space-between; }
-  .brand { margin-right: 0; }
-
-  .actions {
-    flex-direction: row !important;      /* ← 改成左右排列 */
-    justify-content: space-between !important;
-    align-items: center !important;
-    flex-wrap: wrap;
-    gap: 10px;
-    width: 100%;
-  }
-
-  .actions button {
-    flex: 1;
-    min-width: 40%;
-    max-width: 45%;
-  }
-
-  .actions button + button {
-    margin-top: 0; /* 移除垂直間距 */
-  }
-}
-
   </style>
 </head>
 <body>
