@@ -794,59 +794,170 @@
       }
     }
 
-    async function submitBooking(){
-      const pSel=document.getElementById('passengers');
-      const p=Number(pSel.value||0);
-      if(!p || p<1 || p>4 || p>selectedAvailableSeats){document.getElementById('passengersErr').style.display='block';return;}
-      document.getElementById('passengersErr').style.display='none';
-
-      const identity=document.getElementById('identitySelect').value;
-      const payload={
-        direction:selectedDirection,
-        date:selectedDateRaw,
-        station:selectedStationRaw,
-        time:selectedScheduleTime,
-        identity,
-        checkIn: identity==='hotel'? (document.getElementById('checkInDate').value||null):null,
-        checkOut: identity==='hotel'? (document.getElementById('checkOutDate').value||null):null,
-        diningDate: identity==='dining'? (document.getElementById('diningDate').value||null):null,
-        roomNumber: identity==='hotel'? (document.getElementById('roomNumber').value||null):null,
-        name:(document.getElementById('guestName').value||'').trim(),
-        phone:(document.getElementById('guestPhone').value||'').trim(),
-        email:(document.getElementById('guestEmail').value||'').trim(),
-        passengers:p,
-        dropLocation:selectedDirection==='回程'?'福泰大飯店 Forte Hotel':selectedStationRaw,
-        pickLocation:selectedDirection==='回程'?selectedStationRaw:'福泰大飯店 Forte Hotel',
-      };
-      showVerifyLoading(true);
-      try{
-        const res = await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'book', data:payload})});
-        const result = await res.json();
-        if(result.status==='success'){
-          const qr = result.qr_url.startsWith('http') ? result.qr_url : (QR_ORIGIN + result.qr_url);
-          document.getElementById('qrImg').src = qr;
-          document.getElementById('succBookingId').value = result.booking_id || '';
-          document.getElementById('succSchedule').value = `${selectedDateRaw} ${selectedScheduleTime}`;
-          document.getElementById('succDirection').value = selectedDirection;
-          document.getElementById('succPick').value = payload.pickLocation;
-          document.getElementById('succDrop').value = payload.dropLocation;
-          document.getElementById('succName').value = payload.name;
-          document.getElementById('succPhone').value = payload.phone;
-          document.getElementById('succEmail').value = payload.email;
-
-          // 顯示成功卡
-          ['step6'].forEach(id=>document.getElementById(id).style.display='none');
-          document.getElementById('successCard').style.display='';
-          window.scrollTo({top:0,behavior:'smooth'});
-        }else{
-          alert(result.detail || result.message || '預約失敗，請稍後再試');
-        }
-      }catch(e){
-        alert('提交失敗：' + e.message);
-      }finally{
-        showVerifyLoading(false);
-      }
+async function submitBooking(){
+    const pSel = document.getElementById('passengers');
+    const p = Number(pSel.value || 0);
+    
+    // 驗證人數
+    if (!p || p < 1 || p > 4 || p > selectedAvailableSeats) {
+        document.getElementById('passengersErr').style.display = 'block';
+        return;
     }
+    document.getElementById('passengersErr').style.display = 'none';
+
+    const identity = document.getElementById('identitySelect').value;
+    const payload = {
+        direction: selectedDirection,
+        date: selectedDateRaw,
+        station: selectedStationRaw,
+        time: selectedScheduleTime,
+        identity,
+        checkIn: identity === 'hotel' ? (document.getElementById('checkInDate').value || null) : null,
+        checkOut: identity === 'hotel' ? (document.getElementById('checkOutDate').value || null) : null,
+        diningDate: identity === 'dining' ? (document.getElementById('diningDate').value || null) : null,
+        roomNumber: identity === 'hotel' ? (document.getElementById('roomNumber').value || null) : null,
+        name: (document.getElementById('guestName').value || '').trim(),
+        phone: (document.getElementById('guestPhone').value || '').trim(),
+        email: (document.getElementById('guestEmail').value || '').trim(),
+        passengers: p,
+        dropLocation: selectedDirection === '回程' ? '福泰大飯店 Forte Hotel' : selectedStationRaw,
+        pickLocation: selectedDirection === '回程' ? selectedStationRaw : '福泰大飯店 Forte Hotel',
+    };
+
+    console.log('提交預約資料:', payload); // 除錯用
+
+    showVerifyLoading(true);
+    
+    try {
+        const res = await fetch(OPS_URL, {
+            method: 'POST', 
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }, 
+            body: JSON.stringify({
+                action: 'book', 
+                data: payload
+            })
+        });
+
+        // 檢查 HTTP 狀態碼
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+
+        const result = await res.json();
+        console.log('後端回傳結果:', result); // 除錯用
+
+        if (result.status === 'success') {
+            // 直接使用後端回傳的完整 QR URL，不需要再拼接
+            let qrUrl = result.qr_url;
+            
+            // 如果後端回傳的是相對路徑，加上基礎 URL
+            if (qrUrl && !qrUrl.startsWith('http')) {
+                qrUrl = QR_ORIGIN + qrUrl;
+            }
+            
+            console.log('最終 QR URL:', qrUrl); // 除錯用
+            
+            // 設定 QR 圖片來源
+            document.getElementById('qrImg').src = qrUrl;
+            
+            // 設定成功頁面的其他資訊
+            document.getElementById('succBookingId').value = result.booking_id || '';
+            document.getElementById('succSchedule').value = `${selectedDateRaw} ${selectedScheduleTime}`;
+            document.getElementById('succDirection').value = selectedDirection;
+            document.getElementById('succPick').value = payload.pickLocation;
+            document.getElementById('succDrop').value = payload.dropLocation;
+            document.getElementById('succName').value = payload.name;
+            document.getElementById('succPhone').value = payload.phone;
+            document.getElementById('succEmail').value = payload.email;
+
+            // 隱藏步驟6，顯示成功卡片
+            document.getElementById('step6').style.display = 'none';
+            document.getElementById('successCard').style.display = '';
+            
+            // 滾動到頂部
+            window.scrollTo({top: 0, behavior: 'smooth'});
+
+        } else {
+            // 處理錯誤情況
+            const errorMessage = result.detail || result.message || '預約失敗，請稍後再試';
+            console.error('預約失敗:', errorMessage);
+            alert(errorMessage);
+        }
+        
+    } catch (e) {
+        console.error('提交失敗:', e);
+        alert('提交失敗：' + e.message);
+    } finally {
+        showVerifyLoading(false);
+    }
+}
+
+// 添加 QR 圖片載入錯誤處理
+document.addEventListener('DOMContentLoaded', function() {
+    const qrImg = document.getElementById('qrImg');
+    if (qrImg) {
+        qrImg.addEventListener('error', function() {
+            console.error('QR 圖片載入失敗');
+            // 可以選擇顯示預設圖片或錯誤訊息
+            this.alt = 'QR 碼載入失敗，請重新整理頁面';
+        });
+        
+        qrImg.addEventListener('load', function() {
+            console.log('QR 圖片載入成功');
+        });
+    }
+});
+
+// 下載車票功能（確保有正確綁定）
+document.addEventListener('click', function(e){
+    if (e.target && e.target.id === 'downloadTicketBtn') { 
+        downloadTicketAsImage(); 
+    }
+});
+
+// 下載車票為圖片的完整函數
+async function downloadTicketAsImage(){
+    const node = document.getElementById('ticketCard');
+    if (!node) {
+        alert('找不到車票資料');
+        return;
+    }
+    
+    const scale = 2;
+    const style = {
+        filter: 'none', 
+        transform: 'none', 
+        background: '#fff',
+        width: node.scrollWidth + 'px',
+        height: node.scrollHeight + 'px'
+    };
+    
+    try {
+        const dataUrl = await domtoimage.toPng(node, {
+            bgcolor: '#ffffff', 
+            style: style, 
+            width: node.scrollWidth * scale,
+            height: node.scrollHeight * scale,
+            quality: 1, 
+            pixelRatio: scale
+        });
+        
+        const a = document.createElement('a');
+        const bookingId = document.getElementById('succBookingId').value || 'booking';
+        a.href = dataUrl; 
+        a.download = `ticket_${bookingId}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+    } catch(e) {
+        console.error('下載失敗:', e);
+        alert('下載失敗：' + e.message);
+    }
+}
 
     // 下載車票為圖片
     async function downloadTicketAsImage(){
