@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, validator
 import gspread
 import google.auth  # 新增
 
+
 # ---------- 常數與工具 ----------
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
