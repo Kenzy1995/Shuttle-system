@@ -21,7 +21,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 SPREADSHEET_ID = "1xp54tKOczklmT8uacW-HMxwV8r0VOR2ui33jYcE2pUQ"
-SHEET_NAME = "預約審核(櫃台)"
+SHEET_NAME = "預約審核"
 BASE_URL = "https://booking-manager-995728097341.asia-east1.run.app"
 
 
