@@ -351,3 +351,11 @@ def ops(req: OpsRequest):
 
     else:
         raise HTTPException(400, f"未知 action：{action}")
+
+@app.get("/cors_debug")
+def cors_debug():
+    return {
+        "status": "ok",
+        "cors_test": True,
+        "time": _tz_now_str()
+    }
