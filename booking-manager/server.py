@@ -1,6 +1,3 @@
-"""
-shuttle_ops_api.py - 修正憑證讀取版本
-"""
 from __future__ import annotations
 import io
 import os
@@ -15,10 +12,15 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
 import gspread
-from google.oauth2.service_account import Credentials
+import google.auth  # 新增
 
 # ---------- 常數與工具 ----------
-DEFAULT_SHEET_NAME = os.getenv("SHEET_NAME", "預約審核(櫃台)")
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+SPREADSHEET_ID = "1xp54tKOczklmT8uacW-HMxwV8r0VOR2ui33jYcE2pUQ"
+SHEET_NAME = "預約審核(櫃台)"
 BASE_URL = "https://booking-manager-995728097341.asia-east1.run.app"
 
 HEADER_ALIASES = {
@@ -114,38 +116,23 @@ def _mmdd_prefix(date_iso: str) -> str:
 
 # ---------- Google Sheets ----------
 def open_sheet() -> gspread.Worksheet:
-    """讀取 GCP_CREDENTIALS 環境變數"""
+    """使用服務帳戶身份（與 booking-api 相同的方式）"""
     try:
-        # 使用 GCP_CREDENTIALS 環境變數
-        service_account_json = os.getenv("GCP_CREDENTIALS")
-        if not service_account_json:
-            raise RuntimeError("GCP_CREDENTIALS 環境變數未設定")
+        print("DEBUG: 使用服務帳戶身份連接 Google Sheet")
         
-        print("DEBUG: GCP_CREDENTIALS 環境變數存在")
+        # 使用預設憑證（Cloud Run 服務帳戶）
+        credentials, project = google.auth.default(scopes=SCOPES)
+        gc = gspread.authorize(credentials)
         
-        # 解析 JSON
-        creds_dict = json.loads(service_account_json)
-        creds = Credentials.from_service_account_info(creds_dict)
-        
-        # 從環境變數讀取
-        spreadsheet_id = os.getenv("SPREADSHEET_ID")
-        sheet_name = os.getenv("SHEET_NAME")
-        
-        if not spreadsheet_id:
-            raise RuntimeError("SPREADSHEET_ID 環境變數未設定")
-        
-        scopes = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive",
-        ]
-        creds = creds.with_scopes(scopes)
-        gc = gspread.authorize(creds)
-        sh = gc.open_by_key(spreadsheet_id)
-        ws = sh.worksheet(sheet_name or "預約審核(櫃台)")
+        sh = gc.open_by_key(SPREADSHEET_ID)
+        ws = sh.worksheet(SHEET_NAME)
         
         print("DEBUG: Google Sheet 連接成功")
         return ws
         
+    except Exception as e:
+        print(f"DEBUG: 連接失敗: {str(e)}")
+        raise RuntimeError(f"無法開啟 Google Sheet: {str(e)}")     
     except Exception as e:
         raise RuntimeError(f"無法開啟 Google Sheet: {str(e)}")     
 def header_map(ws: gspread.Worksheet) -> Dict[str, int]:
