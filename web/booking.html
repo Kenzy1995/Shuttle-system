@@ -740,7 +740,7 @@
       const s = String(v).trim();
       if(/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0,10);
       if(/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(s)){ const [y,m,d]=s.split('/'); return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
-      if(/^\d{1,2}:\d{1,2}/.test(s)){ const [m,d,y]=s.split('/'); return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+      if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)){ const [m,d,y]=s.split('/'); return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
       if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
       return s;
     }
@@ -748,7 +748,7 @@
       if(v==null) return "";
       const s = String(v).trim().replace('：',':');
       if(/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(11,16);
-      if(/^\\d{1,2}:\\d{1,2}/.test(s)){ const [h,m]=s.split(':'); return `${String(h).padStart(2,'0')}:${String(m).slice(0,2).padStart(2,'0')}`; }
+      if(/^\d{1,2}:\d{1,2}/.test(s)){ const [h,m]=s.split(':'); return `${String(h).padStart(2,'0')}:${String(m).slice(0,2).padStart(2,'0')}`; }
       return s.slice(0,5);
     }
     function onlyDigits(t){return (t||'').replace(/\D/g,'')}
@@ -763,7 +763,7 @@
       const value = input.value || "";
       const nameErr = document.getElementById('nameErr');
       if(!nameRegex.test(value)){
-        input.value = value.replace(/[^\\u4e00-\\u9fa5a-zA-Z\\s]/g,'');
+        input.value = value.replace(/[^\u4e00-\u9fa5a-zA-Z\s]/g,'');
         nameErr.textContent = t('errName');
         nameErr.style.display='block';
         shake(input);
@@ -846,7 +846,7 @@
 
     function maskName(name){
       const s = String(name||'').trim();
-      if(/[\\u4e00-\\u9fa5]/.test(s)){ return s ? s.charAt(0) : ""; } // 中文顯示姓氏
+      if(/[\u4e00-\u9fa5]/.test(s)){ return s ? s.charAt(0) : ""; } // 中文顯示姓氏
       return s.slice(0,3); // 英文前三碼
     }
     function maskPhone(phone){
