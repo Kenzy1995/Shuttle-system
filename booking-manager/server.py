@@ -113,26 +113,27 @@ def _mmdd_prefix(date_iso: str) -> str:
     return f"{int(m):02d}{int(d):02d}"
 
 # ---------- Google Sheets ----------
-# ---------- Google Sheets ----------
 def open_sheet() -> gspread.Worksheet:
-    """使用舊版本的憑證讀取邏輯"""
+    """讀取 GCP_CREDENTIALS 環境變數"""
     try:
-        # 使用舊版本的名稱 GOOGLE_CREDENTIALS_JSON
-        service_account_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+        # 使用 GCP_CREDENTIALS 環境變數
+        service_account_json = os.getenv("GCP_CREDENTIALS")
         if not service_account_json:
-            # 如果沒有，嘗試新版本的名稱（向後兼容）
-            service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-        if not service_account_json:
-            raise RuntimeError("請設定 GOOGLE_CREDENTIALS_JSON 環境變數")
+            raise RuntimeError("GCP_CREDENTIALS 環境變數未設定")
         
-        # 解析 JSON 字串
+        print("DEBUG: GCP_CREDENTIALS 環境變數存在")
+        
+        # 解析 JSON
         creds_dict = json.loads(service_account_json)
         creds = Credentials.from_service_account_info(creds_dict)
         
+        # 從環境變數讀取
         spreadsheet_id = os.getenv("SPREADSHEET_ID")
+        sheet_name = os.getenv("SHEET_NAME")
+        
         if not spreadsheet_id:
-            raise RuntimeError("請設定 SPREADSHEET_ID")
-            
+            raise RuntimeError("SPREADSHEET_ID 環境變數未設定")
+        
         scopes = [
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive",
@@ -140,14 +141,13 @@ def open_sheet() -> gspread.Worksheet:
         creds = creds.with_scopes(scopes)
         gc = gspread.authorize(creds)
         sh = gc.open_by_key(spreadsheet_id)
-        ws = sh.worksheet(os.getenv("SHEET_NAME", DEFAULT_SHEET_NAME))
+        ws = sh.worksheet(sheet_name or "預約審核(櫃台)")
+        
+        print("DEBUG: Google Sheet 連接成功")
         return ws
         
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"憑證 JSON 格式錯誤: {e}")
     except Exception as e:
-        raise RuntimeError(f"無法開啟 Google Sheet: {str(e)}")
-        
+        raise RuntimeError(f"無法開啟 Google Sheet: {str(e)}")     
 def header_map(ws: gspread.Worksheet) -> Dict[str, int]:
     row = ws.row_values(1)
     m: Dict[str, int] = {}
