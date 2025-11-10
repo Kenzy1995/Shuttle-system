@@ -380,7 +380,6 @@ def ops(req: OpsRequest):
         # ===== 查詢 =====
         elif action == "query":
             p = QueryPayload(**data)
-            p = QueryPayload(**data)
             if not (p.booking_id or p.phone or p.email):
                 raise HTTPException(400, "至少提供 booking_id / phone / email 其中一項")
 
@@ -415,7 +414,11 @@ def ops(req: OpsRequest):
                 if rec.get("櫃台審核", "") == "n":
                     rec["預約狀態"] = "已拒絕"
                 results.append(rec)
+
+            print("=== DEBUG: query result ===")
+            print(results)
             return results
+
 
         # ===== 修改 =====
         elif action == "modify":
