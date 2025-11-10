@@ -24,7 +24,7 @@ SHEET_NAME = "預約審核(櫃台)"
 BASE_URL = "https://booking-manager-995728097341.asia-east1.run.app"
 
 # 表頭實際位於第幾列（1-based）
-HEADER_ROW = 1
+HEADER_ROW = 2
 
 # 狀態固定字串
 BOOKED_TEXT = "✔️ 已預約 Booked"
