@@ -361,7 +361,7 @@
         width: 100%;
       }
       .ticket-actions {
-        flex-direction: column-reverse;
+        flex-direction: row-reverse;
       }
     }
 
@@ -1224,7 +1224,7 @@
         try {
             // 根據螢幕寬度決定下載尺寸
             const isMobile = window.innerWidth <= 768;
-            const width = isMobile ? 350  : 600 * 2; // 手機版350px，電腦版600px
+            const width = isMobile ? 350  : 600 ; // 手機版350px，電腦版600px
             const height = isMobile ? 650  : 500 * 2; // 手機版較高，電腦版較矮
             
             const dataUrl = await domtoimage.toPng(ticketCard, {
