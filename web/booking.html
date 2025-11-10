@@ -313,19 +313,18 @@
           justify-content: space-between !important;
         }
 
-        /* 三個按鈕：前兩個左右排列，第三個置下方置中（JS 自動加 .has-three） */
+        /* 手機版：三個按鈕上下排列且置中 */
         .actions.has-three {
-          flex-wrap: wrap !important;
-          flex-direction: row !important;
-          justify-content: space-between !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: center !important;
         }
         .actions.has-three button {
-          flex: 1 1 45%;
+          width: 80%;
+          max-width: 320px;
         }
-        .actions.has-three button:nth-child(3) {
-          flex: 1 1 100%;
+        .actions.has-three button + button {
           margin-top: 10px;
-          align-self: center;
         }
 
       }
