@@ -135,50 +135,102 @@
     /* 站點頁圖片 iframe 自適應 */
     .station-img{width:100%;border-radius:14px;box-shadow:var(--shadow)}
 
-    /* 新增：車票模態窗口樣式 */
-    .ticket-modal {
+    /* 成功動畫 */
+    .success-animation {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.7);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10000;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 16px;
+      padding: 30px;
+      box-shadow: var(--shadow-lg);
       display: none;
       align-items: center;
       justify-content: center;
-      z-index: 10000;
-      padding: 20px;
+      flex-direction: column;
     }
-    .ticket-modal.show {
+    .success-animation.show {
       display: flex;
+      animation: fadeInOut 2s ease-in-out;
     }
-    .ticket-content {
+    .checkmark {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: block;
+      stroke-width: 2;
+      stroke: #4CAF50;
+      stroke-miterlimit: 10;
+      margin: 20px auto;
+      box-shadow: inset 0px 0px 0px #4CAF50;
+      animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
+    }
+    .checkmark__circle {
+      stroke-dasharray: 166;
+      stroke-dashoffset: 166;
+      stroke-width: 2;
+      stroke-miterlimit: 10;
+      stroke: #4CAF50;
+      fill: none;
+      animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+    }
+    .checkmark__check {
+      transform-origin: 50% 50%;
+      stroke-dasharray: 48;
+      stroke-dashoffset: 48;
+      animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+    }
+    @keyframes stroke {
+      100% { stroke-dashoffset: 0; }
+    }
+    @keyframes scale {
+      0%, 100% { transform: none; }
+      50% { transform: scale3d(1.1, 1.1, 1); }
+    }
+    @keyframes fill {
+      100% { box-shadow: inset 0px 0px 0px 40px #4CAF50; }
+    }
+    @keyframes fadeInOut {
+      0% { opacity: 0; }
+      20% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    /* 車票卡片樣式 */
+    .ticket-card {
       background: white;
       border-radius: 16px;
       box-shadow: var(--shadow-lg);
-      max-width: 500px;
-      width: 100%;
-      max-height: 90vh;
-      overflow-y: auto;
-      position: relative;
+      padding: 24px;
+      margin: 20px auto;
+      max-width: 600px;
     }
     .ticket-header {
-      padding: 20px 20px 10px;
-      border-bottom: 1px solid #eee;
       text-align: center;
+      margin-bottom: 24px;
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 16px;
     }
     .ticket-header h2 {
       margin: 0;
-      font-size: 24px;
-      font-weight: 800;
+      font-size: 28px;
+      font-weight: 900;
       color: var(--primary);
     }
-    .ticket-body {
-      padding: 20px;
+    .ticket-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      align-items: start;
     }
     .ticket-qr {
       text-align: center;
-      margin-bottom: 20px;
+      padding: 20px;
+      background: #f9f9f9;
+      border-radius: 12px;
     }
     .ticket-qr img {
       width: 200px;
@@ -188,55 +240,37 @@
       background: #fff;
     }
     .ticket-info {
-      display: grid;
-      grid-template-columns: 1fr;
+      display: flex;
+      flex-direction: column;
       gap: 12px;
     }
     .ticket-field {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 8px 0;
+      padding: 12px 0;
       border-bottom: 1px solid #f0f0f0;
     }
     .ticket-field:last-child {
       border-bottom: none;
     }
     .ticket-label {
-      font-weight: 700;
-      color: var(--muted);
-      min-width: 100px;
+      font-weight: 800; /* 改為粗體 */
+      color: var(--text);
+      min-width: 120px;
+      font-size: 16px;
     }
     .ticket-value {
       flex: 1;
       text-align: right;
-      color: var(--text);
+      color: var(--muted);
+      font-size: 16px;
     }
     .ticket-actions {
-      padding: 20px;
+      margin-top: 24px;
       display: flex;
-      gap: 10px;
+      gap: 12px;
       justify-content: center;
-      border-top: 1px solid #eee;
-    }
-    .close-modal {
-      position: absolute;
-      top: 15px;
-      right: 15px;
-      background: none;
-      border: none;
-      font-size: 24px;
-      cursor: pointer;
-      color: var(--muted);
-      width: 30px;
-      height: 30px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-    }
-    .close-modal:hover {
-      background: #f5f5f5;
     }
 
     @media (max-width: 768px){
@@ -246,8 +280,19 @@
       .navbar{justify-content:space-between}.brand{margin-right:0}
       .actions{justify-content:space-between}
       .ticket-content {
-        max-width: 100%;
-        margin: 10px;
+        grid-template-columns: 1fr;
+      }
+      .ticket-qr {
+        order: -1;
+      }
+      .ticket-field {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+      .ticket-value {
+        text-align: left;
+        width: 100%;
       }
     }
 
@@ -443,14 +488,59 @@
       </div>
     </section>
 
-    <!-- 成功卡片 -->
+    <!-- 成功卡片 - 直接顯示車票 -->
     <section id="successCard" class="card" style="display:none">
-      <h2>預約完成</h2>
-      <p style="text-align:center;color:var(--muted);margin-bottom:20px">您的預約已成功提交！</p>
-      
-      <div class="actions row">
-        <button class="button" onclick="showTicketModal()">查看車票</button>
-        <button class="button btn-ghost" onclick="restart()">回到首頁</button>
+      <div id="ticketCard" class="ticket-card">
+        <div class="ticket-header">
+          <h2>接駁車票</h2>
+        </div>
+        <div class="ticket-content">
+          <div class="ticket-qr">
+            <img id="ticketQrImg" src="" alt="QR Code"/>
+          </div>
+          <div class="ticket-info">
+            <div class="ticket-field">
+              <span class="ticket-label">預約編號</span>
+              <span class="ticket-value" id="ticketBookingId"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">班次</span>
+              <span class="ticket-value" id="ticketSchedule"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">方向</span>
+              <span class="ticket-value" id="ticketDirection"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">上車地點</span>
+              <span class="ticket-value" id="ticketPick"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">下車地點</span>
+              <span class="ticket-value" id="ticketDrop"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">姓名</span>
+              <span class="ticket-value" id="ticketName"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">手機</span>
+              <span class="ticket-value" id="ticketPhone"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">信箱</span>
+              <span class="ticket-value" id="ticketEmail"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">人數</span>
+              <span class="ticket-value" id="ticketPassengers"></span>
+            </div>
+          </div>
+        </div>
+        <div class="ticket-actions">
+          <button class="button" onclick="downloadTicket()">下載車票</button>
+          <button class="button btn-ghost" onclick="restart()">回到首頁</button>
+        </div>
       </div>
     </section>
   </main>
@@ -550,61 +640,13 @@
     </div>
   </div>
 
-  <!-- 車票模態窗口 -->
-  <div id="ticketModal" class="ticket-modal">
-    <div class="ticket-content">
-      <button class="close-modal" onclick="closeTicketModal()">×</button>
-      <div class="ticket-header">
-        <h2>接駁車票</h2>
-      </div>
-      <div class="ticket-body">
-        <div class="ticket-qr">
-          <img id="ticketQrImg" src="" alt="QR Code"/>
-        </div>
-        <div class="ticket-info">
-          <div class="ticket-field">
-            <span class="ticket-label">預約編號</span>
-            <span class="ticket-value" id="ticketBookingId"></span>
-          </div>
-          <div class="ticket-field">
-            <span class="ticket-label">班次</span>
-            <span class="ticket-value" id="ticketSchedule"></span>
-          </div>
-          <div class="ticket-field">
-            <span class="ticket-label">方向</span>
-            <span class="ticket-value" id="ticketDirection"></span>
-          </div>
-          <div class="ticket-field">
-            <span class="ticket-label">上車地點</span>
-            <span class="ticket-value" id="ticketPick"></span>
-          </div>
-          <div class="ticket-field">
-            <span class="ticket-label">下車地點</span>
-            <span class="ticket-value" id="ticketDrop"></span>
-          </div>
-          <div class="ticket-field">
-            <span class="ticket-label">姓名</span>
-            <span class="ticket-value" id="ticketName"></span>
-          </div>
-          <div class="ticket-field">
-            <span class="ticket-label">手機</span>
-            <span class="ticket-value" id="ticketPhone"></span>
-          </div>
-          <div class="ticket-field">
-            <span class="ticket-label">信箱</span>
-            <span class="ticket-value" id="ticketEmail"></span>
-          </div>
-          <div class="ticket-field">
-            <span class="ticket-label">人數</span>
-            <span class="ticket-value" id="ticketPassengers"></span>
-          </div>
-        </div>
-      </div>
-      <div class="ticket-actions">
-        <button class="button" onclick="downloadTicket()">下載車票</button>
-        <button class="button btn-ghost" onclick="closeTicketModal()">關閉</button>
-      </div>
-    </div>
+  <!-- 成功動畫 -->
+  <div id="successAnimation" class="success-animation">
+    <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+      <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none"/>
+      <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+    </svg>
+    <div style="font-size: 24px; font-weight: 700; color: #4CAF50;">預約成功！</div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js"></script>
@@ -655,6 +697,15 @@
     function showVerifyLoading(s=true){document.getElementById('loadingConfirm').classList.toggle('show',s)}
     function showExpiredOverlay(s=true){document.getElementById('expiredOverlay').classList.toggle('show',s)}
     function overlayRestart(){ showExpiredOverlay(false); restart(); }
+
+    // 顯示成功動畫
+    function showSuccessAnimation() {
+      const animation = document.getElementById('successAnimation');
+      animation.classList.add('show');
+      setTimeout(() => {
+        animation.classList.remove('show');
+      }, 2000);
+    }
 
     // 日期/時間格式
     function fmtDateLabel(v){
@@ -1017,12 +1068,29 @@
                     qrUrl: result.qr_url
                 };
                 
-                // 隱藏步驟6，顯示成功卡片
-                document.getElementById('step6').style.display = 'none';
-                document.getElementById('successCard').style.display = '';
+                // 顯示成功動畫
+                showSuccessAnimation();
                 
-                // 滾動到頂部
-                window.scrollTo({top: 0, behavior: 'smooth'});
+                // 設定車票內容
+                setTimeout(() => {
+                    document.getElementById('ticketQrImg').src = currentBookingData.qrUrl;
+                    document.getElementById('ticketBookingId').textContent = currentBookingData.bookingId;
+                    document.getElementById('ticketSchedule').textContent = currentBookingData.schedule;
+                    document.getElementById('ticketDirection').textContent = currentBookingData.direction;
+                    document.getElementById('ticketPick').textContent = currentBookingData.pickLocation;
+                    document.getElementById('ticketDrop').textContent = currentBookingData.dropLocation;
+                    document.getElementById('ticketName').textContent = currentBookingData.name;
+                    document.getElementById('ticketPhone').textContent = currentBookingData.phone;
+                    document.getElementById('ticketEmail').textContent = currentBookingData.email;
+                    document.getElementById('ticketPassengers').textContent = currentBookingData.passengers + ' 人';
+
+                    // 隱藏步驟6，顯示成功卡片
+                    document.getElementById('step6').style.display = 'none';
+                    document.getElementById('successCard').style.display = '';
+                    
+                    // 滾動到頂部
+                    window.scrollTo({top: 0, behavior: 'smooth'});
+                }, 2000);
 
             } else {
                 // 處理錯誤情況
@@ -1039,38 +1107,15 @@
         }
     }
 
-    // 顯示車票模態窗口
-    function showTicketModal() {
-        // 設定車票內容
-        document.getElementById('ticketQrImg').src = currentBookingData.qrUrl;
-        document.getElementById('ticketBookingId').textContent = currentBookingData.bookingId;
-        document.getElementById('ticketSchedule').textContent = currentBookingData.schedule;
-        document.getElementById('ticketDirection').textContent = currentBookingData.direction;
-        document.getElementById('ticketPick').textContent = currentBookingData.pickLocation;
-        document.getElementById('ticketDrop').textContent = currentBookingData.dropLocation;
-        document.getElementById('ticketName').textContent = currentBookingData.name;
-        document.getElementById('ticketPhone').textContent = currentBookingData.phone;
-        document.getElementById('ticketEmail').textContent = currentBookingData.email;
-        document.getElementById('ticketPassengers').textContent = currentBookingData.passengers + ' 人';
-        
-        // 顯示模態窗口
-        document.getElementById('ticketModal').classList.add('show');
-    }
-
-    // 關閉車票模態窗口
-    function closeTicketModal() {
-        document.getElementById('ticketModal').classList.remove('show');
-    }
-
     // 下載車票
     async function downloadTicket() {
-        const ticketContent = document.querySelector('.ticket-content');
+        const ticketCard = document.getElementById('ticketCard');
         
         try {
-            const dataUrl = await domtoimage.toPng(ticketContent, {
+            const dataUrl = await domtoimage.toPng(ticketCard, {
                 bgcolor: '#ffffff',
-                width: ticketContent.scrollWidth * 2,
-                height: ticketContent.scrollHeight * 2,
+                width: ticketCard.scrollWidth * 2,
+                height: ticketCard.scrollHeight * 2,
                 quality: 1,
                 pixelRatio: 2
             });
@@ -1086,13 +1131,6 @@
             alert('下載失敗：' + e.message);
         }
     }
-
-    // 點擊模態窗口外部關閉
-    document.getElementById('ticketModal').addEventListener('click', function(e) {
-        if (e.target === this) {
-            closeTicketModal();
-        }
-    });
 
     // 添加 QR 圖片載入錯誤處理
     document.addEventListener('DOMContentLoaded', function() {
