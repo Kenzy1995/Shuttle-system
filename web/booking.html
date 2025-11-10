@@ -1386,7 +1386,7 @@
         const wrap = document.getElementById('queryResult');
         wrap.innerHTML='';
         console.log("=== DEBUG: query result ===", data); // 可選，用來看後端回傳
-        const arr = Array.isArray(data) ? data : (data.results || []);
+        const arr = Array.isArray(data) ? data : [];
         if(!arr.length){
           wrap.innerHTML = `<div class="card"><div style="text-align:center;color:#666">查無符合條件的紀錄（僅顯示近一個月）</div></div>`;
           return;
