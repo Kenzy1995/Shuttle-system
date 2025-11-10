@@ -14,7 +14,6 @@ import gspread
 import google.auth
 import hashlib
 
-
 # ========== 常數與工具 ==========
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -74,16 +73,10 @@ DROP_INDEX_MAP_EXACT = {
     "福泰大飯店 Forte Hotel": 5,
 }
 
-
 def _email_hash6(email: str) -> str:
     return hashlib.sha256((email or "").encode("utf-8")).hexdigest()[:6]
 
-
 def _tz_now_str() -> str:
-    """
-    回傳 YYYY-MM-DD HH:MM:SS（Asia/Taipei）。
-    用 USER_ENTERED 寫入 Google Sheets，會被辨識為日期時間格式，而非純文字。
-    """
     os.environ.setdefault("TZ", "Asia/Taipei")
     try:
         time.tzset()
@@ -91,7 +84,6 @@ def _tz_now_str() -> str:
         pass
     t = time.localtime()
     return f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
-
 
 def _time_hm_from_any(s: str) -> str:
     s = (s or "").strip().replace("：", ":")
@@ -101,40 +93,24 @@ def _time_hm_from_any(s: str) -> str:
         return s[:5]
     return s
 
-
 def _display_trip_str(date_iso: str, time_hm: str) -> str:
-    # 顯示車次避免被當作日期，自行前置單引號
     y, m, d = date_iso.split("-")
     return f"'%s/%s %s" % (int(m), int(d), time_hm)
-
 
 def _mmdd_prefix(date_iso: str) -> str:
     y, m, d = date_iso.split("-")
     return f"{int(m):02d}{int(d):02d}"
 
-
 def _compute_indices_and_segments(pickup: str, dropoff: str):
-    """
-    只做精準匹配：
-      上車索引：福泰=1, 展館=2, 火車站=3, LaLaport=4
-      下車索引：展館=2, 火車站=3, LaLaport=4, 福泰=5
-
-    涉及路段範圍：
-      取 [上車索引, 下車索引)（不含下車）。不額外加入 5。
-    """
     ps = (pickup or "").strip()
     ds = (dropoff or "").strip()
-
     pick_idx = PICK_INDEX_MAP_EXACT.get(ps, 0)
     drop_idx = DROP_INDEX_MAP_EXACT.get(ds, 0)
-
     if pick_idx == 0 or drop_idx == 0 or drop_idx <= pick_idx:
         return pick_idx, drop_idx, ""
-
-    segs = list(range(pick_idx, drop_idx))  # [pick, drop)
+    segs = list(range(pick_idx, drop_idx))
     seg_str = ",".join(str(i) for i in segs)
     return pick_idx, drop_idx, seg_str
-
 
 # ========== Google Sheets ==========
 def open_sheet() -> gspread.Worksheet:
@@ -147,16 +123,11 @@ def open_sheet() -> gspread.Worksheet:
     except Exception as e:
         raise RuntimeError(f"無法開啟 Google Sheet: {str(e)}")
 
-
 def _sheet_headers(ws: gspread.Worksheet) -> List[str]:
     headers = ws.row_values(HEADER_ROW)
     return [h.strip() for h in headers]
 
-
 def header_map(ws: gspread.Worksheet) -> Dict[str, int]:
-    """
-    僅對 HEADER_KEYS 做精準比對。欄名需與試算表一致。
-    """
     row = _sheet_headers(ws)
     m: Dict[str, int] = {}
     for idx, name in enumerate(row, start=1):
@@ -165,29 +136,22 @@ def header_map(ws: gspread.Worksheet) -> Dict[str, int]:
             m[name] = idx
     return m
 
-
 def _read_all_rows(ws: gspread.Worksheet) -> List[List[str]]:
     return ws.get_all_values()
-
 
 def _find_rows_by_pred(ws: gspread.Worksheet, pred) -> List[int]:
     values = _read_all_rows(ws)
     if not values:
         return []
-    # 第2列是標題列（跳過第1列合併儲存格）
     headers = values[HEADER_ROW - 1] if len(values) >= HEADER_ROW else []
     result = []
-    # 從第3列（HEADER_ROW + 1）開始搜尋資料
     for i, row in enumerate(values[HEADER_ROW:], start=HEADER_ROW + 1):
-        # 跳過完全空白的列
         if not any(row):
             continue
         d = {headers[j]: row[j] if j < len(row) else "" for j in range(len(headers))}
         if pred(d):
             result.append(i)
     return result
-
-
 
 def _get_max_seq_for_date(ws: gspread.Worksheet, date_iso: str) -> int:
     m = header_map(ws)
@@ -207,7 +171,6 @@ def _get_max_seq_for_date(ws: gspread.Worksheet, date_iso: str) -> int:
                 pass
     return max_seq
 
-
 # ========== Pydantic ==========
 class BookPayload(BaseModel):
     direction: str
@@ -225,19 +188,16 @@ class BookPayload(BaseModel):
     passengers: int = Field(..., ge=1, le=4)
     pickLocation: str
     dropLocation: str
-
     @validator("direction")
     def _v_dir(cls, v):
         if v not in {"去程", "回程"}:
             raise ValueError("方向僅允許 去程 / 回程")
         return v
 
-
 class QueryPayload(BaseModel):
     booking_id: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
-
 
 class ModifyPayload(BaseModel):
     booking_id: str
@@ -248,24 +208,22 @@ class ModifyPayload(BaseModel):
     passengers: Optional[int] = Field(None, ge=1, le=4)
     pickLocation: Optional[str] = None
     dropLocation: Optional[str] = None
-
+    phone: Optional[str] = None
+    email: Optional[str] = None
 
 class DeletePayload(BaseModel):
     booking_id: str
-
 
 class CheckInPayload(BaseModel):
     code: Optional[str] = None
     booking_id: Optional[str] = None
 
-
 class OpsRequest(BaseModel):
     action: str
     data: Dict[str, Any]
 
-
 # ========== FastAPI ==========
-app = FastAPI(title="Shuttle Ops API", version="1.0.7")
+app = FastAPI(title="Shuttle Ops API", version="1.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -279,11 +237,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 @app.get("/health")
 def health():
     return {"status": "ok", "time": _tz_now_str()}
-
 
 @app.get("/api/qr/{code}")
 def qr_image(code: str):
@@ -295,7 +251,6 @@ def qr_image(code: str):
         return Response(content=bio.getvalue(), media_type="image/png")
     except Exception as e:
         raise HTTPException(500, f"QR 生成失敗: {str(e)}")
-
 
 # ========== 主 API ==========
 @app.post("/api/ops")
@@ -318,30 +273,19 @@ def ops(req: OpsRequest):
 
             last_seq = _get_max_seq_for_date(ws, p.date)
             booking_id = f"{_mmdd_prefix(p.date)}{last_seq + 1:03d}"
-
             car_display = _display_trip_str(p.date, _time_hm_from_any(p.time))
 
-            # 精準索引與路段
-            pk_idx, dp_idx, seg_str = _compute_indices_and_segments(
-                p.pickLocation, p.dropLocation
-            )
+            pk_idx, dp_idx, seg_str = _compute_indices_and_segments(p.pickLocation, p.dropLocation)
 
             em6 = _email_hash6(p.email)
             qr_content = f"FT:{booking_id}:{em6}"
             qr_url = f"{BASE_URL}/api/qr/{urllib.parse.quote(qr_content)}"
 
             newrow = [""] * len(headers)
-
-            # 申請日期（YYYY-MM-DD HH:MM:SS）
             setv(newrow, "申請日期", _tz_now_str())
-
-            # 預約狀態
             setv(newrow, "預約狀態", BOOKED_TEXT)
-
-            # 身分：住宿 / 用餐
             identity_simple = "住宿" if p.identity == "hotel" else "用餐"
 
-            # 其他欄位
             setv(newrow, "預約編號", booking_id)
             setv(newrow, "往返", p.direction)
             setv(newrow, "日期", p.date)
@@ -359,23 +303,13 @@ def ops(req: OpsRequest):
             setv(newrow, "入住日期", p.checkIn or "")
             setv(newrow, "退房日期", p.checkOut or "")
             setv(newrow, "用餐日期", p.diningDate or "")
-
-            # 索引與範圍（不含下車索引）
             setv(newrow, "上車索引", pk_idx)
             setv(newrow, "下車索引", dp_idx)
             setv(newrow, "涉及路段範圍", seg_str)
-
-            # QR 編碼
             setv(newrow, "QRCode編碼", qr_content)
 
             ws.append_row(newrow, value_input_option="USER_ENTERED")
-
-            return {
-                "status": "success",
-                "booking_id": booking_id,
-                "qr_url": qr_url,
-                "qr_content": qr_content,
-            }
+            return {"status": "success", "booking_id": booking_id, "qr_url": qr_url, "qr_content": qr_content}
 
         # ===== 查詢 =====
         elif action == "query":
@@ -384,10 +318,6 @@ def ops(req: OpsRequest):
                 raise HTTPException(400, "至少提供 booking_id / phone / email 其中一項")
 
             all_values = _read_all_rows(ws)
-            print("=== DEBUG: all_values ===")
-            for r in all_values:
-                print(r)
-
             if not all_values:
                 return []
 
@@ -411,14 +341,11 @@ def ops(req: OpsRequest):
                 if p.email and p.email != get(row, "信箱"):
                     continue
                 rec = {k: get(row, k) for k in hmap}
-                if rec.get("櫃台審核", "") == "n":
+                if rec.get("櫃台審核", "").lower() == "n":
                     rec["預約狀態"] = "已拒絕"
                 results.append(rec)
 
-            print("=== DEBUG: query result ===")
-            print(results)
             return results
-
 
         # ===== 修改 =====
         elif action == "modify":
@@ -427,10 +354,44 @@ def ops(req: OpsRequest):
             if not target:
                 raise HTTPException(404, "找不到此預約編號")
             rowno = target[0]
-            if "預約狀態" in hmap:
-                ws.update_cell(rowno, hmap["預約狀態"], BOOKED_TEXT)
+
+            # 班次與路段
+            time_hm = _time_hm_from_any(p.time or "")
+            car_display = _display_trip_str(p.date or "", time_hm) if (p.date and time_hm) else None
+
+            pk_idx = dp_idx = None
+            seg_str = None
+            if p.pickLocation and p.dropLocation:
+                pk_idx, dp_idx, seg_str = _compute_indices_and_segments(p.pickLocation, p.dropLocation)
+
+            def upd(col: str, v: Optional[str]):
+                if v is None:
+                    return
+                if col in hmap:
+                    ws.update_cell(rowno, hmap[col], v)
+
+            # 寫入更新欄位
+            upd("預約狀態", BOOKED_TEXT)
+            if p.direction: upd("往返", p.direction)
+            if p.date: upd("日期", p.date)
+            if time_hm: upd("班次", time_hm)
+            if car_display: upd("車次", car_display)
+            if p.pickLocation: upd("上車地點", p.pickLocation)
+            if p.dropLocation: upd("下車地點", p.dropLocation)
+            if p.passengers is not None: upd("預約人數", str(p.passengers))
+            if p.phone: upd("手機", p.phone)
+            if p.email:
+                upd("信箱", p.email)
+                # 依新 email 重算 QR
+                em6 = _email_hash6(p.email)
+                qr_content = f"FT:{p.booking_id}:{em6}"
+                upd("QRCode編碼", qr_content)
+            if pk_idx is not None: upd("上車索引", str(pk_idx))
+            if dp_idx is not None: upd("下車索引", str(dp_idx))
+            if seg_str is not None: upd("涉及路段範圍", seg_str)
             if "最後操作時間" in hmap:
                 ws.update_cell(rowno, hmap["最後操作時間"], _tz_now_str() + " 已修改")
+
             return {"status": "success", "booking_id": p.booking_id}
 
         # ===== 刪除（取消）=====
@@ -472,11 +433,9 @@ def ops(req: OpsRequest):
     except Exception as e:
         raise HTTPException(500, f"伺服器錯誤: {str(e)}")
 
-
 @app.get("/cors_debug")
 def cors_debug():
     return {"status": "ok", "cors_test": True, "time": _tz_now_str()}
-
 
 @app.get("/api/debug")
 def debug_endpoint():
