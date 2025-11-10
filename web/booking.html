@@ -329,8 +329,8 @@
 /* === 修正手機版車票寬度與排版 === */
 @media (max-width: 768px) {
   .ticket-card {
-    width: 100%;
-    max-width: 100%;
+    width: 85%;
+    max-width: 850%;
     box-sizing: border-box;
     margin: 0 auto;
     padding: 14px;
@@ -366,42 +366,19 @@
 }
 
     
-/* === 修正版：手機版按鈕垂直置中 === */
+/* === 手機版統一修正版 === */
 @media (max-width: 768px) {
-  .nav-links { display: none; }
-  .mobile-tabbar { display: block; }
-  body { padding-bottom: 70px; }
-  .navbar { justify-content: space-between; }
-  .brand { margin-right: 0; }
-
-  .actions {
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: 100%;
-  }
-
-  .actions button {
-    width: 80%;
-    max-width: 320px;
-  }
-
-  .actions button + button {
-    margin-top: 10px;
-  }
-}
-/* === 手機板畫面修正版 === */
-@media (max-width: 768px) {
-
   html, body {
-    width: 100vw;
+    width: 100%;
+    max-width: 100%;
     overflow-x: hidden; /* 防止橫向滾動 */
   }
 
   .page, .card, .ticket-card {
-    width: 95vw;
-    max-width: 95vw;
+    width: 100%;
+    max-width: 100%;
     margin: 0 auto;
+    box-sizing: border-box;
   }
 
   /* 導覽設定 */
@@ -411,31 +388,30 @@
   .navbar { justify-content: space-between; }
   .brand { margin-right: 0; }
 
-  /* 手機版按鈕改左右排列 */
+  /* 手機版按鈕左右排列 */
   .actions {
     display: flex !important;
-    flex-wrap: nowrap;
     flex-direction: row !important;
     justify-content: space-between !important;
     align-items: center !important;
     width: 100%;
     max-width: 340px;
     margin: 10px auto 0;
+    gap: 10px;
   }
 
   .actions button {
     flex: 1;
-    min-width: 140px;
+    min-width: 120px;
     max-width: 160px;
     font-size: 15px;
   }
 
-  /* 三個按鈕時，改為左+右+下排列 */
+  /* 三個按鈕時改垂直置中 */
   .actions.has-three {
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 10px;
   }
 
   .actions.has-three button {
@@ -443,8 +419,13 @@
     max-width: 320px;
   }
 
-  /* 車票修正：固定寬度、上下排列 */
+  /* 車票寬度與排版修正 */
+  .ticket-card {
+    padding: 14px;
+    overflow: hidden;
+  }
   .ticket-content {
+    display: flex;
     flex-direction: column;
     align-items: center;
     gap: 12px;
@@ -452,6 +433,7 @@
   .ticket-qr img {
     width: 160px;
     height: 160px;
+    max-width: 100%;
   }
 }
 
