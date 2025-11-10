@@ -113,13 +113,17 @@ def _mmdd_prefix(date_iso: str) -> str:
     return f"{int(m):02d}{int(d):02d}"
 
 # ---------- Google Sheets ----------
+# ---------- Google Sheets ----------
 def open_sheet() -> gspread.Worksheet:
     """使用舊版本的憑證讀取邏輯"""
     try:
-        # 從環境變數讀取 JSON 字串
-        service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+        # 使用舊版本的名稱 GOOGLE_CREDENTIALS_JSON
+        service_account_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
         if not service_account_json:
-            raise RuntimeError("請設定 GOOGLE_SERVICE_ACCOUNT_JSON 環境變數")
+            # 如果沒有，嘗試新版本的名稱（向後兼容）
+            service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+        if not service_account_json:
+            raise RuntimeError("請設定 GOOGLE_CREDENTIALS_JSON 環境變數")
         
         # 解析 JSON 字串
         creds_dict = json.loads(service_account_json)
@@ -140,10 +144,10 @@ def open_sheet() -> gspread.Worksheet:
         return ws
         
     except json.JSONDecodeError as e:
-        raise RuntimeError(f"GOOGLE_SERVICE_ACCOUNT_JSON 不是有效的 JSON: {e}")
+        raise RuntimeError(f"憑證 JSON 格式錯誤: {e}")
     except Exception as e:
         raise RuntimeError(f"無法開啟 Google Sheet: {str(e)}")
-
+        
 def header_map(ws: gspread.Worksheet) -> Dict[str, int]:
     row = ws.row_values(1)
     m: Dict[str, int] = {}
