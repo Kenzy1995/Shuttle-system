@@ -52,8 +52,9 @@ jobs:
           --memory=2Gi \
           --cpu=2 \
           --max-instances=10 \
-          --timeout=300s
+          --timeout=300s \
+          --set-env-vars="GCP_CREDENTIALS=${{ secrets.GCP_CREDENTIALS }},SPREADSHEET_ID=1xp54tKOczklmT8uacW-HMxwV8r0VOR2ui33jYcE2pUQ,SHEET_NAME=預約審核(櫃台)"
 
     - name: Show Service URL
       run: |
-        echo "Service deployed at: https://${{ env.SERVICE }}-$(gcloud config get-value project).a.run.app"
+        echo "Service deployed at: https://${{ env.SERVICE }}-${{ secrets.GCP_PROJECT_ID }}.a.run.app"
