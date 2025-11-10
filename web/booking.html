@@ -30,7 +30,8 @@
       min-height:100vh;
       overflow-x:hidden;
       -webkit-text-size-adjust:100%;
-      display:flex;flex-direction:column;
+      display: flex;
+      flex-direction: column;
     }
     img, iframe{max-width:100%;}
     a{color:inherit; text-decoration:none}
@@ -40,13 +41,14 @@
       display:flex;align-items:center;
       padding:12px 16px;background:var(--card);box-shadow:0 1px 4px rgba(0,0,0,.06)
     }
-    .brand{display:flex;align-items:center;gap:10px;margin-right:30px;}
+    .brand{display:flex;align-items:center;gap:10px;margin-right: 30px;}
     .brand img{height:28px;width:auto;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
     .brand-title{font-weight:800;font-size:18px}
 
     .nav-right{display:flex;align-items:center;gap:12px;margin-left:auto}
-    .lang-wrap span {font-size:12px;}
-
+    .lang-wrap span {
+      font-size: 12px; /* Language 字體變小 */
+    }
     .nav-links{display:flex;gap:8px}
     .nav-links button{
       background:none;border:none;padding:8px 10px;border-radius:10px;cursor:pointer;
@@ -61,22 +63,28 @@
     .page{display:none;padding:20px;max-width:980px;margin:0 auto;flex:1}
     .page.active{display:block}
 
-    .hero{max-width:840px;margin:18px auto 16px;background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:24px 20px;text-align:center}
+    .hero{
+      max-width:840px;margin:18px auto 16px;background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:24px 20px;text-align:center
+    }
     .hero h1{margin:0 0 12px;font-size:30px;font-weight:900}
     .hero p{margin:0;color:var(--muted)}
 
     .button{
-      display:inline-block;min-width:140px;
-      border:none;border-radius:14px;padding:12px 16px;font-size:15px;font-weight:800;cursor:pointer;background:var(--primary);color:#fff;
+      display:inline-block;min-width:160px;
+      border:none;border-radius:14px;padding:14px 18px;font-size:16px;font-weight:700;cursor:pointer;background:var(--primary);color:#fff;
       transition:transform .06s ease,filter .2s ease
     }
     .button:active{transform:translateY(1px)}
     .btn-ghost{background:#eee;color:#333}
 
     .grid{display:grid;gap:14px}
-    .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:18px}
+    .card{
+      background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:18px
+    }
     .card h2{margin:0 0 12px;font-size:20px;font-weight:800;text-align:center}
-    .station-page .card h2 { text-align: left; }
+    .station-page .card h2 {
+      text-align: left; /* 停靠站點標題置左 */
+    }
 
     .field{margin:8px 0}
     .label{display:block;margin-bottom:6px;font-weight:700}
@@ -90,7 +98,9 @@
     .error{color:#b00020;font-size:13px;margin-top:6px;display:none}
 
     .options{display:flex;flex-direction:column;gap:10px}
-    .opt-btn{text-align:left;padding:14px 16px;border:1px solid #e7e7e7;border-radius:12px;background:#fff;font-weight:700;color:var(--primary);cursor:pointer}
+    .opt-btn{
+      text-align:left;padding:14px 16px;border:1px solid #e7e7e7;border-radius:12px;background:#fff;font-weight:700;color:var(--primary);cursor:pointer
+    }
     .opt-btn:hover{box-shadow:var(--shadow)}
     .opt-btn.active{outline:3px solid rgba(169,133,112,.25)}
     .opt-btn.disabled{color:#bbb;background:#f7f7f7;border-color:#eee;cursor:not-allowed}
@@ -99,7 +109,9 @@
     .actions.row{flex-direction:row}
     .actions.col{flex-direction:column}
 
-    .overlay{position:fixed;inset:0;background:rgba(255,255,255,.94);display:none;align-items:center;justify-content:center;z-index:9999}
+    .overlay{
+      position:fixed;inset:0;background:rgba(255,255,255,.94);display:none;align-items:center;justify-content:center;z-index:9999
+    }
     .overlay.show{display:flex}
     .spinner{width:48px;height:48px;border-radius:50%;border:4px solid #eee;border-top:4px solid var(--primary);animation:spin 1s linear infinite;margin:0 auto 10px}
     @keyframes spin{to{transform:rotate(360deg)}}
@@ -111,16 +123,33 @@
 
     .query-form{display:flex;flex-direction:column;gap:14px}
 
-    .footer{background:#f5f5f5;color:#666;text-align:center;padding:20px;margin-top:auto;border-top:1px solid #e0e0e0;width:100%}
+    .footer{
+      background:#f5f5f5;
+      color:#666;
+      text-align:center;
+      padding:20px;
+      margin-top:auto;
+      border-top:1px solid #e0e0e0;
+      width:100%;
+    }
 
-    .mobile-tabbar{position:fixed;left:0;right:0;bottom:0;display:none;z-index:40;background:var(--primary);border-top:1px solid #e9e9e9;box-shadow:0 -2px 12px rgba(0,0,0,.06)}
+    /* 手機底部導覽：主題色背景 + 白字 */
+    .mobile-tabbar{
+      position:fixed;left:0;right:0;bottom:0;display:none;z-index:40;
+      background:var(--primary);border-top:1px solid #e9e9e9;box-shadow:0 -2px 12px rgba(0,0,0,.06)
+    }
     .mobile-tabbar .bar{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
-    .mobile-tabbar button{appearance:none;border:none;background:none;padding:12px 6px;font-size:18px;color:#fff;font-weight:700;opacity:.9}
+    .mobile-tabbar button{
+      appearance:none;border:none;background:none;padding:12px 6px;
+      font-size:18px; /* 手機版底部菜單字體變大為18px */
+      color:#fff;font-weight:700;opacity:.8
+    }
     .mobile-tabbar button.active{opacity:1;text-decoration:underline}
 
     #backToTop{position:fixed;right:18px;bottom:78px;z-index:45;display:none;width:44px;height:44px;border:none;border-radius:50%;cursor:pointer;background:#0009;color:#fff;font-size:22px;line-height:44px;text-align:center}
     #backToTop:hover{filter:brightness(1.2)}
 
+    /* 確認班次資訊與成功頁：欄位上下排版，只有按鈕左右排列 */
     #step6 .grid{grid-template-columns:1fr}
     #successCard .grid{grid-template-columns:1fr}
 
@@ -128,18 +157,80 @@
     .station-img{width:100%;border-radius:14px;box-shadow:var(--shadow)}
 
     /* 成功動畫 */
-    .success-animation {position: fixed;top: 50%;left: 50%;transform: translate(-50%, -50%);z-index: 10000;background: rgba(255, 255, 255, 0.95);border-radius: 16px;padding: 30px;box-shadow: var(--shadow-lg);display: none;align-items: center;justify-content: center;flex-direction: column;}
-    .success-animation.show {display: flex;animation: fadeInOut 2s ease-in-out;}
-    .checkmark {width: 80px;height: 80px;border-radius: 50%;display: block;stroke-width: 2;stroke: #4CAF50;stroke-miterlimit: 10;margin: 20px auto;box-shadow: inset 0px 0px 0px #4CAF50;animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;}
-    .checkmark__circle {stroke-dasharray: 166;stroke-dashoffset: 166;stroke-width: 2;stroke-miterlimit: 10;stroke: #4CAF50;fill: none;animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;}
-    .checkmark__check {transform-origin: 50% 50%;stroke-dasharray: 48;stroke-dashoffset: 48;animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;}
-    @keyframes stroke {100% { stroke-dashoffset: 0; }}
-    @keyframes scale {0%, 100% { transform: none; }50% { transform: scale3d(1.1, 1.1, 1); }}
-    @keyframes fill {100% { box-shadow: inset 0px 0px 0px 40px #4CAF50; }}
-    @keyframes fadeInOut {0% { opacity: 0; }20% { opacity: 1; }80% { opacity: 1; }100% { opacity: 0; }}
+    .success-animation {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10000;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 16px;
+      padding: 30px;
+      box-shadow: var(--shadow-lg);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    .success-animation.show {
+      display: flex;
+      animation: fadeInOut 2s ease-in-out;
+    }
+    .checkmark {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: block;
+      stroke-width: 2;
+      stroke: #4CAF50;
+      stroke-miterlimit: 10;
+      margin: 20px auto;
+      box-shadow: inset 0px 0px 0px #4CAF50;
+      animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
+    }
+    .checkmark__circle {
+      stroke-dasharray: 166;
+      stroke-dashoffset: 166;
+      stroke-width: 2;
+      stroke-miterlimit: 10;
+      stroke: #4CAF50;
+      fill: none;
+      animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+    }
+    .checkmark__check {
+      transform-origin: 50% 50%;
+      stroke-dasharray: 48;
+      stroke-dashoffset: 48;
+      animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+    }
+    @keyframes stroke {
+      100% { stroke-dashoffset: 0; }
+    }
+    @keyframes scale {
+      0%, 100% { transform: none; }
+      50% { transform: scale3d(1.1, 1.1, 1); }
+    }
+    @keyframes fill {
+      100% { box-shadow: inset 0px 0px 0px 40px #4CAF50; }
+    }
+    @keyframes fadeInOut {
+      0% { opacity: 0; }
+      20% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { opacity: 0; }
+    }
 
-    /* 車票卡片（通用） */
-    .ticket-card {position:relative;background:#fff;border-radius:16px;box-shadow:var(--shadow-lg);padding:16px;min-width:320px;max-width:420px;width:100%}
+    /* 車票卡片樣式 */
+    .ticket-card {
+      position:relative;
+      background: white;
+      border-radius: 16px;
+      box-shadow: var(--shadow-lg);
+      padding: 20px;
+      margin: 20px auto;
+      max-width: 600px;
+      width: 100%;
+    }
     .ticket-card.expired{filter:grayscale(1);opacity:.7}
     .status-pill{position:absolute;left:12px;top:12px;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800;color:#fff}
     .status-booked{background:var(--green)}
@@ -148,17 +239,71 @@
     .status-boarded{background:#1976d2}
     .status-expired{background:var(--gray)}
 
-    .ticket-header{padding-top:8px;text-align:center;margin-bottom:12px;border-bottom:2px solid var(--primary);padding-bottom:10px}
-    .ticket-header h2{margin:0;font-size:22px;font-weight:900;color:var(--primary)}
-    .ticket-content{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
-    .ticket-qr{text-align:center;padding:12px;background:#f9f9f9;border-radius:12px}
-    .ticket-qr img{width:180px;height:180px;border-radius:8px;border:1px solid #eee;background:#fff}
-    .ticket-info{display:flex;flex-direction:column;gap:10px}
-    .ticket-field{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0}
-    .ticket-field:last-child{border-bottom:none}
-    .ticket-label{font-weight:800;color:var(--text);min-width:110px;font-size:14px}
-    .ticket-value{flex:1;text-align:right;color:var(--muted);font-size:14px}
-    .ticket-actions{margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+    .ticket-header {
+      text-align: center;
+      margin-bottom: 24px;
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 16px;
+    }
+    .ticket-header h2 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 900;
+      color: var(--primary);
+    }
+    .ticket-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    .ticket-qr {
+      text-align: center;
+      padding: 20px;
+      background: #f9f9f9;
+      border-radius: 12px;
+    }
+    .ticket-qr img {
+      width: 200px;
+      height: 200px;
+      border-radius: 8px;
+      border: 1px solid #eee;
+      background: #fff;
+    }
+    .ticket-info {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .ticket-field {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .ticket-field:last-child {
+      border-bottom: none;
+    }
+    .ticket-label {
+      font-weight: 800;
+      color: var(--text);
+      min-width: 120px;
+      font-size: 16px;
+    }
+    .ticket-value {
+      flex: 1;
+      text-align: right;
+      color: var(--muted);
+      font-size: 16px;
+    }
+    .ticket-actions {
+      margin-top: 24px;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-direction: row-reverse;
+    }
 
     /* 查詢結果：按日期群組 + 橫向卡片捲動 */
     .date-group{margin-bottom:20px;background:#fff;border-radius:14px;box-shadow:var(--shadow)}
@@ -168,38 +313,151 @@
     .tickets-row{display:flex;gap:12px;padding:14px;overflow-x:auto;scroll-snap-type:x mandatory}
     .tickets-row .ticket-card{scroll-snap-align:start;flex:0 0 auto}
 
-    /* 手機版樣式 */
+    /* === 修正手機版車票寬度與排版 === */
     @media (max-width: 768px) {
+      .ticket-card {
+        width: 90%;
+        max-width: 90%;
+        box-sizing: border-box;
+        margin: 0 auto;
+        padding: 14px;
+        overflow: hidden;
+      }
+
+      .ticket-content {
+        display: flex;
+        flex-direction: column; /* 改成上下排：QR 在上，資料在下 */
+        align-items: center;
+        gap: 12px;
+      }
+
+      .ticket-info {
+        width: 100%;
+        word-wrap: break-word; /* 避免長字超出 */
+      }
+
+      .ticket-qr img {
+        width: 160px;
+        height: 160px;
+        max-width: 100%;
+      }
+
+      .hero .actions {
+        justify-content: center !important; /* 手機版立即預約按鈕置中 */
+      }
+      
+      .footer {
+        font-size: 70%; /* 手機版版權文字縮小30% */
+        padding: 15px 10px;
+      }
+      
+      .tickets-row{flex-direction:column;overflow-x:hidden}
+      .ticket-card{width:100%;max-width:100%}
+    }
+
+    #step6 .field {
+      margin: 4px 0;
+    }
+
+    #step6 .label,
+    #step6 .readonly {
+      line-height: 1.2;
+    }
+
+    /* === 手機版統一修正版 === */
+    @media (max-width: 768px) {
+      html, body {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden; /* 防止橫向滾動 */
+      }
+
+      .page, .card, .ticket-card {
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+        box-sizing: border-box;
+      }
+
+      /* 導覽設定 */
       .nav-links { display: none; }
       .mobile-tabbar { display: block; }
       body { padding-bottom: 70px; }
       .navbar { justify-content: space-between; }
       .brand { margin-right: 0; }
-      
-      .actions {display:flex !important;flex-direction:row !important;justify-content:space-between !important;align-items:center !important;width:100%;max-width:340px;margin:10px auto 0;gap:10px}
-      .actions button{flex:1;min-width:120px;max-width:160px;font-size:15px}
-      
+
+      /* 手機版按鈕左右排列 */
+      .actions {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100%;
+        max-width: 340px;
+        margin: 10px auto 0;
+        gap: 10px;
+      }
+
+      .actions button {
+        flex: 1;
+        min-width: 120px;
+        max-width: 160px;
+        font-size: 15px;
+      }
+
+      /* 三個按鈕時改垂直置中 */
       .actions.has-three {
         flex-direction: column !important;
         align-items: center !important;
         justify-content: center !important;
       }
+
       .actions.has-three button {
         width: 80%;
         max-width: 320px;
       }
-      
-      .ticket-content {grid-template-columns:1fr}
-      .ticket-qr {order:-1}
-      .ticket-qr img {width:160px;height:160px;max-width:100%}
-      .ticket-field {flex-direction:column;align-items:flex-start;gap:4px}
-      .ticket-value {text-align:left;width:100%}
-      .tickets-row{flex-direction:column;overflow-x:hidden}
-      .ticket-card{width:100%;max-width:100%}
-      
-      .footer { font-size: 70%; padding: 15px 10px; }
-      
-      .hero .actions { justify-content: center !important; }
+
+      /* === 修正票卡按鈕裁切與三鍵排版 === */
+      .ticket-card {
+        margin: 0 auto 20px;
+        padding: 16px;
+        overflow: visible; /* 允許按鈕完整顯示 */
+      }
+
+      .ticket-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        margin-top: 16px;
+      }
+
+      /* 兩個按鈕時：左右排列 */
+      .ticket-actions:not(.has-three) button {
+        flex: 1;
+        min-width: 140px;
+        max-width: 160px;
+        font-size: 15px;
+      }
+
+      /* 三個按鈕時：左＋右＋下 */
+      .ticket-actions.has-three {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .ticket-actions.has-three button:nth-child(1),
+      .ticket-actions.has-three button:nth-child(2) {
+        width: 45%;
+        max-width: 180px;
+      }
+
+      .ticket-actions.has-three button:nth-child(3) {
+        width: 80%;
+        max-width: 300px;
+      }
     }
   </style>
 </head>
@@ -397,19 +655,50 @@
     <section id="successCard" class="card" style="display:none">
       <div id="ticketCard" class="ticket-card">
         <div class="status-pill status-booked" id="successStatusPill">✔️ 已預約</div>
-        <div class="ticket-header"><h2>接駁車票</h2></div>
+        <div class="ticket-header">
+          <h2>接駁車票</h2>
+        </div>
         <div class="ticket-content">
-          <div class="ticket-qr"><img id="ticketQrImg" src="" alt="QR Code"/></div>
+          <div class="ticket-qr">
+            <img id="ticketQrImg" src="" alt="QR Code"/>
+          </div>
           <div class="ticket-info">
-            <div class="ticket-field"><span class="ticket-label">預約編號</span><span class="ticket-value" id="ticketBookingId"></span></div>
-            <div class="ticket-field"><span class="ticket-label">班次</span><span class="ticket-value" id="ticketSchedule"></span></div>
-            <div class="ticket-field"><span class="ticket-label">方向</span><span class="ticket-value" id="ticketDirection"></span></div>
-            <div class="ticket-field"><span class="ticket-label">上車地點</span><span class="ticket-value" id="ticketPick"></span></div>
-            <div class="ticket-field"><span class="ticket-label">下車地點</span><span class="ticket-value" id="ticketDrop"></span></div>
-            <div class="ticket-field"><span class="ticket-label">姓名</span><span class="ticket-value" id="ticketName"></span></div>
-            <div class="ticket-field"><span class="ticket-label">手機</span><span class="ticket-value" id="ticketPhone"></span></div>
-            <div class="ticket-field"><span class="ticket-label">信箱</span><span class="ticket-value" id="ticketEmail"></span></div>
-            <div class="ticket-field"><span class="ticket-label">人數</span><span class="ticket-value" id="ticketPassengers"></span></div>
+            <div class="ticket-field">
+              <span class="ticket-label">預約編號</span>
+              <span class="ticket-value" id="ticketBookingId"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">班次</span>
+              <span class="ticket-value" id="ticketSchedule"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">方向</span>
+              <span class="ticket-value" id="ticketDirection"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">上車地點</span>
+              <span class="ticket-value" id="ticketPick"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">下車地點</span>
+              <span class="ticket-value" id="ticketDrop"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">姓名</span>
+              <span class="ticket-value" id="ticketName"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">手機</span>
+              <span class="ticket-value" id="ticketPhone"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">信箱</span>
+              <span class="ticket-value" id="ticketEmail"></span>
+            </div>
+            <div class="ticket-field">
+              <span class="ticket-label">人數</span>
+              <span class="ticket-value" id="ticketPassengers"></span>
+            </div>
           </div>
         </div>
         <div class="ticket-actions">
@@ -488,16 +777,30 @@
   </main>
 
   <!-- 底部 -->
-  <footer class="footer">© 2025. Forte Hotel XiZhi汐止福泰大飯店. <a href="https://kz-tech.netlify.app/" target="_blank">Design</a></footer>
+  <footer class="footer">
+    © 2025. Forte Hotel XiZhi汐止福泰大飯店. <a href="https://kz-tech.netlify.app/" target="_blank">Design</a>
+  </footer>
 
   <!-- Loading / Overlay -->
-  <div id="loading" class="overlay"><div><div class="spinner"></div><div style="text-align:center;color:var(--primary);font-weight:700">資料讀取中…</div></div></div>
-  <div id="loadingConfirm" class="overlay"><div><div class="spinner"></div><div style="text-align:center;color:var(--primary);font-weight:700">資料確認中…</div></div></div>
+  <div id="loading" class="overlay">
+    <div>
+      <div class="spinner"></div>
+      <div style="text-align:center;color:var(--primary);font-weight:700">資料讀取中…</div>
+    </div>
+  </div>
+  <div id="loadingConfirm" class="overlay">
+    <div>
+      <div class="spinner"></div>
+      <div style="text-align:center;color:var(--primary);font-weight:700">資料確認中…</div>
+    </div>
+  </div>
   <div id="expiredOverlay" class="overlay">
     <div class="overlay-card">
       <h3>班次已過期或目前不可預約</h3>
       <p>請重新查詢可預約班次</p>
-      <div class="actions" style="margin-top:8px"><button id="overlayBackBtn" class="button" onclick="overlayRestart()">重新查詢</button></div>
+      <div class="actions" style="margin-top:8px">
+        <button id="overlayBackBtn" class="button" onclick="overlayRestart()">重新查詢</button>
+      </div>
     </div>
   </div>
 
@@ -551,26 +854,151 @@
     function showPage(id){
       document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
       document.getElementById(id).classList.add("active");
+
       document.querySelectorAll(".nav-links button").forEach(b=>b.classList.remove("active"));
       const navId = id==='reservation'?'nav-reservation':id==='check'?'nav-check':id==='station'?'nav-station':'nav-contact';
       const navEl = document.getElementById(navId); if(navEl) navEl.classList.add("active");
+
       document.querySelectorAll(".mobile-tabbar button").forEach(b=>b.classList.remove("active"));
       const mId = id==='reservation'?'m-reservation':id==='check'?'m-check':id==='station'?'m-station':'m-contact';
       const mEl = document.getElementById(mId); if(mEl) mEl.classList.add("active");
+
       if(id==='contact'){ window.open('https://www.fortehotelxizhi.com.tw/','_blank'); }
       window.scrollTo({top:0,behavior:'smooth'});
+
       if(id==='reservation'){
         document.getElementById('homeHero').style.display = '';
-        ['step1','step2','step3','step4','step5','step6','successCard'].forEach(s=>{ const el = document.getElementById(s); if(el) el.style.display='none'; });
+        ['step1','step2','step3','step4','step5','step6','successCard'].forEach(s=>{
+          const el = document.getElementById(s); if(el) el.style.display='none';
+        });
       }
     }
     function showLoading(s=true){document.getElementById('loading').classList.toggle('show',s)}
     function showVerifyLoading(s=true){document.getElementById('loadingConfirm').classList.toggle('show',s)}
     function showExpiredOverlay(s=true){document.getElementById('expiredOverlay').classList.toggle('show',s)}
     function overlayRestart(){ showExpiredOverlay(false); restart(); }
-    function shake(el){ if(!el) return; el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'),500); }
+
+    // 顯示成功動畫
+    function showSuccessAnimation() {
+      const animation = document.getElementById('successAnimation');
+      animation.classList.add('show');
+      setTimeout(() => {
+        animation.classList.remove('show');
+      }, 2000);
+    }
+
+    // 日期/時間格式
+    function fmtDateLabel(v){
+      if(!v) return "";
+      const s = String(v).trim();
+      if(/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0,10);
+      if(/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(s)){
+        const [y,m,d]=s.split('/');
+        return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      }
+      if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)){
+        const [m,d,y]=s.split('/');
+        return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      }
+      if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      return s;
+    }
+    function fmtTimeLabel(v){
+      if(v==null) return "";
+      const s = String(v).trim().replace('：',':');
+      if(/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(11,16);
+      if(/^\d{1,2}:\d{1,2}/.test(s)){
+        const [h,m]=s.split(':');
+        return `${String(h).padStart(2,'0')}:${String(m).slice(0,2).padStart(2,'0')}`;
+      }
+      return s;
+    }
     function onlyDigits(t){return (t||'').replace(/\D/g,'')}
-    function todayISO(){ const t = new Date(); const y=t.getFullYear();const m=String(t.getMonth()+1).padStart(2,'0');const d=String(t.getDate()).padStart(2,'0'); return `${y}-${m}-${d}`; }
+
+    // Shake 與錯誤提示
+    function shake(el){ if(!el) return; el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'),500); }
+
+    // 驗證函數
+    const phoneRegex=/^\+?\d{1,3}?\d{7,}$/;
+    const emailRegex=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const roomRegex=/^(0000|501|502|503|505|506|507|508|509|510|511|512|515|516|517|518|519|520|521|522|523|525|526|527|528|601|602|603|605|606|607|608|609|610|611|612|615|616|617|618|619|620|621|622|623|625|626|627|628|701|702|703|705|706|707|708|709|710|711|712|715|716|717|718|719|720|721|722|723|725|726|727|728|801|802|803|805|806|807|808|809|810|811|812|815|816|817|818|819|820|821|822|823|825|826|827|828|901|902|903|905|906|907|908|909|910|911|912|915|916|917|918|919|920|921|922|923|925|926|927|928|1001|1002|1003|1005|1006|1007|1008|1009|1010|1011|1012|1015|1016|1017|1018|1019|1020|1021|1022|1023|1025|1026|1027|1028|1101|1102|1103|1105|1106|1107|1108|1109|1110|1111|1112|1115|1116|1117|1118|1119|1120|1121|1122|1123|1125|1126|1127|1128|1201|1202|1206|1207|1208|1209|1210|1211|1212|1215|1216|1217|1218|1219|1220|1221|1222|1223|1225|1226|1227|1228|1301|1302|1303|1305|1306|1307|1308|1309|1310|1311|1312|1315|1316|1317|1318|1319|1320|1321|1322|1323|1325|1326|1327|1328)$/;
+
+    const nameRegex=/^[\u4e00-\u9fa5a-zA-Z\s]*$/;
+
+    // 姓名驗證
+    function validateName(input){
+      const value = input.value || "";
+      const nameErr = document.getElementById('nameErr');
+      if(!nameRegex.test(value)){
+        input.value = value.replace(/[^\u4e00-\u9fa5a-zA-Z\s]/g,'');
+        nameErr.textContent = '限輸入中文或英文';
+        nameErr.style.display='block';
+        shake(input);
+        input.style.borderColor='#b00020';
+        setTimeout(()=>{ input.style.borderColor='#ddd'; nameErr.style.display='none'; }, 2000);
+      }else if(!value.trim()){
+        nameErr.textContent = '請填寫姓名';
+        nameErr.style.display='block';
+        shake(input);
+        input.style.borderColor='#b00020';
+      }else{
+        nameErr.style.display='none';
+        input.style.borderColor='#ddd';
+      }
+    }
+
+    // 手機驗證
+    function validatePhone(input){
+      const value = input.value || "";
+      const phoneErr = document.getElementById('phoneErr');
+      if(!phoneRegex.test(value)){
+        phoneErr.textContent = '請輸入正確的手機號碼';
+        phoneErr.style.display='block';
+        shake(input);
+        input.style.borderColor='#b00020';
+      }else{
+        phoneErr.style.display='none';
+        input.style.borderColor='#ddd';
+      }
+    }
+
+    // 信箱驗證
+    function validateEmail(input){
+      const value = input.value || "";
+      const emailErr = document.getElementById('emailErr');
+      if(!emailRegex.test(value)){
+        emailErr.textContent = '請填寫正確的郵箱';
+        emailErr.style.display='block';
+        shake(input);
+        input.style.borderColor='#b00020';
+      }else{
+        emailErr.style.display='none';
+        input.style.borderColor='#ddd';
+      }
+    }
+
+    // 房號驗證
+    function validateRoom(input){
+      const value = input.value || "";
+      const roomErr = document.getElementById('roomErr');
+      if(!roomRegex.test(value)){
+        roomErr.textContent = '請填寫正確的房號';
+        roomErr.style.display='block';
+        shake(input);
+        input.style.borderColor='#b00020';
+      }else{
+        roomErr.style.display='none';
+        input.style.borderColor='#ddd';
+      }
+    }
+
+    function todayISO(){
+      const t = new Date();
+      const y = t.getFullYear();
+      const m = String(t.getMonth()+1).padStart(2,'0');
+      const d = String(t.getDate()).padStart(2,'0');
+      return `${y}-${m}-${d}`;
+    }
 
     // 解析日期與時間。time 可能是 "11/10 21:00" 或 "21:00"。
     function parseTripDateTime(dateStr, timeStr){
@@ -587,84 +1015,12 @@
       const [H,M] = (hm||'00:00').split(':');
       return new Date(y, mm-1, dd, parseInt(H||'0',10), parseInt(M||'0',10), 0);
     }
-    function fmtDateLabel(v){
-      if(!v) return "";
-      const s = String(v).trim();
-      if(/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0,10);
-      if(/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(s)){ const [y,m,d]=s.split('/'); return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
-      if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)){ const [m,d,y]=s.split('/'); return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
-      if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-      return s;
-    }
-    function fmtTimeLabel(v){
-      if(v==null) return "";
-      const s = String(v).trim().replace('：',':');
-      if(/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(11,16);
-      if(/^\d{1,2}:\d{1,2}/.test(s)){ const [h,m]=s.split(':'); return `${String(h).padStart(2,'0')}:${String(m).slice(0,2).padStart(2,'0')}`; }
-      if(/^\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}$/.test(s)) return s.split(' ')[1];
-      return s;
-    }
+
     function isExpired(dateStr, timeStr){
       const dt = parseTripDateTime(dateStr, timeStr);
       return dt.getTime() < Date.now();
     }
 
-    // 驗證
-    const phoneRegex=/^\+?\d{1,3}?\d{7,}$/;
-    const emailRegex=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    // 放寬為 0000 或 3~4 位數即可
-    const roomRegex=/^(0000|\d{3,4})$/;
-    const nameRegex=/^[\u4e00-\u9fa5a-zA-Z\s]+$/;
-
-    function validateName(input){
-      const value = input.value || "";
-      const nameErr = document.getElementById('nameErr');
-      if(!value.trim()){
-        nameErr.textContent = '請填寫姓名';
-        nameErr.style.display='block'; shake(input); input.style.borderColor='#b00020';
-        setTimeout(()=>{ nameErr.style.display='none'; input.style.borderColor='#ddd'; }, 2000);
-        return false;
-      }
-      if(!nameRegex.test(value)){
-        nameErr.textContent = '限輸入中文或英文';
-        nameErr.style.display='block'; shake(input); input.style.borderColor='#b00020';
-        setTimeout(()=>{ nameErr.style.display='none'; input.style.borderColor='#ddd'; }, 2000);
-        input.value = value.replace(/[^\u4e00-\u9fa5a-zA-Z\s]/g,'');
-        return false;
-      }
-      nameErr.style.display='none'; input.style.borderColor='#ddd';
-      return true;
-    }
-    function validatePhone(input){
-      const value = input.value || "";
-      const err = document.getElementById('phoneErr');
-      if(!phoneRegex.test(value)){
-        err.textContent = '請輸入正確的手機號碼';
-        err.style.display='block'; shake(input); input.style.borderColor='#b00020';
-        return false;
-      }
-      err.style.display='none'; input.style.borderColor='#ddd'; return true;
-    }
-    function validateEmail(input){
-      const value = input.value || "";
-      const err = document.getElementById('emailErr');
-      if(!emailRegex.test(value)){
-        err.textContent = '請填寫正確的郵箱';
-        err.style.display='block'; shake(input); input.style.borderColor='#b00020';
-        return false;
-      }
-      err.style.display='none'; input.style.borderColor='#ddd'; return true;
-    }
-    function validateRoom(input){
-      const value = input.value || "";
-      const err = document.getElementById('roomErr');
-      if(!roomRegex.test(value)){
-        err.textContent = '請填寫正確的房號';
-        err.style.display='block'; shake(input); input.style.borderColor='#b00020';
-        return false;
-      }
-      err.style.display='none'; input.style.borderColor='#ddd'; return true;
-    }
     /* ====== 資料處理 ====== */
     async function refreshDataIfNeeded(force=false){
       const now = Date.now();
@@ -675,10 +1031,17 @@
         const raw = await res.json();
         const headers = raw[0];
         const rows = raw.slice(1);
-        allRows = rows.map(r=>{ const o={}; headers.forEach((h,i)=>o[h]=r[i]); return o; }).filter(r=>r["去程 / 回程"]&&r["日期"]&&r["班次"]&&r["站點"]);
+        allRows = rows.map(r=>{
+          const o={}; headers.forEach((h,i)=>o[h]=r[i]); return o;
+        }).filter(r=>r["去程 / 回程"]&&r["日期"]&&r["班次"]&&r["站點"]);
         lastDataUpdate = now;
         return true;
-      }catch(e){ alert("資料更新失敗，請稍後再試"); return false; }finally{ showLoading(false); }
+      }catch(e){
+        alert("資料更新失敗，請稍後再試");
+        return false;
+      }finally{
+        showLoading(false);
+      }
     }
 
     /* ====== 預約流程 ====== */
@@ -689,79 +1052,161 @@
       document.getElementById('step1').style.display='';
       window.scrollTo({top:0,behavior:'smooth'});
     }
-    function goStep(n){ ['step1','step2','step3','step4','step5','step6'].forEach(id=>{ const el = document.getElementById(id); if(el) el.style.display='none'; }); const target = document.getElementById('step'+n); if(target) target.style.display=''; window.scrollTo({top:0,behavior:'smooth'}); }
+    function goStep(n){
+      ['step1','step2','step3','step4','step5','step6'].forEach(id=>{
+        const el = document.getElementById(id); if(el) el.style.display='none';
+      });
+      const target = document.getElementById('step'+n);
+      if(target) target.style.display='';
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
     function restart(){
       selectedDirection="";selectedDateRaw="";selectedStationRaw="";selectedScheduleTime="";selectedAvailableSeats=0;
       document.getElementById('homeHero').style.display='';
-      ['directionList','dateList','stationList','scheduleList'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=''; });
-      ['step1','step2','step3','step4','step5','step6','successCard'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+      ['directionList','dateList','stationList','scheduleList'].forEach(id=>{
+        const el=document.getElementById(id); if(el) el.innerHTML='';
+      });
+      ['step1','step2','step3','step4','step5','step6','successCard'].forEach(id=>{
+        const el=document.getElementById(id); if(el) el.style.display='none';
+      });
       showPage('reservation');
       window.scrollTo({top:0,behavior:'smooth'});
     }
+
     function buildStep1(){
       const list = document.getElementById('directionList');
       list.innerHTML='';
-      [{zh:'去程', label:'去程（飯店出發）'}, {zh:'回程', label:'回程（前往飯店）'}].forEach(opt=>{
-        const btn=document.createElement('button'); btn.type='button'; btn.className='opt-btn'; btn.textContent=opt.label;
+      const items=[
+        {zh:'去程', label:'去程（飯店出發）'},
+        {zh:'回程', label:'回程（前往飯店）'},
+      ];
+      items.forEach(opt=>{
+        const btn=document.createElement('button');
+        btn.type='button'; btn.className='opt-btn'; btn.textContent=opt.label;
         btn.onclick=()=>{ selectedDirection = opt.zh; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); toStep2(); };
         list.appendChild(btn);
       });
     }
+
     function toStep2(){
       if(!selectedDirection){ alert('請選擇方向'); return; }
-      const dateSet = new Set(allRows.filter(r=>String(r["去程 / 回程"]).trim()===selectedDirection).map(r=>fmtDateLabel(r["日期"])));
+      const dateSet = new Set(
+        allRows.filter(r=>String(r["去程 / 回程"]).trim()===selectedDirection)
+              .map(r=>fmtDateLabel(r["日期"]))
+      );
       const sorted=[...dateSet].sort((a,b)=>new Date(a)-new Date(b));
-      const list = document.getElementById('dateList'); list.innerHTML='';
-      sorted.forEach(dateStr=>{ const btn=document.createElement('button'); btn.type='button'; btn.className='opt-btn'; btn.textContent=dateStr;
-        btn.onclick=()=>{ selectedDateRaw=dateStr; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); toStep3(); }; list.appendChild(btn); });
+      const list = document.getElementById('dateList');
+      list.innerHTML='';
+      sorted.forEach(dateStr=>{
+        const btn=document.createElement('button');
+        btn.type='button'; btn.className='opt-btn'; btn.textContent=dateStr;
+        btn.onclick=()=>{ selectedDateRaw=dateStr; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); toStep3(); };
+        list.appendChild(btn);
+      });
       goStep(2);
     }
+
     function toStep3(){
       if(!selectedDateRaw){ alert('請選擇日期'); return; }
       document.getElementById('fixedStation').value = '福泰大飯店 Forte Hotel';
-      const stations = new Set(allRows.filter(r=>String(r["去程 / 回程"]).trim()===selectedDirection && fmtDateLabel(r["日期"])===selectedDateRaw).map(r=>String(r["站點"]).trim()));
-      const list = document.getElementById('stationList'); list.innerHTML='';
-      [...stations].forEach(st=>{ const btn=document.createElement('button'); btn.type='button'; btn.className='opt-btn'; btn.textContent=st;
-        btn.onclick=()=>{ selectedStationRaw=st; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); toStep4(); }; list.appendChild(btn); });
+      const stations = new Set(
+        allRows.filter(r=>String(r["去程 / 回程"]).trim()===selectedDirection && fmtDateLabel(r["日期"])===selectedDateRaw)
+               .map(r=>String(r["站點"]).trim())
+      );
+      const list = document.getElementById('stationList');
+      list.innerHTML='';
+      [...stations].forEach(st=>{
+        const btn=document.createElement('button');
+        btn.type='button'; btn.className='opt-btn'; btn.textContent=st;
+        btn.onclick=()=>{ selectedStationRaw=st; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); toStep4(); };
+        list.appendChild(btn);
+      });
       goStep(3);
     }
+
     function toStep4(){
       if(!selectedStationRaw){ alert('請選擇站點'); return; }
-      const list=document.getElementById('scheduleList'); list.innerHTML='';
-      const entries = allRows.filter(r=>String(r["去程 / 回程"]).trim()===selectedDirection && fmtDateLabel(r["日期"])===selectedDateRaw && String(r["站點"]).trim()===selectedStationRaw).sort((a,b)=>fmtTimeLabel(a["班次"]).localeCompare(fmtTimeLabel(b["班次"])));
+      const list=document.getElementById('scheduleList');
+      list.innerHTML='';
+      const entries = allRows.filter(r=>
+        String(r["去程 / 回程"]).trim()===selectedDirection &&
+        fmtDateLabel(r["日期"])===selectedDateRaw &&
+        String(r["站點"]).trim()===selectedStationRaw
+      ).sort((a,b)=>fmtTimeLabel(a["班次"]).localeCompare(fmtTimeLabel(b["班次"])));
       if(entries.length===0){ showExpiredOverlay(true); return; }
-      entries.forEach(r=>{ const time=fmtTimeLabel(r["班次"]); const availText=String(r["可預約人數"]||r["可約人數 / Available"]||'').trim(); const avail=Number(onlyDigits(availText))||0;
-        const btn=document.createElement('button'); btn.type='button'; btn.className='opt-btn';
-        if(avail<=0){ btn.classList.add('disabled'); btn.innerHTML = `<span style="color:#999;font-weight:700">${time}</span> <span style="color:#999;font-size:13px">(已額滿)</span>`; }
-        else{ btn.innerHTML = `<span style="color:var(--primary);font-weight:700">${time}</span> <span style="color:#777;font-size:13px">(可預約：${avail} 人)</span>`;
-          btn.onclick=()=>{ selectedScheduleTime=time; selectedAvailableSeats=avail; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); toStep5(); }; }
+
+      entries.forEach(r=>{
+        const time=fmtTimeLabel(r["班次"]);
+        const availText=String(r["可預約人數"]||r["可約人數 / Available"]||'').trim();
+        const avail=Number(onlyDigits(availText))||0;
+        const btn=document.createElement('button');
+        btn.type='button'; btn.className='opt-btn';
+        if(avail<=0){
+          btn.classList.add('disabled');
+          btn.innerHTML = `<span style="color:#999;font-weight:700">${time}</span> <span style="color:#999;font-size:13px">(已額滿)</span>`;
+        }else{
+          btn.innerHTML = `<span style="color:var(--primary);font-weight:700">${time}</span> <span style="color:#777;font-size:13px">(可預約：${avail} 人)</span>`;
+          btn.onclick=()=>{
+            selectedScheduleTime=time; selectedAvailableSeats=avail;
+            list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+            toStep5();
+          };
+        }
         list.appendChild(btn);
       });
       goStep(4);
     }
+
     function onIdentityChange(){
-      const v=document.getElementById('identitySelect').value; const today = todayISO();
+      const v=document.getElementById('identitySelect').value;
+      const today = todayISO();
       document.getElementById('hotelDates').style.display = v==='hotel'?'block':'none';
       document.getElementById('hotelDates2').style.display = v==='hotel'?'block':'none';
       document.getElementById('roomNumberDiv').style.display = v==='hotel'?'block':'none';
       document.getElementById('diningDateDiv').style.display = v==='dining'?'block':'none';
-      if(v==='hotel'){ const ci = document.getElementById('checkInDate'); const co = document.getElementById('checkOutDate'); if(ci && !ci.value) ci.value = today; if(co && !co.value) co.value = today; }
-      else { const dining = document.getElementById('diningDate'); if(dining && !dining.value) dining.value = today; }
+      
+      // 設定預設日期
+      if(v==='hotel'){
+        const ci = document.getElementById('checkInDate');
+        const co = document.getElementById('checkOutDate');
+        if(ci && !ci.value) ci.value = today;
+        if(co && !co.value) co.value = today;
+      } else if(v==='dining'){
+        const dining = document.getElementById('diningDate');
+        if(dining && !dining.value) dining.value = today;
+      }
     }
-    function toStep5(){ if(!selectedScheduleTime){ alert('請選擇班次'); return; } onIdentityChange(); goStep(5); }
+
+    function toStep5(){
+      if(!selectedScheduleTime){ alert('請選擇班次'); return; }
+      onIdentityChange();
+      goStep(5);
+    }
+
     function validateStep5(){
       const id=document.getElementById('identitySelect').value;
       const name=(document.getElementById('guestName').value||'').trim();
       const phone=(document.getElementById('guestPhone').value||'').trim();
       const email=(document.getElementById('guestEmail').value||'').trim();
+
       if(!id){document.getElementById('identityErr').style.display='block'; return false} else document.getElementById('identityErr').style.display='none';
       if(!name){document.getElementById('nameErr').style.display='block'; shake(document.getElementById('guestName')); return false}else document.getElementById('nameErr').style.display='none';
       if(!phoneRegex.test(phone)){document.getElementById('phoneErr').style.display='block'; shake(document.getElementById('guestPhone')); return false}else document.getElementById('phoneErr').style.display='none';
       if(!emailRegex.test(email)){document.getElementById('emailErr').style.display='block'; shake(document.getElementById('guestEmail')); return false}else document.getElementById('emailErr').style.display='none';
-      if(id==='hotel'){ const cin=document.getElementById('checkInDate').value; const cout=document.getElementById('checkOutDate').value; if(!cin||!cout){ alert('請填寫入住和退房日期'); shake(document.getElementById('checkInDate')); shake(document.getElementById('checkOutDate')); return false; } const room=(document.getElementById('roomNumber').value||'').trim(); if(!roomRegex.test(room)){document.getElementById('roomErr').style.display='block'; shake(document.getElementById('roomNumber')); return false}else document.getElementById('roomErr').style.display='none'; }
-      else { const din=document.getElementById('diningDate').value; if(!din){ alert('請填寫用餐日期'); shake(document.getElementById('diningDate')); return false; } }
+
+      if(id==='hotel'){
+        const cin=document.getElementById('checkInDate').value;
+        const cout=document.getElementById('checkOutDate').value;
+        if(!cin||!cout){ alert('請填寫入住和退房日期'); shake(document.getElementById('checkInDate')); shake(document.getElementById('checkOutDate')); return false; }
+        const room=(document.getElementById('roomNumber').value||'').trim();
+        if(!roomRegex.test(room)){document.getElementById('roomErr').style.display='block'; shake(document.getElementById('roomNumber')); return false}else document.getElementById('roomErr').style.display='none';
+      }else{
+        const din=document.getElementById('diningDate').value;
+        if(!din){ alert('請填寫用餐日期'); shake(document.getElementById('diningDate')); return false; }
+      }
       return true;
     }
+
     async function toStep6(){
       if(!validateStep5())return;
       showVerifyLoading(true);
@@ -769,11 +1214,19 @@
         const res = await fetch(API_URL);
         const raw = await res.json();
         const headers=raw[0]; const rows=raw.slice(1);
-        allRows = rows.map(r=>{const o={};headers.forEach((h,i)=>o[h]=r[i]);return o;}).filter(r=>r["去程 / 回程"]&&r["日期"]&&r["班次"]&&r["站點"]);
-        const found = allRows.find(r=>String(r["去程 / 回程"]).trim()===selectedDirection && fmtDateLabel(r["日期"])===selectedDateRaw && String(r["站點"]).trim()===selectedStationRaw && fmtTimeLabel(r["班次"])===selectedScheduleTime);
+        allRows = rows.map(r=>{const o={};headers.forEach((h,i)=>o[h]=r[i]);return o;})
+                      .filter(r=>r["去程 / 回程"]&&r["日期"]&&r["班次"]&&r["站點"]);
+        const found = allRows.find(r=>
+          String(r["去程 / 回程"]).trim()===selectedDirection &&
+          fmtDateLabel(r["日期"])===selectedDateRaw &&
+          String(r["站點"]).trim()===selectedStationRaw &&
+          fmtTimeLabel(r["班次"])===selectedScheduleTime
+        );
         if(!found){ showVerifyLoading(false); showExpiredOverlay(true); return; }
-        const availableText=found["可預約人數"]||found["可約人數 / Available"]||"0"; selectedAvailableSeats = Number(onlyDigits(availableText))||0;
+        const availableText=found["可預約人數"]||found["可約人數 / Available"]||"0";
+        selectedAvailableSeats = Number(onlyDigits(availableText))||0;
         if(selectedAvailableSeats<=0){ showVerifyLoading(false); alert('此班次已無座位'); showExpiredOverlay(true); return; }
+
         document.getElementById('cf_direction').value = selectedDirection;
         document.getElementById('cf_date').value = selectedDateRaw;
         const pick = selectedDirection==='回程'?selectedStationRaw:'福泰大飯店 Forte Hotel';
@@ -782,76 +1235,156 @@
         document.getElementById('cf_drop').value = drop;
         document.getElementById('cf_time').value = selectedScheduleTime;
         document.getElementById('cf_name').value = (document.getElementById('guestName').value||'').trim();
-        const sel=document.getElementById('passengers'); sel.innerHTML='';
+
+        const sel=document.getElementById('passengers');
+        sel.innerHTML='';
         const maxPassengers = Math.min(4, Math.max(0, selectedAvailableSeats));
-        if(maxPassengers<=0){ const opt=document.createElement('option');opt.value='';opt.textContent='0';sel.appendChild(opt);sel.disabled=true; }
-        else{ sel.disabled=false; for(let i=1;i<=maxPassengers;i++){const opt=document.createElement('option');opt.value=String(i);opt.textContent=String(i);sel.appendChild(opt);} sel.value='1'; }
+        if(maxPassengers<=0){
+          const opt=document.createElement('option');opt.value='';opt.textContent='0';sel.appendChild(opt);sel.disabled=true;
+        }else{
+          sel.disabled=false;
+          for(let i=1;i<=maxPassengers;i++){const opt=document.createElement('option');opt.value=String(i);opt.textContent=String(i);sel.appendChild(opt);}
+          sel.value='1';
+        }
         document.getElementById('passengersHint').textContent = `此班次可預約：${selectedAvailableSeats} 人；單筆最多 4 人`;
         goStep(6);
-      }catch(e){ console.error(e); showExpiredOverlay(true); }finally{ showVerifyLoading(false); }
-    }
-    async function submitBooking(){
-      const pSel = document.getElementById('passengers'); const p = Number(pSel.value || 0);
-      if (!p || p < 1 || p > 4 || p > selectedAvailableSeats) { document.getElementById('passengersErr').style.display = 'block'; return; }
-      document.getElementById('passengersErr').style.display = 'none';
-      const identity = document.getElementById('identitySelect').value;
-      const payload = {
-        direction: selectedDirection, date: selectedDateRaw, station: selectedStationRaw, time: selectedScheduleTime, identity,
-        checkIn: identity === 'hotel' ? (document.getElementById('checkInDate').value || null) : null,
-        checkOut: identity === 'hotel' ? (document.getElementById('checkOutDate').value || null) : null,
-        diningDate: identity === 'dining' ? (document.getElementById('diningDate').value || null) : null,
-        roomNumber: identity === 'hotel' ? (document.getElementById('roomNumber').value || null) : null,
-        name: (document.getElementById('guestName').value || '').trim(),
-        phone: (document.getElementById('guestPhone').value || '').trim(),
-        email: (document.getElementById('guestEmail').value || '').trim(),
-        passengers: p,
-        dropLocation: selectedDirection === '回程' ? '福泰大飯店 Forte Hotel' : selectedStationRaw,
-        pickLocation: selectedDirection === '回程' ? selectedStationRaw : '福泰大飯店 Forte Hotel',
-      };
-      showVerifyLoading(true);
-      try {
-        const res = await fetch(OPS_URL, { method: 'POST', headers: { 'Content-Type': 'application/json','Accept': 'application/json' }, body: JSON.stringify({ action: 'book', data: payload })});
-        if (!res.ok) { throw new Error(`HTTP error! status: ${res.status}`); }
-        const result = await res.json();
-        if (result.status === 'success') {
-          currentBookingData = { bookingId: result.booking_id || '', schedule: `${selectedDateRaw} ${selectedScheduleTime}`, direction: selectedDirection,
-            pickLocation: payload.pickLocation, dropLocation: payload.dropLocation, name: payload.name, phone: payload.phone, email: payload.email,
-            passengers: p, qrUrl: result.qr_url };
-          // 成功動畫 + 成功卡片
-          showSuccessAnimation();
-          setTimeout(() => {
-            document.getElementById('ticketQrImg').src = currentBookingData.qrUrl;
-            document.getElementById('ticketBookingId').textContent = currentBookingData.bookingId;
-            document.getElementById('ticketSchedule').textContent = currentBookingData.schedule;
-            document.getElementById('ticketDirection').textContent = currentBookingData.direction;
-            document.getElementById('ticketPick').textContent = currentBookingData.pickLocation;
-            document.getElementById('ticketDrop').textContent = currentBookingData.dropLocation;
-            document.getElementById('ticketName').textContent = currentBookingData.name;
-            document.getElementById('ticketPhone').textContent = currentBookingData.phone;
-            document.getElementById('ticketEmail').textContent = currentBookingData.email;
-            document.getElementById('ticketPassengers').textContent = currentBookingData.passengers + ' 人';
-            document.getElementById('step6').style.display = 'none';
-            document.getElementById('successCard').style.display = '';
-            window.scrollTo({top: 0, behavior: 'smooth'});
-          }, 1000);
-        } else { const errorMessage = result.detail || result.message || '預約失敗，請稍後再試'; alert(errorMessage); }
-      } catch (e) { alert('提交失敗：' + e.message); } finally { showVerifyLoading(false); }
+      }catch(e){
+        console.error(e); showExpiredOverlay(true);
+      }finally{
+        showVerifyLoading(false);
+      }
     }
 
-    function showSuccessAnimation() {
-      const animation = document.getElementById('successAnimation');
-      animation.classList.add('show');
-      setTimeout(() => { animation.classList.remove('show'); }, 2000);
+    async function submitBooking(){
+        const pSel = document.getElementById('passengers');
+        const p = Number(pSel.value || 0);
+        
+        if (!p || p < 1 || p > 4 || p > selectedAvailableSeats) {
+            document.getElementById('passengersErr').style.display = 'block';
+            return;
+        }
+        document.getElementById('passengersErr').style.display = 'none';
+
+        const identity = document.getElementById('identitySelect').value;
+        const payload = {
+            direction: selectedDirection,
+            date: selectedDateRaw,
+            station: selectedStationRaw,
+            time: selectedScheduleTime,
+            identity,
+            checkIn: identity === 'hotel' ? (document.getElementById('checkInDate').value || null) : null,
+            checkOut: identity === 'hotel' ? (document.getElementById('checkOutDate').value || null) : null,
+            diningDate: identity === 'dining' ? (document.getElementById('diningDate').value || null) : null,
+            roomNumber: identity === 'hotel' ? (document.getElementById('roomNumber').value || null) : null,
+            name: (document.getElementById('guestName').value || '').trim(),
+            phone: (document.getElementById('guestPhone').value || '').trim(),
+            email: (document.getElementById('guestEmail').value || '').trim(),
+            passengers: p,
+            dropLocation: selectedDirection === '回程' ? '福泰大飯店 Forte Hotel' : selectedStationRaw,
+            pickLocation: selectedDirection === '回程' ? selectedStationRaw : '福泰大飯店 Forte Hotel',
+        };
+
+        showVerifyLoading(true);
+        
+        try {
+            const res = await fetch(OPS_URL, {
+                method: 'POST', 
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }, 
+                body: JSON.stringify({
+                    action: 'book', 
+                    data: payload
+                })
+            });
+
+            if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
+
+            const result = await res.json();
+
+            if (result.status === 'success') {
+                currentBookingData = {
+                    bookingId: result.booking_id || '',
+                    schedule: `${selectedDateRaw} ${selectedScheduleTime}`,
+                    direction: selectedDirection,
+                    pickLocation: payload.pickLocation,
+                    dropLocation: payload.dropLocation,
+                    name: payload.name,
+                    phone: payload.phone,
+                    email: payload.email,
+                    passengers: p,
+                    qrUrl: result.qr_url
+                };
+                
+                // 顯示成功動畫
+                showSuccessAnimation();
+                
+                setTimeout(() => {
+                    document.getElementById('ticketQrImg').src = currentBookingData.qrUrl;
+                    document.getElementById('ticketBookingId').textContent = currentBookingData.bookingId;
+                    document.getElementById('ticketSchedule').textContent = currentBookingData.schedule;
+                    document.getElementById('ticketDirection').textContent = currentBookingData.direction;
+                    document.getElementById('ticketPick').textContent = currentBookingData.pickLocation;
+                    document.getElementById('ticketDrop').textContent = currentBookingData.dropLocation;
+                    document.getElementById('ticketName').textContent = currentBookingData.name;
+                    document.getElementById('ticketPhone').textContent = currentBookingData.phone;
+                    document.getElementById('ticketEmail').textContent = currentBookingData.email;
+                    document.getElementById('ticketPassengers').textContent = currentBookingData.passengers + ' 人';
+
+                    document.getElementById('step6').style.display = 'none';
+                    document.getElementById('successCard').style.display = '';
+                    
+                    window.scrollTo({top: 0, behavior: 'smooth'});
+                }, 2000);
+
+            } else {
+                const errorMessage = result.detail || result.message || '預約失敗，請稍後再試';
+                alert(errorMessage);
+            }
+            
+        } catch (e) {
+            alert('提交失敗：' + e.message);
+        } finally {
+            showVerifyLoading(false);
+        }
     }
+
+    // 下載車票 - 修正版本，固定尺寸
     async function downloadTicket() {
-      const ticketCard = document.getElementById('ticketCard');
-      try {
-        const isMobile = window.innerWidth <= 768;
-        const width = isMobile ? 350  : 480;
-        const height = isMobile ? 610 * 2 : 590 * 2;
-        const dataUrl = await domtoimage.toPng(ticketCard, { bgcolor: '#ffffff', width, height, quality: 1, pixelRatio: 2, style: { margin: '0', padding: '24px', transform: 'none' } });
-        const a = document.createElement('a'); a.href = dataUrl; a.download = `ticket_${currentBookingData.bookingId}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      } catch (e) { console.error('下載失敗:', e); alert('下載失敗：' + e.message); }
+        const ticketCard = document.getElementById('ticketCard');
+        
+        try {
+            // 根據螢幕寬度決定下載尺寸
+            const isMobile = window.innerWidth <= 768;
+            const width = isMobile ? 350  : 480 ; // 手機版350px，電腦版600px
+            const height = isMobile ? 610 * 2 : 590 * 2; // 手機版較高，電腦版較矮
+            
+            const dataUrl = await domtoimage.toPng(ticketCard, {
+                bgcolor: '#ffffff',
+                width: width,
+                height: height,
+                quality: 1,
+                pixelRatio: 2,
+                style: {
+                    margin: '0',
+                    padding: '24px',
+                    transform: 'none'
+                }
+            });
+
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = `ticket_${currentBookingData.bookingId}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } catch (e) {
+            console.error('下載失敗:', e);
+            alert('下載失敗：' + e.message);
+        }
     }
 
     /* ====== 我的預約：查詢 / 群組 / 卡片 ====== */
@@ -1108,7 +1641,10 @@
     }
 
     /* ====== 捲動監聽 ====== */
-    window.addEventListener('scroll',()=>{ const btn = document.getElementById('backToTop'); btn.style.display = window.scrollY>400 ? 'block':'none'; });
+    window.addEventListener('scroll',()=>{
+      const btn = document.getElementById('backToTop');
+      btn.style.display = window.scrollY>400 ? 'block':'none';
+    });
 
     /* ====== 初始化 ====== */
     async function init() {
@@ -1116,12 +1652,25 @@
       const ci = document.getElementById('checkInDate');
       const co = document.getElementById('checkOutDate');
       const dining = document.getElementById('diningDate');
-      if(ci) ci.value = t; if(co) co.value = t; if(dining) dining.value = t;
+      if(ci) ci.value = t;
+      if(co) co.value = t;
+      if(dining) dining.value = t; // 用餐日期也預設今天
       showPage('reservation');
     }
+
+    // 放在 init() 後面執行即可，不要放前面
     document.addEventListener('DOMContentLoaded', () => {
-      document.querySelectorAll('.actions').forEach(a => { const btns = a.querySelectorAll('button'); if (btns.length === 3) a.classList.add('has-three'); });
-      init();
+      document.querySelectorAll('.actions').forEach(a => {
+        const btns = a.querySelectorAll('button');
+        if (btns.length === 3) a.classList.add('has-three');
+      });
+
+      document.querySelectorAll('.ticket-actions').forEach(a => {
+        const btns = a.querySelectorAll('button');
+        if (btns.length === 3) a.classList.add('has-three');
+      });
+
+      init(); // 改成這樣直接呼叫 init()
     });
   </script>
 </body>
