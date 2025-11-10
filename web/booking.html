@@ -360,6 +360,48 @@
   line-height: 1.2;     /* 壓縮欄內文字間距 */
 }
     
+/* === 修正手機版車票寬度與排版 === */
+@media (max-width: 768px) {
+  html, body {
+    overflow-x: hidden; /* 防止手機橫向滾動 */
+  }
+
+  .ticket-card {
+    width: 95vw;        /* 卡片接近滿版 */
+    max-width: 95vw;    /* 防止超出畫面 */
+    overflow: hidden;   /* 隱藏多餘內容 */
+    margin: 0 auto;     /* 置中 */
+  }
+
+  .ticket-content {
+    display: flex;
+    flex-direction: column; /* 改成上下排：QR 在上，資訊在下 */
+    align-items: center;
+    gap: 12px;
+  }
+
+  .ticket-info {
+    width: 100%; /* 讓右側資訊自動換行 */
+  }
+
+  .ticket-qr img {
+    width: 160px;
+    height: 160px;
+  }
+
+  /* 修正我的預約卡片在手機上超出螢幕問題 */
+  #check .card {
+    max-width: 95vw;
+    margin: 0 auto;
+    overflow-x: hidden;
+  }
+
+  #check img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
 /* === 修正版：手機版按鈕垂直置中 === */
 @media (max-width: 768px) {
   .nav-links { display: none; }
@@ -382,6 +424,33 @@
 
   .actions button + button {
     margin-top: 10px;
+  }
+}
+/* === 修正版：手機版按鈕左右排列 === */
+@media (max-width: 768px) {
+  .nav-links { display: none; }
+  .mobile-tabbar { display: block; }
+  body { padding-bottom: 70px; }
+  .navbar { justify-content: space-between; }
+  .brand { margin-right: 0; }
+
+  .actions {
+    flex-direction: row !important;      /* ← 改成左右排列 */
+    justify-content: space-between !important;
+    align-items: center !important;
+    flex-wrap: wrap;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .actions button {
+    flex: 1;
+    min-width: 40%;
+    max-width: 45%;
+  }
+
+  .actions button + button {
+    margin-top: 0; /* 移除垂直間距 */
   }
 }
 
