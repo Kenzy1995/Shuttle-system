@@ -384,6 +384,70 @@
     margin-top: 10px;
   }
 }
+/* === 手機板畫面修正版 === */
+@media (max-width: 768px) {
+
+  html, body {
+    width: 100vw;
+    overflow-x: hidden; /* 防止橫向滾動 */
+  }
+
+  .page, .card, .ticket-card {
+    width: 95vw;
+    max-width: 95vw;
+    margin: 0 auto;
+  }
+
+  /* 導覽設定 */
+  .nav-links { display: none; }
+  .mobile-tabbar { display: block; }
+  body { padding-bottom: 70px; }
+  .navbar { justify-content: space-between; }
+  .brand { margin-right: 0; }
+
+  /* 手機版按鈕改左右排列 */
+  .actions {
+    display: flex !important;
+    flex-wrap: nowrap;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100%;
+    max-width: 340px;
+    margin: 10px auto 0;
+  }
+
+  .actions button {
+    flex: 1;
+    min-width: 140px;
+    max-width: 160px;
+    font-size: 15px;
+  }
+
+  /* 三個按鈕時，改為左+右+下排列 */
+  .actions.has-three {
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px;
+  }
+
+  .actions.has-three button {
+    width: 80%;
+    max-width: 320px;
+  }
+
+  /* 車票修正：固定寬度、上下排列 */
+  .ticket-content {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .ticket-qr img {
+    width: 160px;
+    height: 160px;
+  }
+}
 
   </style>
 </head>
@@ -1572,6 +1636,7 @@
 
       init(); // 改成這樣直接呼叫 init()
     });
+
   </script>
 </body>
 </html>
