@@ -138,7 +138,7 @@
     .mobile-tabbar .bar{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
     .mobile-tabbar button{
       appearance:none;border:none;background:none;padding:12px 6px;
-      font-size:14px; /* 手機版底部菜單字體變大 */
+      font-size:18px; /* 手機版底部菜單字體變大為18px */
       color:#fff;font-weight:700;opacity:.8
     }
     .mobile-tabbar button.active{opacity:1;text-decoration:underline}
@@ -304,12 +304,12 @@
         justify-content:center;
         width:100%;
       }
-      /* 兩顆按鈕左右排序 */
+      /* 手機版兩個按鈕左右排列 */
       .actions.row {
         flex-direction: row;
         justify-content: space-between;
       }
-      /* 三顆按鈕特殊排列 */
+      /* 手機版三個按鈕特殊排列 */
       .actions:has(button:nth-child(3)) {
         flex-direction: column;
         align-items: center;
@@ -317,6 +317,12 @@
       .actions:has(button:nth-child(3)) button:nth-child(3) {
         order: 3;
         margin-top: 10px;
+      }
+      
+      /* 手機版預約班次按鈕左右排列 */
+      #step4 .actions {
+        flex-direction: row !important;
+        justify-content: space-between !important;
       }
       
       .hero .actions {
@@ -334,6 +340,10 @@
       .ticket-qr {
         order: -1;
       }
+      .ticket-qr img {
+        width: 180px; /* 手機版QR code 尺寸 */
+        height: 180px;
+      }
       .ticket-field {
         flex-direction: column;
         align-items: flex-start;
@@ -345,12 +355,6 @@
       }
       .ticket-actions {
         flex-direction: column-reverse;
-      }
-      
-      /* 手機版預約班次畫面按鈕排列 */
-      #step4 .actions {
-        flex-direction: row;
-        justify-content: space-between;
       }
     }
 
@@ -708,7 +712,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js"></script>
-  
   <script>
     /* ====== 常數（API） ====== */
     const API_URL = "https://booking-api-995728097341.asia-east1.run.app/api/sheet";
@@ -1207,17 +1210,27 @@
         }
     }
 
-    // 下載車票
+    // 下載車票 - 修正版本，固定尺寸
     async function downloadTicket() {
         const ticketCard = document.getElementById('ticketCard');
         
         try {
+            // 根據螢幕寬度決定下載尺寸
+            const isMobile = window.innerWidth <= 768;
+            const width = isMobile ? 350 * 2 : 600 * 2; // 手機版350px，電腦版600px
+            const height = isMobile ? 650 * 2 : 500 * 2; // 手機版較高，電腦版較矮
+            
             const dataUrl = await domtoimage.toPng(ticketCard, {
                 bgcolor: '#ffffff',
-                width: ticketCard.scrollWidth * 2,
-                height: ticketCard.scrollHeight * 2,
+                width: width,
+                height: height,
                 quality: 1,
-                pixelRatio: 2
+                pixelRatio: 2,
+                style: {
+                    margin: '0',
+                    padding: '24px',
+                    transform: 'none'
+                }
             });
 
             const a = document.createElement('a');
