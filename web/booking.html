@@ -456,7 +456,7 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@2.8.0/dist/dom-to-image-more.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   
   <script>
     /* ====== 常數（API） ====== */
@@ -910,7 +910,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// 下載車票功能（確保有正確綁定）
+// 下載車票功能
 document.addEventListener('click', function(e){
     if (e.target && e.target.id === 'downloadTicketBtn') { 
         downloadTicketAsImage(); 
@@ -919,44 +919,50 @@ document.addEventListener('click', function(e){
 
 // 下載車票為圖片的完整函數
 async function downloadTicketAsImage(){
-    const node = document.getElementById('ticketCard');
-    if (!node) {
-        alert('找不到車票資料');
-        return;
-    }
-    
-    const scale = 2;
-    const style = {
-        filter: 'none', 
-        transform: 'none', 
-        background: '#fff',
-        width: node.scrollWidth + 'px',
-        height: node.scrollHeight + 'px'
-    };
-    
-    try {
-        const dataUrl = await domtoimage.toPng(node, {
-            bgcolor: '#ffffff', 
-            style: style, 
-            width: node.scrollWidth * scale,
-            height: node.scrollHeight * scale,
-            quality: 1, 
-            pixelRatio: scale
-        });
-        
-        const a = document.createElement('a');
-        const bookingId = document.getElementById('succBookingId').value || 'booking';
-        a.href = dataUrl; 
-        a.download = `ticket_${bookingId}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
-    } catch(e) {
-        console.error('下載失敗:', e);
-        alert('下載失敗：' + e.message);
-    }
+  // 目標是整張車票外層（包含乘客資訊 + QR）
+  const node = document.getElementById('ticketModal') || document.getElementById('ticketCard');
+  if (!node) {
+    alert('找不到車票內容');
+    return;
+  }
+
+  // 將目標顯示出來（若隱藏）
+  const wasHidden = window.getComputedStyle(node).display === 'none';
+  if (wasHidden) node.style.display = 'block';
+
+  const scale = 2;
+  const style = {
+    background: '#ffffff',
+    transform: 'none',
+    filter: 'none'
+  };
+
+  try {
+    const dataUrl = await domtoimage.toPng(node, {
+      bgcolor: '#ffffff',
+      style: style,
+      width: node.scrollWidth * scale,
+      height: node.scrollHeight * scale,
+      quality: 1,
+      pixelRatio: scale
+    });
+
+    const bookingId = document.getElementById('succBookingId')?.value || 'booking';
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `ticket_${bookingId}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+  } catch (e) {
+    console.error('下載失敗:', e);
+    alert('下載失敗：' + e.message);
+  } finally {
+    if (wasHidden) node.style.display = 'none';
+  }
 }
+
 
 
     /* ====== 我的預約：查詢 / 修改 / 刪除 ====== */
