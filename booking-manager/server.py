@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
 import gspread
 import google.auth
+import hashlib 
 
 
 # ========== 常數與工具 ==========
@@ -80,6 +81,8 @@ DROP_INDEX_MAP = {
     "福泰大飯店": 5,
 }
 
+def _email_hash6(email: str) -> str:
+    return hashlib.sha256((email or "").encode("utf-8")).hexdigest()[:6]
 
 def _normalize_stop(name: str) -> str:
     raw = (name or "").strip()
@@ -325,8 +328,9 @@ def ops(req: OpsRequest):
             pk_idx, dp_idx, seg_str = _compute_indices_and_segments(
                 p.pickLocation, p.dropLocation
             )
-
-            qr_content = f"FORTEXZ:{booking_id}"
+            
+            em6 = _email_hash6(p.email)
+            qr_content = f"FT:{booking_id}:{em6}"
             qr_url = f"{BASE_URL}/api/qr/{urllib.parse.quote(qr_content)}"
 
             newrow = [""] * len(headers)
