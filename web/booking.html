@@ -1568,26 +1568,28 @@
       btn.style.display = window.scrollY>400 ? 'block':'none';
     });
 
-/* ====== 初始化 ====== */
-// 新增：處理手機不支援 :has() 的狀況
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.actions').forEach(a => {
-    const btns = a.querySelectorAll('button');
-    if (btns.length === 3) a.classList.add('has-three');
-  });
-});
+    /* ====== 初始化 ====== */
+    async function init() {
+      const t = todayISO();
+      const ci = document.getElementById('checkInDate');
+      const co = document.getElementById('checkOutDate');
+      const dining = document.getElementById('diningDate');
+      if(ci) ci.value = t;
+      if(co) co.value = t;
+      if(dining) dining.value = t; // 用餐日期也預設今天
+      await refreshDataIfNeeded(true);
+      showPage('reservation');
+    }
 
-async function init() {
-  const t = todayISO();
-  const ci = document.getElementById('checkInDate');
-  const co = document.getElementById('checkOutDate');
-  const dining = document.getElementById('diningDate');
-  if(ci) ci.value = t;
-  if(co) co.value = t;
-  if(dining) dining.value = t; // 用餐日期也預設今天
-  await refreshDataIfNeeded(true);
-  showPage('reservation');
-}
+    // 放在 init() 後面執行即可，不要放前面
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('.actions').forEach(a => {
+        const btns = a.querySelectorAll('button');
+        if (btns.length === 3) a.classList.add('has-three');
+      });
 
-document.addEventListener('DOMContentLoaded', init);
-
+      init(); // 改成這樣直接呼叫 init()
+    });
+  </script>
+</body>
+</html>
