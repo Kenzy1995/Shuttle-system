@@ -201,16 +201,21 @@
 
     /* 車票卡片樣式 - 獨立樣式避免下載時包含空白 */
     .ticket-card {
+      display: block;
+      margin: 40px auto;
+      width: 420px;
       background: white;
       border-radius: 16px;
       box-shadow: var(--shadow-lg);
       padding: 24px;
-      margin: 20px auto;
-      max-width: 600px;
-      width: 100%;
+      text-align: left;
+      position: relative;
+    }
       /* 確保車票卡片獨立佈局 */
       display: block;
       position: relative;
+
+}
     }
     .ticket-header {
       text-align: center;
@@ -1182,54 +1187,36 @@
         }
     }
 
-    // 下載車票 - 使用專門的下載容器
     async function downloadTicket() {
-        // 先更新下載專用容器的內容
-        document.getElementById('downloadQrImg').src = currentBookingData.qrUrl;
-        document.getElementById('downloadBookingId').textContent = currentBookingData.bookingId;
-        document.getElementById('downloadSchedule').textContent = currentBookingData.schedule;
-        document.getElementById('downloadDirection').textContent = currentBookingData.direction;
-        document.getElementById('downloadPick').textContent = currentBookingData.pickLocation;
-        document.getElementById('downloadDrop').textContent = currentBookingData.dropLocation;
-        document.getElementById('downloadName').textContent = currentBookingData.name;
-        document.getElementById('downloadPhone').textContent = currentBookingData.phone;
-        document.getElementById('downloadEmail').textContent = currentBookingData.email;
-        document.getElementById('downloadPassengers').textContent = currentBookingData.passengers + ' 人';
-        
-        const downloadContainer = document.getElementById('ticketForDownload');
-        
-        try {
-            // 暫時顯示下載容器
-            downloadContainer.style.display = 'block';
-            
-            const dataUrl = await domtoimage.toPng(downloadContainer, {
-                bgcolor: '#ffffff',
-                width: downloadContainer.scrollWidth * 2,
-                height: downloadContainer.scrollHeight * 2,
-                quality: 1,
-                pixelRatio: 2,
-                style: {
-                    transform: 'none',
-                    margin: '0',
-                    padding: '24px'
-                }
-            });
+    const node = document.getElementById('ticketCard'); // 改這行
+      if (!node) return alert('找不到車票內容');
 
-            const a = document.createElement('a');
-            a.href = dataUrl;
-            a.download = `ticket_${currentBookingData.bookingId}.png`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            
-        } catch (e) {
-            console.error('下載失敗:', e);
-            alert('下載失敗：' + e.message);
-        } finally {
-            // 下載完成後隱藏下載容器
-            downloadContainer.style.display = 'none';
-        }
-    }
+      try {
+        const dataUrl = await domtoimage.toPng(node, {
+          bgcolor: '#ffffff',
+          width: node.scrollWidth * 2,
+          height: node.scrollHeight * 2,
+          quality: 1,
+          pixelRatio: 2,
+          style: {
+            transform: 'none',
+            margin: '0',
+            padding: '0'
+          }
+        });
+
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `ticket_${currentBookingData.bookingId}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (e) {
+    console.error('下載失敗:', e);
+    alert('下載失敗：' + e.message);
+  }
+}
+
 
     // 添加 QR 圖片載入錯誤處理
     document.addEventListener('DOMContentLoaded', function() {
