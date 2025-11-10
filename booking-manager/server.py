@@ -21,7 +21,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 SPREADSHEET_ID = "1xp54tKOczklmT8uacW-HMxwV8r0VOR2ui33jYcE2pUQ"
-SHEET_NAME = "預約審核(櫃台)"
+SHEET_NAME = "工作表20"
 BASE_URL = "https://booking-manager-995728097341.asia-east1.run.app"
 
 HEADER_ALIASES = {
@@ -134,8 +134,7 @@ def open_sheet() -> gspread.Worksheet:
     except Exception as e:
         print(f"DEBUG: 連接失敗: {str(e)}")
         raise RuntimeError(f"無法開啟 Google Sheet: {str(e)}")     
-    except Exception as e:
-        raise RuntimeError(f"無法開啟 Google Sheet: {str(e)}")     
+  
 def header_map(ws: gspread.Worksheet) -> Dict[str, int]:
     row = ws.row_values(1)
     m: Dict[str, int] = {}
