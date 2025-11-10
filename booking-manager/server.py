@@ -374,10 +374,15 @@ def ops(req: OpsRequest):
         # ===== 查詢 =====
         elif action == "query":
             p = QueryPayload(**data)
+            p = QueryPayload(**data)
             if not (p.booking_id or p.phone or p.email):
                 raise HTTPException(400, "至少提供 booking_id / phone / email 其中一項")
 
             all_values = _read_all_rows(ws)
+            print("=== DEBUG: all_values ===")
+            for r in all_values:
+                print(r)
+
             if not all_values:
                 return []
 
