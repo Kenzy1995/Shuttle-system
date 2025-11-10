@@ -329,36 +329,42 @@
 /* === 修正手機版車票寬度與排版 === */
 @media (max-width: 768px) {
   .ticket-card {
-    width: 95vw;        /* 卡片接近滿版 */
-    max-width: 95vw;    /* 防止超出畫面 */
-    overflow: hidden;   /* 隱藏超出內容，避免左右滾動 */
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding: 14px;
+    overflow: hidden;
   }
 
   .ticket-content {
     display: flex;
     flex-direction: column; /* 改成上下排：QR 在上，資料在下 */
-    align-items: center;    /* 水平置中 */
-    gap: 12px;              /* 元素間距 */
+    align-items: center;
+    gap: 12px;
   }
 
   .ticket-info {
-    width: 100%;            /* 讓右側資訊自動換行 */
+    width: 100%;
+    word-wrap: break-word; /* 避免長字超出 */
   }
 
   .ticket-qr img {
     width: 160px;
     height: 160px;
+    max-width: 100%;
   }
 }
 
 #step6 .field {
-  margin: 4px 0;       /* 原本為 8px，這裡縮小垂直間距 */
+  margin: 4px 0;
 }
 
 #step6 .label,
 #step6 .readonly {
-  line-height: 1.2;     /* 壓縮欄內文字間距 */
+  line-height: 1.2;
 }
+
     
 /* === 修正版：手機版按鈕垂直置中 === */
 @media (max-width: 768px) {
