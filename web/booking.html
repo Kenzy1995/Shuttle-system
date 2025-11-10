@@ -1262,8 +1262,8 @@
         try {
             // 根據螢幕寬度決定下載尺寸
             const isMobile = window.innerWidth <= 768;
-            const width = isMobile ? 380  : 500 ; // 手機版350px，電腦版600px
-            const height = isMobile ? 630 * 2 : 600 * 2; // 手機版較高，電腦版較矮
+            const width = isMobile ? 380  : 480 ; // 手機版350px，電腦版600px
+            const height = isMobile ? 610 * 2 : 590 * 2; // 手機版較高，電腦版較矮
             
             const dataUrl = await domtoimage.toPng(ticketCard, {
                 bgcolor: '#ffffff',
