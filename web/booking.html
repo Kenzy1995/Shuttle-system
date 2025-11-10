@@ -315,16 +315,25 @@
         justify-content: space-between !important;
       }
       
-      /* 只有三個按鈕的才用特殊排列 */
-      .actions:has(button:nth-child(3)):not(.col) {
-        flex-direction: column !important;
-        align-items: center !important;
+      @media (max-width: 768px) {
+        /* 三個按鈕：前兩個左右排列，第三個置下方置中 */
+        .actions:has(button:nth-child(3)):not(.col) {
+          flex-wrap: wrap !important;
+          flex-direction: row !important;
+          justify-content: space-between !important;
+        }
+
+        .actions:has(button:nth-child(3)) button {
+          flex: 1 1 45%;
+        }
+
+        .actions:has(button:nth-child(3)) button:nth-child(3) {
+          flex: 1 1 100%;
+          margin-top: 10px;
+          align-self: center;
+        }
       }
-      
-      .actions:has(button:nth-child(3)) button:nth-child(3) {
-        order: 3;
-        margin-top: 10px;
-      }
+
       
       /* 手機版預約班次按鈕左右排列 */
       #step4 .actions {
