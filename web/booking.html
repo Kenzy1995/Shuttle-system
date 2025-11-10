@@ -959,23 +959,6 @@ async function downloadTicketAsImage(){
     }
 }
 
-    // 下載車票為圖片
-    async function downloadTicketAsImage(){
-      const node = document.getElementById('ticketCard');
-      const scale = 2;
-      const style = {filter:'none', transform:'none', background:'#fff'};
-      try{
-        const dataUrl = await domtoimage.toPng(node, {bgcolor:'#ffffff', style, width: node.scrollWidth, height: node.scrollHeight, quality:1, pixelRatio:scale});
-        const a = document.createElement('a');
-        a.href = dataUrl; a.download = `ticket_${document.getElementById('succBookingId').value||'booking'}.png`;
-        a.click();
-      }catch(e){
-        alert('下載失敗：' + e.message);
-      }
-    }
-    document.addEventListener('click', (e)=>{
-      if(e.target && e.target.id==='downloadTicketBtn'){ downloadTicketAsImage(); }
-    });
 
     /* ====== 我的預約：查詢 / 修改 / 刪除 ====== */
     function resetQuery(){
