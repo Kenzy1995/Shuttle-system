@@ -199,7 +199,7 @@
       100% { opacity: 0; }
     }
 
-    /* 車票卡片樣式 */
+    /* 車票卡片樣式 - 獨立樣式避免下載時包含空白 */
     .ticket-card {
       background: white;
       border-radius: 16px;
@@ -207,6 +207,10 @@
       padding: 24px;
       margin: 20px auto;
       max-width: 600px;
+      width: 100%;
+      /* 確保車票卡片獨立佈局 */
+      display: block;
+      position: relative;
     }
     .ticket-header {
       text-align: center;
@@ -271,6 +275,23 @@
       display: flex;
       gap: 12px;
       justify-content: center;
+      flex-direction: row-reverse; /* 按鈕位置對調 */
+    }
+
+    /* 專門用於下載的車票容器 - 隱藏按鈕 */
+    .ticket-for-download {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 600px;
+      width: 100%;
+      display: none; /* 平常隱藏 */
+      position: fixed;
+      top: -10000px; /* 放在視窗外 */
+      left: -10000px;
+    }
+    .ticket-for-download .ticket-actions {
+      display: none; /* 下載版本隱藏按鈕 */
     }
 
     @media (max-width: 768px){
@@ -293,6 +314,9 @@
       .ticket-value {
         text-align: left;
         width: 100%;
+      }
+      .ticket-actions {
+        flex-direction: column-reverse; /* 手機版也保持對調 */
       }
     }
 
@@ -320,7 +344,7 @@
           <option value="zh" selected>中文</option>
           <option value="en">English</option>
           <option value="ja">日本語</option>
-          <option value="ko">한국어</option>
+          <option value="ko">韓國語</option>
         </select>
       </div>
     </div>
@@ -538,12 +562,63 @@
           </div>
         </div>
         <div class="ticket-actions">
-          <button class="button" onclick="downloadTicket()">下載車票</button>
+          <!-- 按鈕位置對調：回到首頁在前，下載車票在後 -->
           <button class="button btn-ghost" onclick="restart()">回到首頁</button>
+          <button class="button" onclick="downloadTicket()">下載車票</button>
         </div>
       </div>
     </section>
   </main>
+
+  <!-- 專門用於下載的車票容器 -->
+  <div id="ticketForDownload" class="ticket-for-download">
+    <div class="ticket-header">
+      <h2>接駁車票</h2>
+    </div>
+    <div class="ticket-content">
+      <div class="ticket-qr">
+        <img id="downloadQrImg" src="" alt="QR Code"/>
+      </div>
+      <div class="ticket-info">
+        <div class="ticket-field">
+          <span class="ticket-label">預約編號</span>
+          <span class="ticket-value" id="downloadBookingId"></span>
+        </div>
+        <div class="ticket-field">
+          <span class="ticket-label">班次</span>
+          <span class="ticket-value" id="downloadSchedule"></span>
+        </div>
+        <div class="ticket-field">
+          <span class="ticket-label">方向</span>
+          <span class="ticket-value" id="downloadDirection"></span>
+        </div>
+        <div class="ticket-field">
+          <span class="ticket-label">上車地點</span>
+          <span class="ticket-value" id="downloadPick"></span>
+        </div>
+        <div class="ticket-field">
+          <span class="ticket-label">下車地點</span>
+          <span class="ticket-value" id="downloadDrop"></span>
+        </div>
+        <div class="ticket-field">
+          <span class="ticket-label">姓名</span>
+          <span class="ticket-value" id="downloadName"></span>
+        </div>
+        <div class="ticket-field">
+          <span class="ticket-label">手機</span>
+          <span class="ticket-value" id="downloadPhone"></span>
+        </div>
+        <div class="ticket-field">
+          <span class="ticket-label">信箱</span>
+          <span class="ticket-value" id="downloadEmail"></span>
+        </div>
+        <div class="ticket-field">
+          <span class="ticket-label">人數</span>
+          <span class="ticket-value" id="downloadPassengers"></span>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- 我的預約 -->
   <main id="check" class="page">
@@ -1107,17 +1182,37 @@
         }
     }
 
-    // 下載車票
+    // 下載車票 - 使用專門的下載容器
     async function downloadTicket() {
-        const ticketCard = document.getElementById('ticketCard');
+        // 先更新下載專用容器的內容
+        document.getElementById('downloadQrImg').src = currentBookingData.qrUrl;
+        document.getElementById('downloadBookingId').textContent = currentBookingData.bookingId;
+        document.getElementById('downloadSchedule').textContent = currentBookingData.schedule;
+        document.getElementById('downloadDirection').textContent = currentBookingData.direction;
+        document.getElementById('downloadPick').textContent = currentBookingData.pickLocation;
+        document.getElementById('downloadDrop').textContent = currentBookingData.dropLocation;
+        document.getElementById('downloadName').textContent = currentBookingData.name;
+        document.getElementById('downloadPhone').textContent = currentBookingData.phone;
+        document.getElementById('downloadEmail').textContent = currentBookingData.email;
+        document.getElementById('downloadPassengers').textContent = currentBookingData.passengers + ' 人';
+        
+        const downloadContainer = document.getElementById('ticketForDownload');
         
         try {
-            const dataUrl = await domtoimage.toPng(ticketCard, {
+            // 暫時顯示下載容器
+            downloadContainer.style.display = 'block';
+            
+            const dataUrl = await domtoimage.toPng(downloadContainer, {
                 bgcolor: '#ffffff',
-                width: ticketCard.scrollWidth * 2,
-                height: ticketCard.scrollHeight * 2,
+                width: downloadContainer.scrollWidth * 2,
+                height: downloadContainer.scrollHeight * 2,
                 quality: 1,
-                pixelRatio: 2
+                pixelRatio: 2,
+                style: {
+                    transform: 'none',
+                    margin: '0',
+                    padding: '24px'
+                }
             });
 
             const a = document.createElement('a');
@@ -1126,9 +1221,13 @@
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+            
         } catch (e) {
             console.error('下載失敗:', e);
             alert('下載失敗：' + e.message);
+        } finally {
+            // 下載完成後隱藏下載容器
+            downloadContainer.style.display = 'none';
         }
     }
 
