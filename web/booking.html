@@ -329,8 +329,8 @@
 /* === 修正手機版車票寬度與排版 === */
 @media (max-width: 768px) {
   .ticket-card {
-    width: 85%;
-    max-width: 850%;
+    width: 90%;
+    max-width: 90%;
     box-sizing: border-box;
     margin: 0 auto;
     padding: 14px;
@@ -365,7 +365,6 @@
   line-height: 1.2;
 }
 
-    
 /* === 手機版統一修正版 === */
 @media (max-width: 768px) {
   html, body {
@@ -419,23 +418,49 @@
     max-width: 320px;
   }
 
-  /* 車票寬度與排版修正 */
+  /* === 修正票卡按鈕裁切與三鍵排版 === */
   .ticket-card {
-    padding: 14px;
-    overflow: hidden;
+    margin: 0 auto 20px;
+    padding: 16px;
+    overflow: visible; /* 允許按鈕完整顯示 */
   }
-  .ticket-content {
+
+  .ticket-actions {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    margin-top: 16px;
+  }
+
+  /* 兩個按鈕時：左右排列 */
+  .ticket-actions:not(.has-three) button {
+    flex: 1;
+    min-width: 140px;
+    max-width: 160px;
+    font-size: 15px;
+  }
+
+  /* 三個按鈕時：左＋右＋下 */
+  .ticket-actions.has-three {
     flex-direction: column;
     align-items: center;
-    gap: 12px;
   }
-  .ticket-qr img {
-    width: 160px;
-    height: 160px;
-    max-width: 100%;
+
+  .ticket-actions.has-three button:nth-child(1),
+  .ticket-actions.has-three button:nth-child(2) {
+    width: 45%;
+    max-width: 180px;
+  }
+
+  .ticket-actions.has-three button:nth-child(3) {
+    width: 80%;
+    max-width: 300px;
   }
 }
+
 
   </style>
 </head>
@@ -1297,7 +1322,7 @@
         try {
             // 根據螢幕寬度決定下載尺寸
             const isMobile = window.innerWidth <= 768;
-            const width = isMobile ? 380  : 480 ; // 手機版350px，電腦版600px
+            const width = isMobile ? 350  : 480 ; // 手機版350px，電腦版600px
             const height = isMobile ? 610 * 2 : 590 * 2; // 手機版較高，電腦版較矮
             
             const dataUrl = await domtoimage.toPng(ticketCard, {
