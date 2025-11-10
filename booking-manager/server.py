@@ -8,6 +8,7 @@ import os
 import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
+import urllib.parse
 
 import qrcode
 from fastapi import FastAPI, HTTPException, Response
@@ -18,6 +19,7 @@ from google.oauth2.service_account import Credentials
 
 # ---------- 常數與工具 ----------
 DEFAULT_SHEET_NAME = os.getenv("SHEET_NAME", "預約審核(櫃台)")
+BASE_URL = "https://booking-manager-995728097341.asia-east1.run.app"
 
 HEADER_ALIASES = {
     "申請日期": {"申請日期", "建立時間"},
@@ -220,7 +222,7 @@ class OpsRequest(BaseModel):
     data: Dict[str, Any]
 
 # ---------- FastAPI ----------
-app = FastAPI(title="Shuttle Ops API", version="1.0.2")
+app = FastAPI(title="Shuttle Ops API", version="1.0.3")
 
 app.add_middleware(
     CORSMiddleware,
@@ -240,122 +242,157 @@ def health():
 
 @app.get("/api/qr/{code}")
 def qr_image(code: str):
-    img = qrcode.make(code)
-    bio = io.BytesIO()
-    img.save(bio, format="PNG")
-    return Response(content=bio.getvalue(), media_type="image/png")
+    try:
+        # 解碼 URL 編碼的內容
+        decoded_code = urllib.parse.unquote(code)
+        img = qrcode.make(decoded_code)
+        bio = io.BytesIO()
+        img.save(bio, format="PNG")
+        return Response(content=bio.getvalue(), media_type="image/png")
+    except Exception as e:
+        raise HTTPException(500, f"QR 生成失敗: {str(e)}")
 
 # ---------- 主 API ----------
 @app.post("/api/ops")
 def ops(req: OpsRequest):
+    print(f"收到請求: action={req.action}")
+    
     action = (req.action or "").strip().lower()
     data = req.data or {}
-    ws = open_sheet()
-    hmap = header_map(ws)
+    
+    try:
+        ws = open_sheet()
+        hmap = header_map(ws)
 
-    # ===== 新增預約 =====
-    if action == "book":
-        p = BookPayload(**data)
-        last_seq = _get_max_seq_for_date(ws, p.date)
-        booking_id = f"{_mmdd_prefix(p.date)}{last_seq+1:03d}"
-        car_display = _display_trip_str(p.date, _time_hm_from_any(p.time))
-        pk_idx, dp_idx, seg_str = _compute_indices_and_segments(p.direction, p.pickLocation, p.dropLocation)
-        qr_content = f"FORTEXZ:{booking_id}"
+        # ===== 新增預約 =====
+        if action == "book":
+            p = BookPayload(**data)
+            last_seq = _get_max_seq_for_date(ws, p.date)
+            booking_id = f"{_mmdd_prefix(p.date)}{last_seq+1:03d}"
+            car_display = _display_trip_str(p.date, _time_hm_from_any(p.time))
+            pk_idx, dp_idx, seg_str = _compute_indices_and_segments(p.direction, p.pickLocation, p.dropLocation)
+            qr_content = f"FORTEXZ:{booking_id}"
 
-        headers = _read_all_rows(ws)[0]
-        newrow = [""] * len(headers)
-        def setv(col, v):
-            if col in hmap:
-                newrow[hmap[col]-1] = str(v)
-        setv("申請日期", _tz_now_str())
-        setv("預約編號", booking_id)
-        setv("往返", p.direction)
-        setv("日期", p.date)
-        setv("班次", _time_hm_from_any(p.time))
-        setv("車次", car_display)
-        setv("上車地點", p.pickLocation)
-        setv("下車地點", p.dropLocation)
-        setv("姓名", p.name)
-        setv("手機", p.phone)
-        setv("信箱", p.email)
-        setv("預約人數", p.passengers)
-        setv("預約狀態", "已預約")
-        setv("乘車狀態", "")
-        setv("身分", "住宿貴賓" if p.identity == "hotel" else "用餐貴賓")
-        setv("房號", p.roomNumber or "")
-        setv("入住日期", p.checkIn or "")
-        setv("退房日期", p.checkOut or "")
-        setv("用餐日期", p.diningDate or "")
-        setv("上車索引", pk_idx)
-        setv("下車索引", dp_idx)
-        setv("涉及路段範圍", seg_str)
-        setv("QRCode編碼", qr_content)
-        ws.append_row(newrow, value_input_option="USER_ENTERED")
-        return {"status": "success", "booking_id": booking_id, "qr_url": f"/api/qr/{qr_content}"}
+            headers = _read_all_rows(ws)[0]
+            newrow = [""] * len(headers)
+            def setv(col, v):
+                if col in hmap:
+                    newrow[hmap[col]-1] = str(v)
+            setv("申請日期", _tz_now_str())
+            setv("預約編號", booking_id)
+            setv("往返", p.direction)
+            setv("日期", p.date)
+            setv("班次", _time_hm_from_any(p.time))
+            setv("車次", car_display)
+            setv("上車地點", p.pickLocation)
+            setv("下車地點", p.dropLocation)
+            setv("姓名", p.name)
+            setv("手機", p.phone)
+            setv("信箱", p.email)
+            setv("預約人數", p.passengers)
+            setv("預約狀態", "已預約")
+            setv("乘車狀態", "")
+            setv("身分", "住宿貴賓" if p.identity == "hotel" else "用餐貴賓")
+            setv("房號", p.roomNumber or "")
+            setv("入住日期", p.checkIn or "")
+            setv("退房日期", p.checkOut or "")
+            setv("用餐日期", p.diningDate or "")
+            setv("上車索引", pk_idx)
+            setv("下車索引", dp_idx)
+            setv("涉及路段範圍", seg_str)
+            setv("QRCode編碼", qr_content)
+            
+            ws.append_row(newrow, value_input_option="USER_ENTERED")
+            
+            # 生成完整的 QR URL
+            qr_url = f"{BASE_URL}/api/qr/{urllib.parse.quote(qr_content)}"
+            
+            print(f"生成預約: booking_id={booking_id}, qr_content={qr_content}, qr_url={qr_url}")
+            
+            return {
+                "status": "success", 
+                "booking_id": booking_id, 
+                "qr_url": qr_url,
+                "qr_content": qr_content
+            }
 
-    # ===== 查詢 =====
-    elif action == "query":
-        p = QueryPayload(**data)
-        if not (p.booking_id or p.phone or p.email):
-            raise HTTPException(400, "至少提供 booking_id / phone / email 其中一項")
-        all_values = _read_all_rows(ws)
-        if not all_values: return []
-        headers = all_values[0]
-        now, one_month_ago = datetime.now(), datetime.now() - timedelta(days=31)
-        def get(row, key):
-            return row[hmap[key]-1] if key in hmap and len(row)>=hmap[key] else ""
-        results=[]
-        for row in all_values[1:]:
-            date_iso = get(row, "日期")
-            try: d = datetime.strptime(date_iso, "%Y-%m-%d")
-            except: d = now
-            if d < one_month_ago: continue
-            if p.booking_id and p.booking_id != get(row, "預約編號"): continue
-            if p.phone and p.phone != get(row, "手機"): continue
-            if p.email and p.email != get(row, "信箱"): continue
-            results.append({k: get(row, k) for k in hmap})
-        return results
+        # ===== 查詢 =====
+        elif action == "query":
+            p = QueryPayload(**data)
+            if not (p.booking_id or p.phone or p.email):
+                raise HTTPException(400, "至少提供 booking_id / phone / email 其中一項")
+            all_values = _read_all_rows(ws)
+            if not all_values: return []
+            headers = all_values[0]
+            now, one_month_ago = datetime.now(), datetime.now() - timedelta(days=31)
+            def get(row, key):
+                return row[hmap[key]-1] if key in hmap and len(row)>=hmap[key] else ""
+            results=[]
+            for row in all_values[1:]:
+                date_iso = get(row, "日期")
+                try: d = datetime.strptime(date_iso, "%Y-%m-%d")
+                except: d = now
+                if d < one_month_ago: continue
+                if p.booking_id and p.booking_id != get(row, "預約編號"): continue
+                if p.phone and p.phone != get(row, "手機"): continue
+                if p.email and p.email != get(row, "信箱"): continue
+                results.append({k: get(row, k) for k in hmap})
+            return results
 
-    # ===== 修改 =====
-    elif action == "modify":
-        p = ModifyPayload(**data)
-        target = _find_rows_by_pred(ws, lambda r: r.get("預約編號") == p.booking_id)
-        if not target: raise HTTPException(404, "找不到此預約編號")
-        rowno = target[0]
-        updates = {"最後操作時間": _tz_now_str()+" 已修改", "預約狀態": "已預約"}
-        for k,v in updates.items():
-            ws.update_cell(rowno, hmap[k], v)
-        return {"status": "success", "booking_id": p.booking_id}
+        # ===== 修改 =====
+        elif action == "modify":
+            p = ModifyPayload(**data)
+            target = _find_rows_by_pred(ws, lambda r: r.get("預約編號") == p.booking_id)
+            if not target: raise HTTPException(404, "找不到此預約編號")
+            rowno = target[0]
+            updates = {"最後操作時間": _tz_now_str()+" 已修改", "預約狀態": "已預約"}
+            for k,v in updates.items():
+                ws.update_cell(rowno, hmap[k], v)
+            return {"status": "success", "booking_id": p.booking_id}
 
-    # ===== 刪除 =====
-    elif action == "delete":
-        p = DeletePayload(**data)
-        target = _find_rows_by_pred(ws, lambda r: r.get("預約編號") == p.booking_id)
-        if not target: raise HTTPException(404, "找不到此預約編號")
-        rowno = target[0]
-        ws.update_cell(rowno, hmap["預約狀態"], "已刪除")
-        ws.update_cell(rowno, hmap["最後操作時間"], _tz_now_str()+" 已刪除")
-        return {"status": "success", "booking_id": p.booking_id}
+        # ===== 刪除 =====
+        elif action == "delete":
+            p = DeletePayload(**data)
+            target = _find_rows_by_pred(ws, lambda r: r.get("預約編號") == p.booking_id)
+            if not target: raise HTTPException(404, "找不到此預約編號")
+            rowno = target[0]
+            ws.update_cell(rowno, hmap["預約狀態"], "已刪除")
+            ws.update_cell(rowno, hmap["最後操作時間"], _tz_now_str()+" 已刪除")
+            return {"status": "success", "booking_id": p.booking_id}
 
-    # ===== 掃碼上車 =====
-    elif action == "check_in":
-        p = CheckInPayload(**data)
-        if not (p.code or p.booking_id):
-            raise HTTPException(400, "需提供 code 或 booking_id")
-        target = _find_rows_by_pred(ws, lambda r: r.get("QRCode編碼") == p.code or r.get("預約編號") == p.booking_id)
-        if not target: raise HTTPException(404, "找不到符合條件之訂單")
-        rowno = target[0]
-        ws.update_cell(rowno, hmap["乘車狀態"], "已上車")
-        ws.update_cell(rowno, hmap["最後操作時間"], _tz_now_str()+" 已上車")
-        return {"status": "success", "row": rowno}
+        # ===== 掃碼上車 =====
+        elif action == "check_in":
+            p = CheckInPayload(**data)
+            if not (p.code or p.booking_id):
+                raise HTTPException(400, "需提供 code 或 booking_id")
+            target = _find_rows_by_pred(ws, lambda r: r.get("QRCode編碼") == p.code or r.get("預約編號") == p.booking_id)
+            if not target: raise HTTPException(404, "找不到符合條件之訂單")
+            rowno = target[0]
+            ws.update_cell(rowno, hmap["乘車狀態"], "已上車")
+            ws.update_cell(rowno, hmap["最後操作時間"], _tz_now_str()+" 已上車")
+            return {"status": "success", "row": rowno}
 
-    else:
-        raise HTTPException(400, f"未知 action：{action}")
+        else:
+            raise HTTPException(400, f"未知 action：{action}")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"伺服器錯誤: {str(e)}")
+        raise HTTPException(500, f"伺服器錯誤: {str(e)}")
 
 @app.get("/cors_debug")
 def cors_debug():
     return {
         "status": "ok",
         "cors_test": True,
+        "time": _tz_now_str()
+    }
+
+@app.get("/api/debug")
+def debug_endpoint():
+    return {
+        "status": "服務正常",
+        "base_url": BASE_URL,
         "time": _tz_now_str()
     }
