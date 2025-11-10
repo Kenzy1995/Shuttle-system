@@ -25,8 +25,10 @@
       color:var(--text);
       font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",Segoe UI,Roboto,Arial,sans-serif;
       min-height:100vh;
-      overflow-x:hidden; /* 修正手機左右可滑動 */
+      overflow-x:hidden;
       -webkit-text-size-adjust:100%;
+      display: flex;
+      flex-direction: column;
     }
     img, iframe{max-width:100%;}
     a{color:inherit; text-decoration:none}
@@ -41,6 +43,9 @@
     .brand-title{font-weight:800;font-size:18px}
 
     .nav-right{display:flex;align-items:center;gap:12px;margin-left:auto}
+    .lang-wrap span {
+      font-size: 12px; /* Language 字體變小 */
+    }
     .nav-links{display:flex;gap:8px}
     .nav-links button{
       background:none;border:none;padding:8px 10px;border-radius:10px;cursor:pointer;
@@ -52,7 +57,7 @@
       appearance:none;padding:8px 28px 8px 10px;border:1px solid #ddd;border-radius:10px;background:white url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="10" viewBox="0 0 24 24" fill="none" stroke="%23666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>') no-repeat right 8px center/14px
     }
 
-    .page{display:none;padding:20px;max-width:980px;margin:0 auto}
+    .page{display:none;padding:20px;max-width:980px;margin:0 auto;flex:1}
     .page.active{display:block}
 
     .hero{
@@ -74,6 +79,9 @@
       background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:18px
     }
     .card h2{margin:0 0 12px;font-size:20px;font-weight:800;text-align:center}
+    .station-page .card h2 {
+      text-align: left; /* 停靠站點標題置左 */
+    }
 
     .field{margin:14px 0}
     .label{display:block;margin-bottom:6px;font-weight:700}
@@ -112,7 +120,15 @@
 
     .query-form{display:flex;flex-direction:column;gap:14px}
 
-    .footer{background:#f5f5f5;color:#666;text-align:center;padding:20px;margin-top:40px;border-top:1px solid #e0e0e0}
+    .footer{
+      background:#f5f5f5;
+      color:#666;
+      text-align:center;
+      padding:20px;
+      margin-top:auto;
+      border-top:1px solid #e0e0e0;
+      width:100%;
+    }
 
     /* 手機底部導覽：主題色背景 + 白字 */
     .mobile-tabbar{
@@ -121,7 +137,9 @@
     }
     .mobile-tabbar .bar{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
     .mobile-tabbar button{
-      appearance:none;border:none;background:none;padding:12px 6px;font-size:13px;color:#fff;font-weight:700;opacity:.8
+      appearance:none;border:none;background:none;padding:12px 6px;
+      font-size:14px; /* 手機版底部菜單字體變大 */
+      color:#fff;font-weight:700;opacity:.8
     }
     .mobile-tabbar button.active{opacity:1;text-decoration:underline}
 
@@ -199,23 +217,15 @@
       100% { opacity: 0; }
     }
 
-    /* 車票卡片樣式 - 獨立樣式避免下載時包含空白 */
+    /* 車票卡片樣式 */
     .ticket-card {
-      display: block;
-      margin: 40px auto;
-      width: 420px;
       background: white;
       border-radius: 16px;
       box-shadow: var(--shadow-lg);
       padding: 24px;
-      text-align: left;
-      position: relative;
-    }
-      /* 確保車票卡片獨立佈局 */
-      display: block;
-      position: relative;
-
-}
+      margin: 20px auto;
+      max-width: 600px;
+      width: 100%;
     }
     .ticket-header {
       text-align: center;
@@ -264,7 +274,7 @@
       border-bottom: none;
     }
     .ticket-label {
-      font-weight: 800; /* 改為粗體 */
+      font-weight: 800;
       color: var(--text);
       min-width: 120px;
       font-size: 16px;
@@ -280,31 +290,44 @@
       display: flex;
       gap: 12px;
       justify-content: center;
-      flex-direction: row-reverse; /* 按鈕位置對調 */
-    }
-
-    /* 專門用於下載的車票容器 - 隱藏按鈕 */
-    .ticket-for-download {
-      background: white;
-      border-radius: 16px;
-      padding: 24px;
-      max-width: 600px;
-      width: 100%;
-      display: none; /* 平常隱藏 */
-      position: fixed;
-      top: -10000px; /* 放在視窗外 */
-      left: -10000px;
-    }
-    .ticket-for-download .ticket-actions {
-      display: none; /* 下載版本隱藏按鈕 */
+      flex-direction: row-reverse;
     }
 
     @media (max-width: 768px){
       .nav-links{display:none}
       .mobile-tabbar{display:block}
-      body{padding-bottom:70px} /* 預留底部導覽高度 */
+      body{padding-bottom:70px}
       .navbar{justify-content:space-between}.brand{margin-right:0}
-      .actions{justify-content:space-between}
+      
+      /* 手機版按鈕置中 */
+      .actions{
+        justify-content:center;
+        width:100%;
+      }
+      /* 兩顆按鈕左右排序 */
+      .actions.row {
+        flex-direction: row;
+        justify-content: space-between;
+      }
+      /* 三顆按鈕特殊排列 */
+      .actions:has(button:nth-child(3)) {
+        flex-direction: column;
+        align-items: center;
+      }
+      .actions:has(button:nth-child(3)) button:nth-child(3) {
+        order: 3;
+        margin-top: 10px;
+      }
+      
+      .hero .actions {
+        justify-content: center !important; /* 手機版立即預約按鈕置中 */
+      }
+      
+      .footer {
+        font-size: 70%; /* 手機版版權文字縮小30% */
+        padding: 15px 10px;
+      }
+      
       .ticket-content {
         grid-template-columns: 1fr;
       }
@@ -321,7 +344,13 @@
         width: 100%;
       }
       .ticket-actions {
-        flex-direction: column-reverse; /* 手機版也保持對調 */
+        flex-direction: column-reverse;
+      }
+      
+      /* 手機版預約班次畫面按鈕排列 */
+      #step4 .actions {
+        flex-direction: row;
+        justify-content: space-between;
       }
     }
 
@@ -349,7 +378,7 @@
           <option value="zh" selected>中文</option>
           <option value="en">English</option>
           <option value="ja">日本語</option>
-          <option value="ko">韓國語</option>
+          <option value="ko">한국어</option>
         </select>
       </div>
     </div>
@@ -465,7 +494,7 @@
 
       <div id="roomNumberDiv" class="field" style="display:none">
         <label class="label">房號<span style="color:#b00020">*</span></label>
-        <input id="roomNumber" type="text" class="input" placeholder="" />
+        <input id="roomNumber" type="text" class="input" placeholder="" oninput="validateRoom(this)" />
         <div id="roomErr" class="error">請填寫正確的房號</div>
         <div class="hint">尚未 CHECK IN 請輸入0000</div>
       </div>
@@ -477,13 +506,13 @@
       </div>
       <div class="field">
         <label class="label">手機<span style="color:#b00020">*</span></label>
-        <input id="guestPhone" type="tel" class="input" placeholder="+886921234567" />
+        <input id="guestPhone" type="tel" class="input" placeholder="+886921234567" oninput="validatePhone(this)" />
         <div id="phoneErr" class="error">請輸入正確的手機號碼</div>
         <div class="hint">請輸入正確的手機號碼（可填寫非台灣手機號碼）</div>
       </div>
       <div class="field">
         <label class="label">信箱<span style="color:#b00020">*</span></label>
-        <input id="guestEmail" type="email" class="input" placeholder="name@example.com" />
+        <input id="guestEmail" type="email" class="input" placeholder="name@example.com" oninput="validateEmail(this)" />
         <div id="emailErr" class="error">請填寫正確的郵箱</div>
       </div>
 
@@ -567,63 +596,12 @@
           </div>
         </div>
         <div class="ticket-actions">
-          <!-- 按鈕位置對調：回到首頁在前，下載車票在後 -->
           <button class="button btn-ghost" onclick="restart()">回到首頁</button>
           <button class="button" onclick="downloadTicket()">下載車票</button>
         </div>
       </div>
     </section>
   </main>
-
-  <!-- 專門用於下載的車票容器 -->
-  <div id="ticketForDownload" class="ticket-for-download">
-    <div class="ticket-header">
-      <h2>接駁車票</h2>
-    </div>
-    <div class="ticket-content">
-      <div class="ticket-qr">
-        <img id="downloadQrImg" src="" alt="QR Code"/>
-      </div>
-      <div class="ticket-info">
-        <div class="ticket-field">
-          <span class="ticket-label">預約編號</span>
-          <span class="ticket-value" id="downloadBookingId"></span>
-        </div>
-        <div class="ticket-field">
-          <span class="ticket-label">班次</span>
-          <span class="ticket-value" id="downloadSchedule"></span>
-        </div>
-        <div class="ticket-field">
-          <span class="ticket-label">方向</span>
-          <span class="ticket-value" id="downloadDirection"></span>
-        </div>
-        <div class="ticket-field">
-          <span class="ticket-label">上車地點</span>
-          <span class="ticket-value" id="downloadPick"></span>
-        </div>
-        <div class="ticket-field">
-          <span class="ticket-label">下車地點</span>
-          <span class="ticket-value" id="downloadDrop"></span>
-        </div>
-        <div class="ticket-field">
-          <span class="ticket-label">姓名</span>
-          <span class="ticket-value" id="downloadName"></span>
-        </div>
-        <div class="ticket-field">
-          <span class="ticket-label">手機</span>
-          <span class="ticket-value" id="downloadPhone"></span>
-        </div>
-        <div class="ticket-field">
-          <span class="ticket-label">信箱</span>
-          <span class="ticket-value" id="downloadEmail"></span>
-        </div>
-        <div class="ticket-field">
-          <span class="ticket-label">人數</span>
-          <span class="ticket-value" id="downloadPassengers"></span>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- 我的預約 -->
   <main id="check" class="page">
@@ -652,7 +630,7 @@
   </main>
 
   <!-- 停靠站點 -->
-  <main id="station" class="page">
+  <main id="station" class="page station-page">
     <div class="grid">
       <section class="card">
         <h2>福泰大飯店發車-側門出口 / Forte Hotel Xizhi Departure - Side Entrance</h2>
@@ -733,9 +711,9 @@
   
   <script>
     /* ====== 常數（API） ====== */
-    const API_URL = "https://booking-api-995728097341.asia-east1.run.app/api/sheet"; // 讀取班次（不改）
-    const OPS_URL = "https://booking-manager-995728097341.asia-east1.run.app/api/ops"; // 新的寫入/查詢/修改/刪除 API
-    const QR_ORIGIN = "https://booking-manager-995728097341.asia-east1.run.app"; // 供拼接 qr_url 相對位址時使用
+    const API_URL = "https://booking-api-995728097341.asia-east1.run.app/api/sheet";
+    const OPS_URL = "https://booking-manager-995728097341.asia-east1.run.app/api/ops";
+    const QR_ORIGIN = "https://booking-manager-995728097341.asia-east1.run.app";
 
     /* ====== 狀態 ====== */
     let allRows = [];
@@ -747,7 +725,6 @@
     let lastDataUpdate = 0;
     const UPDATE_INTERVAL = 30000;
     
-    // 新增：儲存預約成功後的資料
     let currentBookingData = {};
 
     /* ====== 工具 ====== */
@@ -818,18 +795,76 @@
     // Shake 與錯誤提示
     function shake(el){ if(!el) return; el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'),500); }
 
-    // 姓名驗證：限中英文
+    // 驗證函數
+    const phoneRegex=/^\+?\d{1,3}?\d{7,}$/;
+    const emailRegex=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const roomRegex=/^(0000|[5-9]\d{2}|10\d{2}|11\d{2}|12\d{2}|13\d{2})$/;
+    const nameRegex=/^[\u4e00-\u9fa5a-zA-Z\s]*$/;
+
+    // 姓名驗證
     function validateName(input){
       const value = input.value || "";
-      const regex = /^[\u4e00-\u9fa5a-zA-Z\s]*$/;
       const nameErr = document.getElementById('nameErr');
-      if(!regex.test(value)){
+      if(!nameRegex.test(value)){
         input.value = value.replace(/[^\u4e00-\u9fa5a-zA-Z\s]/g,'');
-        if(nameErr){ nameErr.textContent = '限輸入中文或英文'; nameErr.style.display='block'; }
-        shake(input); input.style.borderColor='#b00020';
-        setTimeout(()=>{ input.style.borderColor='#ddd'; if(nameErr) nameErr.style.display='none'; }, 2000);
+        nameErr.textContent = '限輸入中文或英文';
+        nameErr.style.display='block';
+        shake(input);
+        input.style.borderColor='#b00020';
+        setTimeout(()=>{ input.style.borderColor='#ddd'; nameErr.style.display='none'; }, 2000);
+      }else if(!value.trim()){
+        nameErr.textContent = '請填寫姓名';
+        nameErr.style.display='block';
+        shake(input);
+        input.style.borderColor='#b00020';
       }else{
-        if(nameErr) nameErr.style.display='none';
+        nameErr.style.display='none';
+        input.style.borderColor='#ddd';
+      }
+    }
+
+    // 手機驗證
+    function validatePhone(input){
+      const value = input.value || "";
+      const phoneErr = document.getElementById('phoneErr');
+      if(!phoneRegex.test(value)){
+        phoneErr.textContent = '請輸入正確的手機號碼';
+        phoneErr.style.display='block';
+        shake(input);
+        input.style.borderColor='#b00020';
+      }else{
+        phoneErr.style.display='none';
+        input.style.borderColor='#ddd';
+      }
+    }
+
+    // 信箱驗證
+    function validateEmail(input){
+      const value = input.value || "";
+      const emailErr = document.getElementById('emailErr');
+      if(!emailRegex.test(value)){
+        emailErr.textContent = '請填寫正確的郵箱';
+        emailErr.style.display='block';
+        shake(input);
+        input.style.borderColor='#b00020';
+      }else{
+        emailErr.style.display='none';
+        input.style.borderColor='#ddd';
+      }
+    }
+
+    // 房號驗證
+    function validateRoom(input){
+      const value = input.value || "";
+      const roomErr = document.getElementById('roomErr');
+      if(!roomRegex.test(value)){
+        roomErr.textContent = '請填寫正確的房號';
+        roomErr.style.display='block';
+        shake(input);
+        input.style.borderColor='#b00020';
+      }else{
+        roomErr.style.display='none';
+        input.style.borderColor='#ddd';
       }
     }
 
@@ -886,11 +921,9 @@
       ['directionList','dateList','stationList','scheduleList'].forEach(id=>{
         const el=document.getElementById(id); if(el) el.innerHTML='';
       });
-      // 隱藏所有步驟和成功卡
       ['step1','step2','step3','step4','step5','step6','successCard'].forEach(id=>{
         const el=document.getElementById(id); if(el) el.style.display='none';
       });
-      // 回首頁頁籤
       showPage('reservation');
       window.scrollTo({top:0,behavior:'smooth'});
     }
@@ -986,18 +1019,18 @@
       document.getElementById('hotelDates2').style.display = v==='hotel'?'block':'none';
       document.getElementById('roomNumberDiv').style.display = v==='hotel'?'block':'none';
       document.getElementById('diningDateDiv').style.display = v==='dining'?'block':'none';
-      // 預設日期
+      
+      // 設定預設日期
       if(v==='hotel'){
         const ci = document.getElementById('checkInDate');
         const co = document.getElementById('checkOutDate');
         if(ci && !ci.value) ci.value = today;
         if(co && !co.value) co.value = today;
+      } else if(v==='dining'){
+        const dining = document.getElementById('diningDate');
+        if(dining && !dining.value) dining.value = today;
       }
     }
-
-    const phoneRegex=/^\+?\d{1,3}?\d{7,}$/;
-    const emailRegex=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const roomRegex=/^(0000|[5-9]\d{2}|10\d{2}|11\d{2}|12\d{2}|13\d{2})$/;
 
     function toStep5(){
       if(!selectedScheduleTime){ alert('請選擇班次'); return; }
@@ -1033,7 +1066,6 @@
       if(!validateStep5())return;
       showVerifyLoading(true);
       try{
-        // 再驗座位
         const res = await fetch(API_URL);
         const raw = await res.json();
         const headers=raw[0]; const rows=raw.slice(1);
@@ -1082,7 +1114,6 @@
         const pSel = document.getElementById('passengers');
         const p = Number(pSel.value || 0);
         
-        // 驗證人數
         if (!p || p < 1 || p > 4 || p > selectedAvailableSeats) {
             document.getElementById('passengersErr').style.display = 'block';
             return;
@@ -1108,8 +1139,6 @@
             pickLocation: selectedDirection === '回程' ? selectedStationRaw : '福泰大飯店 Forte Hotel',
         };
 
-        console.log('提交預約資料:', payload); // 除錯用
-
         showVerifyLoading(true);
         
         try {
@@ -1125,16 +1154,13 @@
                 })
             });
 
-            // 檢查 HTTP 狀態碼
             if (!res.ok) {
                 throw new Error(`HTTP error! status: ${res.status}`);
             }
 
             const result = await res.json();
-            console.log('後端回傳結果:', result); // 除錯用
 
             if (result.status === 'success') {
-                // 儲存預約資料
                 currentBookingData = {
                     bookingId: result.booking_id || '',
                     schedule: `${selectedDateRaw} ${selectedScheduleTime}`,
@@ -1151,7 +1177,6 @@
                 // 顯示成功動畫
                 showSuccessAnimation();
                 
-                // 設定車票內容
                 setTimeout(() => {
                     document.getElementById('ticketQrImg').src = currentBookingData.qrUrl;
                     document.getElementById('ticketBookingId').textContent = currentBookingData.bookingId;
@@ -1164,74 +1189,48 @@
                     document.getElementById('ticketEmail').textContent = currentBookingData.email;
                     document.getElementById('ticketPassengers').textContent = currentBookingData.passengers + ' 人';
 
-                    // 隱藏步驟6，顯示成功卡片
                     document.getElementById('step6').style.display = 'none';
                     document.getElementById('successCard').style.display = '';
                     
-                    // 滾動到頂部
                     window.scrollTo({top: 0, behavior: 'smooth'});
                 }, 2000);
 
             } else {
-                // 處理錯誤情況
                 const errorMessage = result.detail || result.message || '預約失敗，請稍後再試';
-                console.error('預約失敗:', errorMessage);
                 alert(errorMessage);
             }
             
         } catch (e) {
-            console.error('提交失敗:', e);
             alert('提交失敗：' + e.message);
         } finally {
             showVerifyLoading(false);
         }
     }
 
+    // 下載車票
     async function downloadTicket() {
-    const node = document.getElementById('ticketCard'); // 改這行
-      if (!node) return alert('找不到車票內容');
-
-      try {
-        const dataUrl = await domtoimage.toPng(node, {
-          bgcolor: '#ffffff',
-          width: node.scrollWidth * 2,
-          height: node.scrollHeight * 2,
-          quality: 1,
-          pixelRatio: 2,
-          style: {
-            transform: 'none',
-            margin: '0',
-            padding: '0'
-          }
-        });
-
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = `ticket_${currentBookingData.bookingId}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  } catch (e) {
-    console.error('下載失敗:', e);
-    alert('下載失敗：' + e.message);
-  }
-}
-
-
-    // 添加 QR 圖片載入錯誤處理
-    document.addEventListener('DOMContentLoaded', function() {
-        const qrImg = document.getElementById('ticketQrImg');
-        if (qrImg) {
-            qrImg.addEventListener('error', function() {
-                console.error('QR 圖片載入失敗');
-                this.alt = 'QR 碼載入失敗，請重新整理頁面';
+        const ticketCard = document.getElementById('ticketCard');
+        
+        try {
+            const dataUrl = await domtoimage.toPng(ticketCard, {
+                bgcolor: '#ffffff',
+                width: ticketCard.scrollWidth * 2,
+                height: ticketCard.scrollHeight * 2,
+                quality: 1,
+                pixelRatio: 2
             });
-            
-            qrImg.addEventListener('load', function() {
-                console.log('QR 圖片載入成功');
-            });
+
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = `ticket_${currentBookingData.bookingId}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } catch (e) {
+            console.error('下載失敗:', e);
+            alert('下載失敗：' + e.message);
         }
-    });
+    }
 
     /* ====== 我的預約：查詢 / 修改 / 刪除 ====== */
     function resetQuery(){
@@ -1250,7 +1249,6 @@
     }
     function isExpired(dateStr, timeStr){
       const t = (timeStr||'00:00').slice(0,5);
-      let m=timeStr; // 若傳入 'M/D HH:mm' 直接用 dateStr
       const d = new Date(dateStr + 'T' + t + ':00');
       return d.getTime() < Date.now();
     }
@@ -1304,7 +1302,6 @@
           const line = document.createElement('div');
           line.style.margin='10px 0'; line.style.borderTop='1px dashed #e6e6e6'; card.appendChild(line);
 
-          // 票卡樣式（含 QR 與下載、修改、刪除）
           const inner = document.createElement('div');
           inner.className='grid';
           inner.style.gridTemplateColumns='1fr';
@@ -1330,7 +1327,6 @@
           const dlBtn = document.createElement('button');
           dlBtn.className='button'; dlBtn.textContent='下載車票';
           dlBtn.onclick = ()=>{
-            // 即時建立一個卡片節點導出圖片
             domtoimage.toPng(inner,{bgcolor:'#fff', pixelRatio:2}).then((dataUrl)=>{
               const a=document.createElement('a'); a.href=dataUrl; a.download=`ticket_${bookingId}.png`; a.click();
             });
@@ -1372,9 +1368,8 @@
       }
     }
 
-    // 修改對話框（簡易版）
+    // 修改對話框
     async function openModifyDialog({bookingId, direction, date, pick, drop, time}){
-      // 讀取可選資料
       await refreshDataIfNeeded(true);
 
       const ov = document.createElement('div');
@@ -1414,7 +1409,7 @@
 
       let mdDirection = direction;
       let mdDate = date;
-      let mdStation = (direction==='回程') ? pick : drop; // 與下方邏輯一致，顯示非飯店站
+      let mdStation = (direction==='回程') ? pick : drop;
       let mdTime = time;
       let mdAvail = 0;
 
@@ -1480,7 +1475,6 @@
 
       ov.querySelector('#md_dir').addEventListener('change', (e)=>{
         mdDirection = e.target.value;
-        // 方向改變時預設站點修正
         mdStation = (mdDirection==='回程') ? pick : drop;
         buildDateOptions();
       });
@@ -1493,7 +1487,6 @@
           date: mdDate,
           time: mdTime,
           passengers,
-          // 方向：回程 pick=非飯店站，drop=飯店；去程 pick=飯店，drop=非飯店站
           pickLocation: mdDirection==='回程' ? mdStation : '福泰大飯店 Forte Hotel',
           dropLocation: mdDirection==='回程' ? '福泰大飯店 Forte Hotel' : mdStation,
         };
@@ -1507,7 +1500,6 @@
         finally{ showLoading(false); }
       };
 
-      // 初始化
       buildDateOptions();
     }
 
@@ -1519,14 +1511,14 @@
 
     /* ====== 初始化 ====== */
     async function init() {
-      // 設定預設入住/退房日期
       const t = todayISO();
       const ci = document.getElementById('checkInDate');
       const co = document.getElementById('checkOutDate');
+      const dining = document.getElementById('diningDate');
       if(ci) ci.value = t;
       if(co) co.value = t;
+      if(dining) dining.value = t; // 用餐日期也預設今天
       await refreshDataIfNeeded(true);
-      // 維持首頁
       showPage('reservation');
     }
     document.addEventListener('DOMContentLoaded', init);
