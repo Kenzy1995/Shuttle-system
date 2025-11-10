@@ -1,14 +1,10 @@
-
 from __future__ import annotations
 import io
 import os
-import re
-import json
 import time
-import urllib.parse
-import urllib.request
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
+import urllib.parse
 
 import qrcode
 from fastapi import FastAPI, HTTPException, Response
@@ -26,9 +22,6 @@ SCOPES = [
 SPREADSHEET_ID = "1xp54tKOczklmT8uacW-HMxwV8r0VOR2ui33jYcE2pUQ"
 SHEET_NAME = "預約審核(櫃台)"
 BASE_URL = "https://booking-manager-995728097341.asia-east1.run.app"
-
-# 供容量再次驗證的聚合 API（與前端一致）
-AGGREGATOR_URL = "https://booking-api-995728097341.asia-east1.run.app/api/sheet"
 
 # 表頭列（1-based）
 HEADER_ROW = 2
@@ -54,7 +47,6 @@ HEADER_KEYS = {
     "預約人數",
     "櫃台審核",
     "預約狀態",
-    "訂單狀態",   # ★ 需求 10
     "乘車狀態",
     "身分",
     "房號",
@@ -65,10 +57,10 @@ HEADER_KEYS = {
     "下車索引",
     "涉及路段範圍",
     "QRCode編碼",
-    "備註",       # ★ 需求 10
+    "備註",  # 新增備註欄位
 }
 
-# 站點索引（精準雙語字串）
+# 站點索引（精準雙語字串，完全相同才匹配）
 PICK_INDEX_MAP_EXACT = {
     "福泰大飯店 Forte Hotel": 1,
     "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": 2,
@@ -120,22 +112,6 @@ def _compute_indices_and_segments(pickup: str, dropoff: str):
     segs = list(range(pick_idx, drop_idx))
     seg_str = ",".join(str(i) for i in segs)
     return pick_idx, drop_idx, seg_str
-
-def _norm_date(s: str) -> str:
-    s = (s or "").strip()
-    if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
-        return s
-    if re.match(r"^\d{4}/\d{1,2}/\d{1,2}$", s):
-        y, m, d = s.split("/")
-        return f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
-    if re.match(r"^\d{1,2}/\d{1,2}/\d{4}$", s):
-        m, d, y = s.split("/")
-        return f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
-    return s
-
-def _digits(n: str) -> int:
-    m = re.findall(r"\\d+", str(n or ""))
-    return int("".join(m)) if m else 0
 
 # ========== Google Sheets ==========
 def open_sheet() -> gspread.Worksheet:
@@ -196,93 +172,6 @@ def _get_max_seq_for_date(ws: gspread.Worksheet, date_iso: str) -> int:
                 pass
     return max_seq
 
-# ========== 聚合容量查詢 ==========
-def _fetch_agg_rows() -> Tuple[List[str], List[List[str]]]:
-    """取回 aggregator 原始資料：第一列 headers、其後 rows。失敗則拋錯。"""
-    try:
-        with urllib.request.urlopen(AGGREGATOR_URL, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        if not (isinstance(data, list) and data and isinstance(data[0], list)):
-            raise RuntimeError("Aggregator 回傳格式異常")
-        headers = data[0]
-        rows = data[1:]
-        return headers, rows
-    except Exception as e:
-        raise HTTPException(503, f"目前無法確認剩餘座位，請稍後再試：{e}")
-
-def _col_idx(headers: List[str], candidates: List[str]) -> Optional[int]:
-    for name in candidates:
-        if name in headers:
-            return headers.index(name)
-    return None
-
-def _match_value(a: str, b: str) -> bool:
-    return (a or "").strip() == (b or "").strip()
-
-def _available_seats_from_agg(direction: str, date_iso: str, station: str, time_hm: str) -> int:
-    """以方向/日期/站點/時間查 aggregator 的『可預約人數』。找不到回 0。"""
-    headers, rows = _fetch_agg_rows()
-    idx_dir = _col_idx(headers, ["去程 / 回程"])
-    idx_date = _col_idx(headers, ["日期"])
-    idx_time = _col_idx(headers, ["班次"])
-    idx_st  = _col_idx(headers, ["站點"])
-    idx_av  = _col_idx(headers, ["可預約人數", "可約人數 / Available"])
-    if None in (idx_dir, idx_date, idx_time, idx_st, idx_av):
-        raise HTTPException(503, "Aggregator 欄位不足，無法確認剩餘座位")
-
-    tgt_date = _norm_date(date_iso)
-    tgt_time = _time_hm_from_any(time_hm)
-    for r in rows:
-        r_dir  = r[idx_dir] if idx_dir < len(r) else ""
-        r_date = _norm_date(r[idx_date] if idx_date < len(r) else "")
-        r_time = _time_hm_from_any(r[idx_time] if idx_time < len(r) else "")
-        r_st   = r[idx_st] if idx_st < len(r) else ""
-        if _match_value(r_dir, direction) and _match_value(r_date, tgt_date) and _match_value(r_time, tgt_time) and _match_value(r_st, station):
-            return max(0, _digits(r[idx_av] if idx_av < len(r) else "0"))
-    # 沒找到就視為 0（不可預約）
-    return 0
-
-def _check_capacity_for_booking(direction: str, date_iso: str, time_hm: str, pick: str, drop: str, passengers: int):
-    """新增預約之容量檢查。"""
-    # 聚合站點鍵與前端一致：
-    agg_station = pick if direction == "回程" else drop
-    avail = _available_seats_from_agg(direction, date_iso, agg_station, time_hm)
-    if passengers > avail:
-        raise HTTPException(400, f"超過可預約人數（剩餘 {avail} 人）")
-
-def _check_capacity_for_modify(ws: gspread.Worksheet, hmap: Dict[str, int], rowno: int, new_direction: str, new_date: str, new_time: str, new_pick: str, new_drop: str, new_passengers: int):
-    """修改預約之容量檢查：同班次可 +本人佔位"""
-    def get_cell(col: str) -> str:
-        if col not in hmap:
-            return ""
-        return ws.cell(rowno, hmap[col]).value or ""
-
-    old_direction = get_cell("往返")
-    old_date      = get_cell("日期")
-    old_time      = get_cell("班次")
-    old_pick      = get_cell("上車地點")
-    old_drop      = get_cell("下車地點")
-    try:
-        old_pax = int(get_cell("預約人數") or "0")
-    except:
-        old_pax = 0
-
-    # aggregator 站點鍵
-    old_station = old_pick if old_direction == "回程" else old_drop
-    new_station = new_pick if new_direction == "回程" else new_drop
-
-    same_trip = (
-        _match_value(old_direction, new_direction) and
-        _match_value(_norm_date(old_date), _norm_date(new_date)) and
-        _match_value(_time_hm_from_any(old_time), _time_hm_from_any(new_time)) and
-        _match_value(old_station, new_station)
-    )
-
-    base_avail = _available_seats_from_agg(new_direction, new_date, new_station, new_time)
-    allowed = base_avail + (old_pax if same_trip else 0)
-    if new_passengers > allowed:
-        raise HTTPException(400, f"超過可預約人數（此班次剩餘 {base_avail}，{ '含本人 ' + str(old_pax) if same_trip else '不可含本人' }）")
-
 # ========== Pydantic ==========
 class BookPayload(BaseModel):
     direction: str
@@ -322,7 +211,6 @@ class ModifyPayload(BaseModel):
     dropLocation: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
-    # 備註可由後端自動寫入時間說明
 
 class DeletePayload(BaseModel):
     booking_id: str
@@ -336,7 +224,7 @@ class OpsRequest(BaseModel):
     data: Dict[str, Any]
 
 # ========== FastAPI ==========
-app = FastAPI(title="Shuttle Ops API", version="1.2.0")
+app = FastAPI(title="Shuttle Ops API", version="1.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -384,13 +272,9 @@ def ops(req: OpsRequest):
         if action == "book":
             p = BookPayload(**data)
 
-            # ★ 再次檢查容量
-            time_hm = _time_hm_from_any(p.time)
-            _check_capacity_for_booking(p.direction, _norm_date(p.date), time_hm, p.pickLocation, p.dropLocation, int(p.passengers))
-
-            last_seq = _get_max_seq_for_date(ws, _norm_date(p.date))
-            booking_id = f"{_mmdd_prefix(_norm_date(p.date))}{last_seq + 1:03d}"
-            car_display = _display_trip_str(_norm_date(p.date), time_hm)
+            last_seq = _get_max_seq_for_date(ws, p.date)
+            booking_id = f"{_mmdd_prefix(p.date)}{last_seq + 1:03d}"
+            car_display = _display_trip_str(p.date, _time_hm_from_any(p.time))
 
             pk_idx, dp_idx, seg_str = _compute_indices_and_segments(p.pickLocation, p.dropLocation)
 
@@ -401,20 +285,19 @@ def ops(req: OpsRequest):
             newrow = [""] * len(headers)
             setv(newrow, "申請日期", _tz_now_str())
             setv(newrow, "預約狀態", BOOKED_TEXT)
-            setv(newrow, "訂單狀態", BOOKED_TEXT)  # ★ 需求 10：同步訂單狀態
             identity_simple = "住宿" if p.identity == "hotel" else "用餐"
 
             setv(newrow, "預約編號", booking_id)
             setv(newrow, "往返", p.direction)
-            setv(newrow, "日期", _norm_date(p.date))
-            setv(newrow, "班次", time_hm)
+            setv(newrow, "日期", p.date)
+            setv(newrow, "班次", _time_hm_from_any(p.time))
             setv(newrow, "車次", car_display)
             setv(newrow, "上車地點", p.pickLocation)
             setv(newrow, "下車地點", p.dropLocation)
             setv(newrow, "姓名", p.name)
             setv(newrow, "手機", p.phone)
             setv(newrow, "信箱", p.email)
-            setv(newrow, "預約人數", int(p.passengers))
+            setv(newrow, "預約人數", p.passengers)
             setv(newrow, "乘車狀態", "")
             setv(newrow, "身分", identity_simple)
             setv(newrow, "房號", p.roomNumber or "")
@@ -425,7 +308,6 @@ def ops(req: OpsRequest):
             setv(newrow, "下車索引", dp_idx)
             setv(newrow, "涉及路段範圍", seg_str)
             setv(newrow, "QRCode編碼", qr_content)
-            # 備註不寫入
 
             ws.append_row(newrow, value_input_option="USER_ENTERED")
             return {"status": "success", "booking_id": booking_id, "qr_url": qr_url, "qr_content": qr_content}
@@ -448,7 +330,7 @@ def ops(req: OpsRequest):
             for row in all_values[HEADER_ROW:]:
                 date_iso = get(row, "日期")
                 try:
-                    d = datetime.strptime(_norm_date(date_iso), "%Y-%m-%d")
+                    d = datetime.strptime(date_iso, "%Y-%m-%d")
                 except:
                     d = now
                 if d < one_month_ago:
@@ -462,7 +344,6 @@ def ops(req: OpsRequest):
                 rec = {k: get(row, k) for k in hmap}
                 if rec.get("櫃台審核", "").lower() == "n":
                     rec["預約狀態"] = "已拒絕"
-                    rec["訂單狀態"] = "已拒絕"
                 results.append(rec)
 
             return results
@@ -475,28 +356,14 @@ def ops(req: OpsRequest):
                 raise HTTPException(404, "找不到此預約編號")
             rowno = target[0]
 
-            def get_cell(col: str) -> str:
-                if col not in hmap:
-                    return ""
-                return ws.cell(rowno, hmap[col]).value or ""
+            # 班次與路段
+            time_hm = _time_hm_from_any(p.time or "")
+            car_display = _display_trip_str(p.date or "", time_hm) if (p.date and time_hm) else None
 
-            # 目標值（若未給則取舊值）
-            new_direction = p.direction or get_cell("往返")
-            new_date = _norm_date(p.date or get_cell("日期"))
-            time_hm = _time_hm_from_any(p.time or get_cell("班次"))
-            new_pick = p.pickLocation or get_cell("上車地點")
-            new_drop = p.dropLocation or get_cell("下車地點")
-            try:
-                old_pax = int(get_cell("預約人數") or "0")
-            except:
-                old_pax = 0
-            new_pax = int(p.passengers if p.passengers is not None else old_pax)
-
-            # ★ 修改時再次檢查容量（同班次可含本人）
-            _check_capacity_for_modify(ws, hmap, rowno, new_direction, new_date, time_hm, new_pick, new_drop, new_pax)
-
-            car_display = _display_trip_str(new_date, time_hm)
-            pk_idx, dp_idx, seg_str = _compute_indices_and_segments(new_pick, new_drop)
+            pk_idx = dp_idx = None
+            seg_str = None
+            if p.pickLocation and p.dropLocation:
+                pk_idx, dp_idx, seg_str = _compute_indices_and_segments(p.pickLocation, p.dropLocation)
 
             def upd(col: str, v: Optional[str]):
                 if v is None:
@@ -504,30 +371,32 @@ def ops(req: OpsRequest):
                 if col in hmap:
                     ws.update_cell(rowno, hmap[col], v)
 
-            # 寫入更新欄位（★ 需求 10）
-            upd("預約狀態", BOOKED_TEXT)
-            upd("訂單狀態", BOOKED_TEXT)
-            upd("往返", new_direction)
-            upd("日期", new_date)
-            upd("班次", time_hm)
-            upd("車次", car_display)
-            upd("上車地點", new_pick)
-            upd("下車地點", new_drop)
-            upd("預約人數", str(new_pax))
-            if p.phone:
-                upd("手機", p.phone)
+            # 寫入更新欄位 - 按照您的要求
+            upd("預約狀態", BOOKED_TEXT)  # 覆蓋訂單狀態
+            if p.passengers is not None: upd("預約人數", str(p.passengers))  # 覆蓋預約人數
+            if "備註" in hmap:  # 新增備註
+                current_note = ws.cell(rowno, hmap["備註"]).value or ""
+                new_note = f"{_tz_now_str()} 已修改"
+                if current_note:
+                    new_note = f"{current_note}; {new_note}"
+                upd("備註", new_note)
+            
+            if p.direction: upd("往返", p.direction)
+            if p.date: upd("日期", p.date)
+            if time_hm: upd("班次", time_hm)
+            if car_display: upd("車次", car_display)
+            if p.pickLocation: upd("上車地點", p.pickLocation)
+            if p.dropLocation: upd("下車地點", p.dropLocation)
+            if p.phone: upd("手機", p.phone)
             if p.email:
                 upd("信箱", p.email)
                 # 依新 email 重算 QR
                 em6 = _email_hash6(p.email)
                 qr_content = f"FT:{p.booking_id}:{em6}"
                 upd("QRCode編碼", qr_content)
-            upd("上車索引", str(pk_idx))
-            upd("下車索引", str(dp_idx))
-            upd("涉及路段範圍", seg_str)
-            # 備註寫入「當下修改時間 已修改」
-            if "備註" in hmap:
-                ws.update_cell(rowno, hmap["備註"], _tz_now_str() + " 已修改")
+            if pk_idx is not None: upd("上車索引", str(pk_idx))
+            if dp_idx is not None: upd("下車索引", str(dp_idx))
+            if seg_str is not None: upd("涉及路段範圍", seg_str)
             if "最後操作時間" in hmap:
                 ws.update_cell(rowno, hmap["最後操作時間"], _tz_now_str() + " 已修改")
 
@@ -542,10 +411,12 @@ def ops(req: OpsRequest):
             rowno = target[0]
             if "預約狀態" in hmap:
                 ws.update_cell(rowno, hmap["預約狀態"], CANCELLED_TEXT)
-            if "訂單狀態" in hmap:
-                ws.update_cell(rowno, hmap["訂單狀態"], CANCELLED_TEXT)
-            if "備註" in hmap:
-                ws.update_cell(rowno, hmap["備註"], _tz_now_str() + " 已刪除")
+            if "備註" in hmap:  # 新增備註
+                current_note = ws.cell(rowno, hmap["備註"]).value or ""
+                new_note = f"{_tz_now_str()} 已取消"
+                if current_note:
+                    new_note = f"{current_note}; {new_note}"
+                ws.update_cell(rowno, hmap["備註"], new_note)
             if "最後操作時間" in hmap:
                 ws.update_cell(rowno, hmap["最後操作時間"], _tz_now_str() + " 已刪除")
             return {"status": "success", "booking_id": p.booking_id}
