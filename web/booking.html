@@ -83,7 +83,7 @@
       text-align: left; /* 停靠站點標題置左 */
     }
 
-    .field{margin:14px 0}
+    .field{margin:8px 0}
     .label{display:block;margin-bottom:6px;font-weight:700}
     .hint{font-size:12px;color:var(--muted)}
 
@@ -305,15 +305,22 @@
         width:100%;
       }
       /* 手機版兩個按鈕左右排列 */
-      .actions.row {
-        flex-direction: row;
-        justify-content: space-between;
+      .actions.row,
+      #step1 .actions,
+      #step2 .actions,
+      #step3 .actions,
+      #step4 .actions,
+      #step6 .actions {
+        flex-direction: row !important;
+        justify-content: space-between !important;
       }
-      /* 手機版三個按鈕特殊排列 */
-      .actions:has(button:nth-child(3)) {
-        flex-direction: column;
-        align-items: center;
+      
+      /* 只有三個按鈕的才用特殊排列 */
+      .actions:has(button:nth-child(3)):not(.col) {
+        flex-direction: column !important;
+        align-items: center !important;
       }
+      
       .actions:has(button:nth-child(3)) button:nth-child(3) {
         order: 3;
         margin-top: 10px;
@@ -1217,8 +1224,8 @@
         try {
             // 根據螢幕寬度決定下載尺寸
             const isMobile = window.innerWidth <= 768;
-            const width = isMobile ? 350 * 2 : 600 * 2; // 手機版350px，電腦版600px
-            const height = isMobile ? 650 * 2 : 500 * 2; // 手機版較高，電腦版較矮
+            const width = isMobile ? 350  : 600 * 2; // 手機版350px，電腦版600px
+            const height = isMobile ? 650  : 500 * 2; // 手機版較高，電腦版較矮
             
             const dataUrl = await domtoimage.toPng(ticketCard, {
                 bgcolor: '#ffffff',
