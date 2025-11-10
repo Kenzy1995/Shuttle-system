@@ -222,9 +222,9 @@
       background: white;
       border-radius: 16px;
       box-shadow: var(--shadow-lg);
-      padding: 24px;
+      padding: 20px;
       margin: 20px auto;
-      max-width: 600px;
+      max-width: 500px;
       width: 100%;
     }
     .ticket-header {
@@ -373,6 +373,15 @@
         flex-direction: row-reverse;
       }
     }
+
+#step6 .field {
+  margin: 6px 0;       /* 原本為 8px，這裡縮小垂直間距 */
+}
+
+#step6 .label,
+#step6 .readonly {
+  line-height: 1.4;     /* 壓縮欄內文字間距 */
+}
 
   </style>
 </head>
@@ -1234,8 +1243,8 @@
         try {
             // 根據螢幕寬度決定下載尺寸
             const isMobile = window.innerWidth <= 768;
-            const width = isMobile ? 350  : 600 ; // 手機版350px，電腦版600px
-            const height = isMobile ? 650  : 500 * 2; // 手機版較高，電腦版較矮
+            const width = isMobile ? 380  : 600 ; // 手機版350px，電腦版600px
+            const height = isMobile ? 650 * 2 : 500 * 2; // 手機版較高，電腦版較矮
             
             const dataUrl = await domtoimage.toPng(ticketCard, {
                 bgcolor: '#ffffff',
