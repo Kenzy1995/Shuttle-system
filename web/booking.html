@@ -313,25 +313,21 @@
           justify-content: space-between !important;
         }
 
-        /* 三個按鈕：前兩個左右排列，第三個置下方置中 */
-        .actions:has(button:nth-child(3)):not(.col) {
+        /* 三個按鈕：前兩個左右排列，第三個置下方置中（JS 自動加 .has-three） */
+        .actions.has-three {
           flex-wrap: wrap !important;
           flex-direction: row !important;
           justify-content: space-between !important;
         }
-        .actions:has(button:nth-child(3)) button {
+        .actions.has-three button {
           flex: 1 1 45%;
         }
-
-        .actions:has(button:nth-child(3)) button {
-          flex: 1 1 45%;
-        }
-
-        .actions:has(button:nth-child(3)) button:nth-child(3) {
+        .actions.has-three button:nth-child(3) {
           flex: 1 1 100%;
           margin-top: 10px;
           align-self: center;
         }
+
       }
 
       
@@ -1572,19 +1568,26 @@
       btn.style.display = window.scrollY>400 ? 'block':'none';
     });
 
-    /* ====== 初始化 ====== */
-    async function init() {
-      const t = todayISO();
-      const ci = document.getElementById('checkInDate');
-      const co = document.getElementById('checkOutDate');
-      const dining = document.getElementById('diningDate');
-      if(ci) ci.value = t;
-      if(co) co.value = t;
-      if(dining) dining.value = t; // 用餐日期也預設今天
-      await refreshDataIfNeeded(true);
-      showPage('reservation');
-    }
-    document.addEventListener('DOMContentLoaded', init);
-  </script>
-</body>
-</html>
+/* ====== 初始化 ====== */
+// 新增：處理手機不支援 :has() 的狀況
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.actions').forEach(a => {
+    const btns = a.querySelectorAll('button');
+    if (btns.length === 3) a.classList.add('has-three');
+  });
+});
+
+async function init() {
+  const t = todayISO();
+  const ci = document.getElementById('checkInDate');
+  const co = document.getElementById('checkOutDate');
+  const dining = document.getElementById('diningDate');
+  if(ci) ci.value = t;
+  if(co) co.value = t;
+  if(dining) dining.value = t; // 用餐日期也預設今天
+  await refreshDataIfNeeded(true);
+  showPage('reservation');
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
