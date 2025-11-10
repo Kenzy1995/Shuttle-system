@@ -1,11 +1,11 @@
 """
-shuttle_ops_api.py
-FastAPI「寫入與營運」服務（/api/ops）
+shuttle_ops_api.py - 修正憑證讀取版本
 """
 from __future__ import annotations
 import io
 import os
 import time
+import json
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 import urllib.parse
@@ -114,21 +114,35 @@ def _mmdd_prefix(date_iso: str) -> str:
 
 # ---------- Google Sheets ----------
 def open_sheet() -> gspread.Worksheet:
-    json_path = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-    if not json_path or not os.path.exists(json_path):
-        raise RuntimeError("找不到 GOOGLE_SERVICE_ACCOUNT_JSON 憑證檔")
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
-    ]
-    creds = Credentials.from_service_account_file(json_path, scopes=scopes)
-    gc = gspread.authorize(creds)
-    spreadsheet_id = os.getenv("SPREADSHEET_ID")
-    if not spreadsheet_id:
-        raise RuntimeError("請設定 SPREADSHEET_ID")
-    sh = gc.open_by_key(spreadsheet_id)
-    ws = sh.worksheet(os.getenv("SHEET_NAME", DEFAULT_SHEET_NAME))
-    return ws
+    """使用舊版本的憑證讀取邏輯"""
+    try:
+        # 從環境變數讀取 JSON 字串
+        service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+        if not service_account_json:
+            raise RuntimeError("請設定 GOOGLE_SERVICE_ACCOUNT_JSON 環境變數")
+        
+        # 解析 JSON 字串
+        creds_dict = json.loads(service_account_json)
+        creds = Credentials.from_service_account_info(creds_dict)
+        
+        spreadsheet_id = os.getenv("SPREADSHEET_ID")
+        if not spreadsheet_id:
+            raise RuntimeError("請設定 SPREADSHEET_ID")
+            
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive",
+        ]
+        creds = creds.with_scopes(scopes)
+        gc = gspread.authorize(creds)
+        sh = gc.open_by_key(spreadsheet_id)
+        ws = sh.worksheet(os.getenv("SHEET_NAME", DEFAULT_SHEET_NAME))
+        return ws
+        
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"GOOGLE_SERVICE_ACCOUNT_JSON 不是有效的 JSON: {e}")
+    except Exception as e:
+        raise RuntimeError(f"無法開啟 Google Sheet: {str(e)}")
 
 def header_map(ws: gspread.Worksheet) -> Dict[str, int]:
     row = ws.row_values(1)
