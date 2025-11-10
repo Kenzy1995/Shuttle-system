@@ -65,12 +65,12 @@ PICK_INDEX_MAP_EXACT = {
     "福泰大飯店 Forte Hotel": 1,
     "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": 2,
     "南港火車站 Nangang Train Station": 3,
-    "南港 LaLaport Shopping Park": 4,
+    "LaLaport Shopping Park": 4,
 }
 DROP_INDEX_MAP_EXACT = {
     "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": 2,
     "南港火車站 Nangang Train Station": 3,
-    "南港 LaLaport Shopping Park": 4,
+    "LaLaport Shopping Park": 4,
     "福泰大飯店 Forte Hotel": 5,
 }
 
