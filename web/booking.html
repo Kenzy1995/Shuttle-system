@@ -706,17 +706,19 @@
       document.querySelectorAll('[data-i18n]').forEach(el=>{
         const k = el.getAttribute('data-i18n');
         const v = t(k);
-        if(v) el.textContent = v;
+        if(!v) return;
+        if(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA'){
+          el.placeholder = v;                // ✅ 支援輸入框 placeholder
+        } else if(el.tagName === 'OPTION'){
+          el.textContent = v;                // ✅ 支援下拉選單選項文字
+        } else {
+          el.textContent = v;                // ✅ 一般文字節點
+        }
       });
-      // 成功狀態 pill
       const pill = document.getElementById('successStatusPill');
       if(pill) pill.textContent = ts('booked');
     }
-    function onLanguageChange(lang){
-      currentLang = lang || "zh";
-      applyI18N();
-      rerenderQueryPages();
-    }
+
 
     let allRows = [];
     let selectedDirection = "";
@@ -876,7 +878,7 @@
         const el = document.getElementById(id);
         if(!el) return;
         el.classList.remove('show');
-        el.style.display = (id==='successAnimation') ? 'none' : el.style.display; // 保險處理
+        el.style.display = 'none'; // 強制隱藏，避免遮擋點擊
       });
     }
 
@@ -931,7 +933,7 @@
     function showSuccessAnimation() {
       const animation = document.getElementById('successAnimation');
       animation.classList.add('show');
-      setTimeout(() => { animation.classList.remove('show'); }, 3000);
+      setTimeout(async () => { animation.classList.remove('show'); }, 3000);
     }
 
     /* ====== 預約流程 ====== */
@@ -1517,13 +1519,6 @@ async function sendEmailFromData(type, data, lang) {
         var rowRefEmail = rowRef ? String(rowRef['信箱']||'') : '';
         const j = await r.json();
         if(j.status==='success'){
-          // 成功刪除後寄送取消信（無票圖）
-          try {
-            const emailTo = (rowRefEmail||'').trim() || (String((lastQueryResults.find(r=>String(r['預約編號'])===bookingId)||{})['信箱']||'').trim());
-            if(emailTo){
-              await fetch(OPS_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'email', data:{ type:'cancel', email: emailTo, bookingId: bookingId, booking_id: bookingId, lang: currentLang } }) });
-            }
-          } catch (e) { console.error(e); }
           showSuccessAnimation();
           setTimeout(async ()=>{
             // 重查並回日期頁
