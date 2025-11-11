@@ -854,14 +854,11 @@
   const prefix = s.slice(0,2);
   return prefix + '*'.repeat(Math.max(0, s.length - 2));
 }
-function maskPhone(phone){
-  const p = String(phone||'');
-  return p.slice(-4);
-}
-(phone){
+    function maskPhone(phone){
       const p = String(phone||'');
       return p.slice(-4); // 僅後四碼
     }
+
     function maskEmail(email){
   const e = String(email||'').trim().toLowerCase();
   const at = e.indexOf('@');
