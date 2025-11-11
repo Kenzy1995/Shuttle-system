@@ -291,7 +291,7 @@ def _compose_mail_html(info: Dict[str, str], lang: str, kind: str) -> (str, str)
         "modify": {
             "zh": "汐止福泰大飯店接駁車預約變更確認",
             "en": "Forte Hotel Xizhi Shuttle Reservation Updated",
-            "ja": "汐止フルオンホテル シャトル予約変更完了",
+            "ja": "汐止フルオンホ테ル シャトル予約変更完了",
             "ko": "포르테 호텔 시즈 셔틀 예약 변경 완료",
         },
         "cancel": {
@@ -520,6 +520,9 @@ def ops(req: OpsRequest):
                 raise HTTPException(404, "找不到此預約編號")
             rowno = target[0]
 
+            # 收集所有要更新的欄位
+            updates = {}
+
             # 班次與路段
             time_hm = _time_hm_from_any(p.time or "")
             car_display = _display_trip_str(p.date or "", time_hm) if (p.date and time_hm) else None
@@ -529,16 +532,10 @@ def ops(req: OpsRequest):
             if p.pickLocation and p.dropLocation:
                 pk_idx, dp_idx, seg_str = _compute_indices_and_segments(p.pickLocation, p.dropLocation)
 
-            def upd(col: str, v: Optional[str]):
-                if v is None:
-                    return
-                if col in hmap:
-                    ws.update_cell(rowno, hmap[col], v)
-
             # 覆蓋狀態與人數（確保寫入「預約人數」欄位 Q）
-            upd("預約狀態", BOOKED_TEXT)
+            updates["預約狀態"] = BOOKED_TEXT
             if p.passengers is not None:
-                upd("預約人數", str(p.passengers))  # 僅寫入「預約人數」，不碰「確認人數」
+                updates["預約人數"] = str(p.passengers)  # 僅寫入「預約人數」，不碰「確認人數」
 
             # 備註
             if "備註" in hmap:
@@ -546,26 +543,39 @@ def ops(req: OpsRequest):
                 new_note = f"{_tz_now_str()} 已修改"
                 if current_note:
                     new_note = f"{current_note}; {new_note}"
-                upd("備註", new_note)
+                updates["備註"] = new_note
 
-            if p.direction: upd("往返", p.direction)
-            if p.date: upd("日期", p.date)
-            if time_hm: upd("班次", time_hm)
-            if car_display: upd("車次", car_display)
-            if p.pickLocation: upd("上車地點", p.pickLocation)
-            if p.dropLocation: upd("下車地點", p.dropLocation)
-            if p.phone: upd("手機", p.phone)
+            if p.direction: updates["往返"] = p.direction
+            if p.date: updates["日期"] = p.date
+            if time_hm: updates["班次"] = time_hm
+            if car_display: updates["車次"] = car_display
+            if p.pickLocation: updates["上車地點"] = p.pickLocation
+            if p.dropLocation: updates["下車地點"] = p.dropLocation
+            if p.phone: updates["手機"] = p.phone
             if p.email:
-                upd("信箱", p.email)
+                updates["信箱"] = p.email
                 # 依新 email 重算 QR
                 em6 = _email_hash6(p.email)
                 qr_content = f"FT:{p.booking_id}:{em6}"
-                upd("QRCode編碼", qr_content)
-            if pk_idx is not None: upd("上車索引", str(pk_idx))
-            if dp_idx is not None: upd("下車索引", str(dp_idx))
-            if seg_str is not None: upd("涉及路段範圍", seg_str)
+                updates["QRCode編碼"] = qr_content
+            if pk_idx is not None: updates["上車索引"] = str(pk_idx)
+            if dp_idx is not None: updates["下車索引"] = str(dp_idx)
+            if seg_str is not None: updates["涉及路段範圍"] = seg_str
             if "最後操作時間" in hmap:
-                ws.update_cell(rowno, hmap["最後操作時間"], _tz_now_str() + " 已修改")
+                updates["最後操作時間"] = _tz_now_str() + " 已修改"
+
+            # 批量更新所有欄位
+            if updates:
+                batch_updates = []
+                for col_name, value in updates.items():
+                    if col_name in hmap:
+                        batch_updates.append({
+                            'range': gspread.utils.rowcol_to_a1(rowno, hmap[col_name]),
+                            'values': [[value]]
+                        })
+                
+                if batch_updates:
+                    ws.batch_update(batch_updates)
 
             return {"status": "success", "booking_id": p.booking_id}
 
@@ -576,16 +586,34 @@ def ops(req: OpsRequest):
             if not target:
                 raise HTTPException(404, "找不到此預約編號")
             rowno = target[0]
+
+            # 收集所有要更新的欄位
+            updates = {}
+
             if "預約狀態" in hmap:
-                ws.update_cell(rowno, hmap["預約狀態"], CANCELLED_TEXT)
+                updates["預約狀態"] = CANCELLED_TEXT
             if "備註" in hmap:
                 current_note = ws.cell(rowno, hmap["備註"]).value or ""
                 new_note = f"{_tz_now_str()} 已取消"
                 if current_note:
                     new_note = f"{current_note}; {new_note}"
-                ws.update_cell(rowno, hmap["備註"], new_note)
+                updates["備註"] = new_note
             if "最後操作時間" in hmap:
-                ws.update_cell(rowno, hmap["最後操作時間"], _tz_now_str() + " 已刪除")
+                updates["最後操作時間"] = _tz_now_str() + " 已刪除"
+
+            # 批量更新所有欄位
+            if updates:
+                batch_updates = []
+                for col_name, value in updates.items():
+                    if col_name in hmap:
+                        batch_updates.append({
+                            'range': gspread.utils.rowcol_to_a1(rowno, hmap[col_name]),
+                            'values': [[value]]
+                        })
+                
+                if batch_updates:
+                    ws.batch_update(batch_updates)
+
             return {"status": "success", "booking_id": p.booking_id}
 
         # ===== 掃碼上車 =====
@@ -600,10 +628,28 @@ def ops(req: OpsRequest):
             if not target:
                 raise HTTPException(404, "找不到符合條件之訂單")
             rowno = target[0]
+            
+            # 收集所有要更新的欄位
+            updates = {}
+            
             if "乘車狀態" in hmap:
-                ws.update_cell(rowno, hmap["乘車狀態"], "已上車")
+                updates["乘車狀態"] = "已上車"
             if "最後操作時間" in hmap:
-                ws.update_cell(rowno, hmap["最後操作時間"], _tz_now_str() + " 已上車")
+                updates["最後操作時間"] = _tz_now_str() + " 已上車"
+
+            # 批量更新所有欄位
+            if updates:
+                batch_updates = []
+                for col_name, value in updates.items():
+                    if col_name in hmap:
+                        batch_updates.append({
+                            'range': gspread.utils.rowcol_to_a1(rowno, hmap[col_name]),
+                            'values': [[value]]
+                        })
+                
+                if batch_updates:
+                    ws.batch_update(batch_updates)
+
             return {"status": "success", "row": rowno}
 
         # ===== 寄信（成功預約／變更／取消） =====
@@ -645,11 +691,24 @@ def ops(req: OpsRequest):
             # 寄信
             try:
                 _send_email_gmail(info["email"], subject, html, attachment=attachment_bytes, attachment_filename=f"ticket_{info['booking_id']}.png" if attachment_bytes else "ticket.png")
-                # 更新 sheet 標記
+                # 更新 sheet 標記 - 使用批量更新
+                updates = {}
                 if "已寄信" in hmap:
-                    ws.update_cell(rowno, hmap["已寄信"], "已寄信")
+                    updates["已寄信"] = "已寄信"
                 if "寄信狀態" in hmap:
-                    ws.update_cell(rowno, hmap["寄信狀態"], f"{_tz_now_str()} 已寄信")
+                    updates["寄信狀態"] = f"{_tz_now_str()} 已寄信"
+                
+                if updates:
+                    batch_updates = []
+                    for col_name, value in updates.items():
+                        if col_name in hmap:
+                            batch_updates.append({
+                                'range': gspread.utils.rowcol_to_a1(rowno, hmap[col_name]),
+                                'values': [[value]]
+                            })
+                    
+                    if batch_updates:
+                        ws.batch_update(batch_updates)
             except Exception as e:
                 raise HTTPException(500, f"寄信失敗：{str(e)}")
 
@@ -670,5 +729,3 @@ def cors_debug():
 @app.get("/api/debug")
 def debug_endpoint():
     return {"status": "服務正常", "base_url": BASE_URL, "time": _tz_now_str()}
-
-
