@@ -1204,24 +1204,46 @@
       }
     }
     async function downloadTicket() {
-      const ticketCard = document.getElementById('ticketCard');
+      const card = document.getElementById('ticketCard');
+      if (!card) { alert('找不到票卡'); return; }
+
       try {
-        const isMobile = window.innerWidth <= 768;
-        const width = isMobile ? 350  : 480 ;
-        const height = isMobile ? 610 * 2 : 590 * 2;
-        const dataUrl = await domtoimage.toPng(ticketCard, {
-          bgcolor: '#ffffff', width, height, quality: 1, pixelRatio: 2,
-          style: { margin: '0', padding: '24px', transform: 'none' }
+        // 1) 量測目前畫面上的實際尺寸
+        const rect = card.getBoundingClientRect();
+        // 2) 以裝置像素比產生高解析輸出（避免文字鋸齒）
+        const dpr = Math.max(window.devicePixelRatio || 1, 1);
+        const width = Math.round(rect.width);
+        const height = Math.round(rect.height);
+
+        // 3) 交給 dom-to-image，以容器實際大小為基礎，DPR 放大
+        const dataUrl = await domtoimage.toPng(card, {
+          width,                // 以容器寬度輸出
+          height,               // 以容器高度輸出
+          bgcolor: '#ffffff',
+          pixelRatio: dpr,      // 依設備像素比放大，清晰
+          style: {
+            // 確保不被外部樣式影響導致縮放或偏移
+            margin: '0',
+            transform: 'none',
+            // 鎖定渲染時的盒模型，避免動畫或陰影對快照造成抖動
+            boxShadow: 'none',
+            // 可選：若父層有 overflow 影響，強制顯示完整
+            overflow: 'visible'
+          }
         });
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = `ticket_${currentBookingData.bookingId}.png`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      } catch (e) {
-        console.error('下載失敗:', e);
-        alert('下載失敗：' + e.message);
-      }
-    }
+
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `ticket_${currentBookingData?.bookingId || 'shuttle'}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (e) {
+    console.error('下載失敗:', e);
+    alert('下載失敗：' + e.message);
+  }
+}
+
     function closeTicketToHome(){
       document.getElementById('successCard').style.display='none';
       hardResetOverlays();
