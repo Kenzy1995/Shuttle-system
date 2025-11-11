@@ -4,4 +4,5 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 COPY . .
 ENV PORT=8080
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD exec uvicorn server:app --host 0.0.0.0 --port $PORT
+
