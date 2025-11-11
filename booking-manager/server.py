@@ -669,3 +669,10 @@ def cors_debug():
 @app.get("/api/debug")
 def debug_endpoint():
     return {"status": "服務正常", "base_url": BASE_URL, "time": _tz_now_str()}
+
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
