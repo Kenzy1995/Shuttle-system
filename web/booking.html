@@ -97,7 +97,7 @@
     .options{display:flex;flex-direction:column;gap:10px}
     .opt-btn{
       text-align:left;padding:14px 16px;border:1px solid #e7e7e7;border-radius:12px;background:#fff;font-weight:800;color:var(--primary);cursor:pointer;
-      font-size:18px; /* 維持選項字體 18 */
+      font-size:18px;
     }
     .opt-btn:hover{box-shadow:var(--shadow)}
     .opt-btn.active{outline:3px solid rgba(169,133,112,.25)}
@@ -107,7 +107,7 @@
     .actions.row{flex-direction:row}
     .actions.col{flex-direction:column}
 
-    /* ===== 修正：覆蓋層預設不吃點擊，僅 .show 時才接管 ===== */
+    /* 覆蓋層 */
     .overlay{ position:fixed;inset:0;background:rgba(255,255,255,.94);display:none;align-items:center;justify-content:center;z-index:9999; pointer-events:none }
     .overlay.show{display:flex; pointer-events:auto}
     .spinner{width:48px;height:48px;border-radius:50%;border:4px solid #eee;border-top:4px solid var(--primary);animation:spin 1s linear infinite;margin:0 auto 10px}
@@ -128,14 +128,14 @@
     .mobile-tabbar button{ appearance:none;border:none;background:none;padding:12px 6px;font-size:18px;color:#fff;font-weight:700;opacity:.8 }
     .mobile-tabbar button.active{opacity:1;text-decoration:underline}
 
-    /* ★ 回到頂端按鈕：提高層級並避開底部導覽 */
+    /* ★ 回到頂端按鈕 */
     #backToTop{
       position:fixed;right:18px;bottom:24px;z-index:1000;display:none;width:44px;height:44px;border:none;border-radius:50%;cursor:pointer;background:#0009;color:#fff;font-size:22px;line-height:44px;text-align:center
     }
     #backToTop:hover{filter:brightness(1.2)}
-    @media (max-width: 768px){ #backToTop{ bottom:96px; } } /* 手機避開底部 bar */
+    @media (max-width: 768px){ #backToTop{ bottom:96px; } }
 
-    /* 成功動畫（3秒） + 指標事件控制 */
+    /* 成功動畫（3秒） */
     .success-animation { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10000; background: rgba(255, 255, 255, 0.95); border-radius: 16px; padding: 30px; box-shadow: var(--shadow-lg); display: none; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }
     .success-animation.show { display: flex; animation: fadeInOut 3s ease-in-out; pointer-events: auto; }
     .checkmark { width: 80px;height: 80px;border-radius: 50%;display: block;stroke-width: 2;stroke: #4CAF50;stroke-miterlimit: 10;margin: 20px auto;box-shadow: inset 0px 0px 0px #4CAF50;animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both; }
@@ -159,22 +159,20 @@
     .ticket-header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid var(--primary); padding-bottom: 16px; }
     .ticket-header h2 { margin: 0; font-size: 28px; font-weight: 900; color: var(--primary); }
 
-    /* 成功車票右上角關閉按鈕 */
     .ticket-close{
       position:absolute;right:12px;top:12px;width:36px;height:36px;border-radius:50%;border:none;background:#00000022;color:#333;font-size:18px;cursor:pointer;line-height:36px;text-align:center
     }
 
     .ticket-content { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
     .ticket-qr { text-align: center; padding: 20px; background: #f9f9f9; border-radius: 12px; min-height: 200px; }
-    .ticket-qr img { width: 200px; height: 200px; border-radius: 8px; border: 1px solid #eee; background: #fff; }
+    .ticket-qr img { width: 200px; height: 200px; border-radius: 8px; border: 1px solid #eee; background: #fff; object-fit: contain; }
     .ticket-info { display: flex; flex-direction: column; gap: 12px; }
     .ticket-field { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
     .ticket-field:last-child { border-bottom: none; }
     .ticket-label { font-weight: 800; color: var(--text); min-width: 120px; font-size: 18px; }
-    .ticket-value { flex: 1; text-align: right; color: var(--muted); font-size: 18px; word-break: break-all; overflow-wrap: anywhere; max-width: 100%; }
+    .ticket-value { flex: 1; text-align: right; color: var(--muted); font-size: 18px; overflow-wrap: anywhere; word-break: break-word; }
     .ticket-actions { margin-top: 24px; display: flex; gap: 12px; justify-content: center; flex-direction: row-reverse; }
 
-    /* 查詢結果（舊清單保留但不使用） */
     .date-group{margin-bottom:20px;background:#fff;border-radius:14px;box-shadow:var(--shadow)}
     .date-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #eee;cursor:pointer}
     .date-title{font-weight:900}
@@ -182,7 +180,6 @@
     .tickets-row{display:flex;gap:12px;padding:14px;overflow-x:auto;scroll-snap-type:x mandatory}
     .tickets-row .ticket-card{scroll-snap-align:start;flex:0 0 auto}
 
-    /* 查詢跳轉頁面：日期列表與票卡頁 */
     .check-date-card.wizard-fixed{}
     .ticket-page .ticket-card{ max-width: 820px; width:100%; }
 
@@ -223,7 +220,6 @@
       .ticket-actions.has-three button:nth-child(3) { width: 80%; max-width: 300px; }
     }
 
-    /* 被拒絕的提示圓圈驚嘆號 */
     .badge-alert{
       position:absolute; right:60px; top:12px;
       width:28px;height:28px;border-radius:50%;border:none;background:#ffcc80;color:#8a4b08;font-weight:900;cursor:pointer;
@@ -441,7 +437,6 @@
           </div>
         </div>
         <div class="ticket-actions">
-          <!-- 刪除回到首頁按鈕，改為右上角 X ，因此移除 -->
           <button class="button" onclick="downloadTicket()" data-i18n="download">下載車票</button>
         </div>
       </div>
@@ -577,7 +572,7 @@
     const OPS_URL = "https://booking-manager-995728097341.asia-east1.run.app/api/ops";
     const QR_ORIGIN = "https://booking-manager-995728097341.asia-east1.run.app";
 
-    /* ====== 語言包：集中管理（除站點名） ====== */
+    /* ====== 語言包 ====== */
     const TEXTS = {
       zh: {
         title:"飯店服務-免費接駁車預約", brand:"飯店服務",
@@ -684,7 +679,7 @@
         selectDateTitle:"날짜 선택", backToQuery:"조회로 돌아가기",
         notice1:"※ 출발 1시간 전까지 예약·변경·취소해 주세요. 좌석 한정.",
         notice2:"※ 숙박객 및 식사객은 예약 시 무료 탑승.",
-        download:"승차권 다운로드",
+        download:"티켓 다운로드",
         rejectedTip:"문의 사항은 프런트에 연락하세요.",
       }
     };
@@ -708,7 +703,6 @@
         const v = t(k);
         if(v) el.textContent = v;
       });
-      // 成功狀態 pill
       const pill = document.getElementById('successStatusPill');
       if(pill) pill.textContent = ts('booked');
     }
@@ -724,8 +718,6 @@
     let selectedStationRaw = "";
     let selectedScheduleTime = "";
     let selectedAvailableSeats = 0;
-    let lastDataUpdate = 0;
-    const UPDATE_INTERVAL = 30000;
     let currentBookingData = {};
     let lastQueryResults = [];
 
@@ -749,6 +741,7 @@
       const s = String(v).trim().replace('：',':');
       if(/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(11,16);
       if(/^\d{1,2}:\d{1,2}/.test(s)){ const [h,m]=s.split(':'); return `${String(h).padStart(2,'0')}:${String(m).slice(0,2).padStart(2,'0')}`; }
+      if(/\//.test(s) && /:/.test(s)){ return s.split(' ').pop().slice(0,5); } // "mm/dd HH:MM" -> "HH:MM"
       return s.slice(0,5);
     }
     function onlyDigits(t){return (t||'').replace(/\D/g,'')}
@@ -757,7 +750,6 @@
     const emailRegex=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const roomRegex=/^(0000|501|502|503|505|506|507|508|509|510|511|512|515|516|517|518|519|520|521|522|523|525|526|527|528|601|602|603|605|606|607|608|609|610|611|612|615|616|617|618|619|620|621|622|623|625|626|627|628|701|702|703|705|706|707|708|709|710|711|712|715|716|717|718|719|720|721|722|723|725|726|727|728|801|802|803|805|806|807|808|809|810|811|812|815|816|817|818|819|820|821|822|823|825|826|827|828|901|902|903|905|906|907|908|909|910|911|912|915|916|917|918|919|920|921|922|923|925|926|927|928|1001|1002|1003|1005|1006|1007|1008|1009|1010|1011|1012|1015|1016|1017|1018|1019|1020|1021|1022|1023|1025|1026|1027|1028|1101|1102|1103|1105|1106|1107|1108|1109|1110|1111|1112|1115|1116|1117|1118|1119|1120|1121|1122|1123|1125|1126|1127|1128|1201|1202|1206|1207|1208|1209|1210|1211|1212|1215|1216|1217|1218|1219|1220|1221|1222|1223|1225|1226|1227|1228|1301|1302|1303|1305|1306|1307|1308|1309|1310|1311|1312|1315|1316|1317|1318|1319|1320|1321|1322|1323|1325|1326|1327|1328)$/;
     const nameRegex=/^[\u4e00-\u9fa5a-zA-Z\s]*$/;
-
 
     function validateName(input){
       const value = input.value || "";
@@ -844,34 +836,30 @@
       return dt.getTime() < Date.now();
     }
 
+    // ★ 個資遮罩（要求：以 * 取代未顯示部分）
     function maskName(name){
-  const s = String(name||'').trim();
-  if(!s) return "";
-  if(/[\u4e00-\u9fa5]/.test(s)){
-    const prefix = s.charAt(0);
-    return prefix + '*'.repeat(Math.max(0, s.length - 1));
-  }
-  const prefix = s.slice(0,2);
-  return prefix + '*'.repeat(Math.max(0, s.length - 2));
-}
-function maskPhone(phone){
-  const p = String(phone||'');
-  return p.slice(-4);
-}
-(phone){
+      const s = String(name||'').trim();
+      if(!s) return "";
+      if(/[\u4e00-\u9fa5]/.test(s)){
+        return s.charAt(0) + '*'.repeat(Math.max(0, s.length-1));
+      }
+      const prefix = s.slice(0,3);
+      return prefix + '*'.repeat(Math.max(0, s.length-3));
+    }
+    function maskPhone(phone){
       const p = String(phone||'');
-      return p.slice(-4); // 僅後四碼
+      return p.slice(-4);
     }
     function maskEmail(email){
-  const e = String(email||'').trim().toLowerCase();
-  const at = e.indexOf('@');
-  if(at <= 0) return (e.slice(0,3) + '*');
-  const local = e.slice(0, at);
-  const domain = e.slice(at+1);
-  const prefix = local.slice(0,3);
-  const stars = '*'.repeat(Math.max(0, local.length - 3));
-  return `${prefix}${stars}@${domain}`;
-}
+      const e = String(email||'').trim();
+      const at = e.indexOf('@');
+      if(at <= 0) return e ? e[0] + '***' : '';
+      const name = e.slice(0, at);
+      const prefix = name.slice(0,3);
+      const stars = '*'.repeat(Math.max(0, name.length - 3));
+      const domain = e.slice(at+1).toLowerCase();
+      return `${prefix}${stars}@${domain}`;
+    }
 
     /* ====== 覆蓋層硬重置 ====== */
     function hardResetOverlays(){
@@ -879,14 +867,12 @@ function maskPhone(phone){
         const el = document.getElementById(id);
         if(!el) return;
         el.classList.remove('show');
-        el.style.display = (id==='successAnimation') ? 'none' : el.style.display; // 保險處理
+        el.style.display = (id==='successAnimation') ? 'none' : el.style.display;
       });
     }
 
     /* ====== 資料處理 ====== */
-    async function refreshDataIfNeeded(force=false){
-      const now = Date.now();
-      if(!force && (now-lastDataUpdate)<=UPDATE_INTERVAL) return false;
+    async function refreshData(){
       showLoading(true);
       try{
         const res = await fetch(API_URL);
@@ -895,7 +881,6 @@ function maskPhone(phone){
         const rows = raw.slice(1);
         allRows = rows.map(r=>{const o={}; headers.forEach((h,i)=>o[h]=r[i]); return o;})
                       .filter(r=>r["去程 / 回程"]&&r["日期"]&&r["班次"]&&r["站點"]);
-        lastDataUpdate = now;
         return true;
       }catch(e){
         alert("資料更新失敗，請稍後再試");
@@ -907,9 +892,7 @@ function maskPhone(phone){
 
     /* ====== 頁面切換 ====== */
     function showPage(id){
-      // 先確保所有覆蓋層關閉，避免攔截點擊
       hardResetOverlays();
-
       document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
       document.getElementById(id).classList.add("active");
       document.querySelectorAll(".nav-links button").forEach(b=>b.classList.remove("active"));
@@ -940,7 +923,7 @@ function maskPhone(phone){
     /* ====== 預約流程 ====== */
     async function startBooking(){
       document.getElementById('homeHero').style.display='none';
-      await refreshDataIfNeeded(true);
+      await refreshData();
       buildStep1();
       document.getElementById('step1').style.display='';
       window.scrollTo({top:0,behavior:'smooth'});
@@ -953,7 +936,6 @@ function maskPhone(phone){
     }
     function restart(){
       selectedDirection="";selectedDateRaw="";selectedStationRaw="";selectedScheduleTime="";selectedAvailableSeats=0;
-      // 關閉所有覆蓋層
       hardResetOverlays();
       document.getElementById('homeHero').style.display='';
       ['directionList','dateList','stationList','scheduleList'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=''; });
@@ -965,8 +947,6 @@ function maskPhone(phone){
     function buildStep1(){
       const list = document.getElementById('directionList');
       list.innerHTML='';
-      const items=[{zh:'去程', label:t('navReservation')+' - 去程'},{zh:'回程', label:t('navReservation')+' - 回程'}];
-      // 保留原本文案以避免變更多，直接顯示簡單文字
       const opts=[{zh:'去程', label:'去程（飯店出發）'},{zh:'回程', label:'回程（前往飯店）'}];
       opts.forEach(opt=>{
         const btn=document.createElement('button');
@@ -1015,7 +995,7 @@ function maskPhone(phone){
       if(entries.length===0){ showExpiredOverlay(true); return; }
 
       entries.forEach(r=>{
-        const time=fmtTimeLabel(r["班次"]);
+        const time=fmtTimeLabel(r["班次"]||r["車次"]);
         const availText=String(r["可預約人數"]||r["可約人數 / Available"]||'').trim();
         const avail=Number(onlyDigits(availText))||0;
         const btn=document.createElement('button');
@@ -1078,16 +1058,12 @@ function maskPhone(phone){
       if(!validateStep5())return;
       showVerifyLoading(true);
       try{
-        const res = await fetch(API_URL);
-        const raw = await res.json();
-        const headers=raw[0]; const rows=raw.slice(1);
-        allRows = rows.map(r=>{const o={};headers.forEach((h,i)=>o[h]=r[i]);return o;})
-                      .filter(r=>r["去程 / 回程"]&&r["日期"]&&r["班次"]&&r["站點"]);
+        await refreshData(); // 取最新座位
         const found = allRows.find(r=>
           String(r["去程 / 回程"]).trim()===selectedDirection &&
           fmtDateLabel(r["日期"])===selectedDateRaw &&
           String(r["站點"]).trim()===selectedStationRaw &&
-          fmtTimeLabel(r["班次"])===selectedScheduleTime
+          fmtTimeLabel(r["班次"]||r["車次"])===selectedScheduleTime
         );
         if(!found){ showVerifyLoading(false); showExpiredOverlay(true); return; }
         const availableText=found["可預約人數"]||found["可約人數 / Available"]||"0";
@@ -1130,6 +1106,22 @@ function maskPhone(phone){
       }
       document.getElementById('passengersErr').style.display = 'none';
 
+      // ★ 送出前再次驗證座位（需求 9）
+      await refreshData();
+      const check = allRows.find(r=>
+        String(r["去程 / 回程"]).trim()===selectedDirection &&
+        fmtDateLabel(r["日期"])===selectedDateRaw &&
+        String(r["站點"]).trim()===selectedStationRaw &&
+        fmtTimeLabel(r["班次"]||r["車次"])===selectedScheduleTime
+      );
+      if(!check){
+        alert('班次已不存在，請重新查詢'); return;
+      }
+      const latestAvail = Number(onlyDigits(String(check["可預約人數"]||check["可約人數 / Available"]||'0'))) || 0;
+      if(p > latestAvail){
+        alert(`此班次目前僅剩 ${latestAvail} 位，請重新選擇`); return;
+      }
+
       const identity = document.getElementById('identitySelect').value;
       const payload = {
         direction: selectedDirection,
@@ -1161,7 +1153,8 @@ function maskPhone(phone){
         if (result.status === 'success') {
           currentBookingData = {
             bookingId: result.booking_id || '',
-            schedule: `${selectedScheduleTime}`,
+            date: selectedDateRaw,
+            time: selectedScheduleTime, // ★ 僅 HH:MM
             direction: selectedDirection,
             pickLocation: payload.pickLocation,
             dropLocation: payload.dropLocation,
@@ -1171,11 +1164,11 @@ function maskPhone(phone){
             passengers: p,
             qrUrl: result.qr_url
           };
-          showSuccessAnimation(); // 3 秒成功動畫
-          setTimeout(() => {
+          showSuccessAnimation();
+          setTimeout(async () => {
             document.getElementById('ticketQrImg').src = currentBookingData.qrUrl;
             document.getElementById('ticketBookingId').textContent = currentBookingData.bookingId;
-            document.getElementById('ticketSchedule').textContent = currentBookingData.schedule;
+            document.getElementById('ticketSchedule').textContent = currentBookingData.time; // ★ 班次僅顯示時間
             document.getElementById('ticketDirection').textContent = currentBookingData.direction;
             document.getElementById('ticketPick').textContent = currentBookingData.pickLocation;
             document.getElementById('ticketDrop').textContent = currentBookingData.dropLocation;
@@ -1185,21 +1178,12 @@ function maskPhone(phone){
             document.getElementById('ticketPassengers').textContent = currentBookingData.passengers + ' 人';
             document.getElementById('step6').style.display = 'none';
             document.getElementById('successCard').style.display = '';
-            // 寄送成功預約信（含票卡圖片）
-            try {
-              await sendEmailWithExistingTicket('book', {
-                bookingId: currentBookingData.bookingId,
-                email: currentBookingData.email,
-                name: currentBookingData.name,
-                time: currentBookingData.schedule,
-                passengers: currentBookingData.passengers,
-                direction: currentBookingData.direction,
-                phone: currentBookingData.phone,
-                pickLocation: currentBookingData.pickLocation,
-                dropLocation: currentBookingData.dropLocation
-              }, currentLang);
-            } catch (e) { console.error(e); }
             window.scrollTo({top: 0, behavior: 'smooth'});
+            // ★ 成功後寄信（附圖）
+            try{
+              const dataUrl = await domtoimage.toPng(document.getElementById('ticketCard'), {bgcolor:'#fff', pixelRatio:2});
+              await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'mail', data:{ booking_id: currentBookingData.bookingId, lang: currentLang, kind:'book', ticket_png_base64: dataUrl }})});
+            }catch(e){ console.warn('寄信失敗(前端)：', e); }
           }, 3000);
         } else {
           const errorMessage = result.detail || result.message || '預約失敗，請稍後再試';
@@ -1232,108 +1216,9 @@ function maskPhone(phone){
     }
     function closeTicketToHome(){
       document.getElementById('successCard').style.display='none';
-      // 關閉所有覆蓋層，避免遮罩殘留阻擋點擊
       hardResetOverlays();
       restart();
     }
-
-    
-// === 郵件寄送：將票卡轉圖並呼叫後端 /api/ops email ===
-async function captureTicketPngFromElement(el) {
-  const isMobile = window.innerWidth <= 768;
-  const width = isMobile ? 350 : 480;
-  const height = isMobile ? 610 * 2 : 590 * 2;
-  return await domtoimage.toPng(el, {
-    bgcolor: '#ffffff',
-    width,
-    height,
-    quality: 1,
-    pixelRatio: 2,
-    style: { margin: '0', padding: '24px', transform: 'none' }
-  });
-}
-
-async function sendEmailWithExistingTicket(type, booking, lang) {
-  try {
-    const ticketEl = document.getElementById('ticketCard');
-    const pngDataUrl = await captureTicketPngFromElement(ticketEl);
-    const payload = {
-      type,
-      email: booking.email,
-      name: booking.name,
-      bookingId: booking.bookingId,
-      time: booking.time || booking.schedule || '',
-      passengers: booking.passengers,
-      direction: booking.direction,
-      phone: booking.phone,
-      pickLocation: booking.pickLocation,
-      dropLocation: booking.dropLocation,
-      lang: lang || currentLang,
-      ticket_png: pngDataUrl
-    };
-    await fetch(OPS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ action: 'email', data: payload })
-    });
-  } catch (e) {
-    console.error('sendEmailWithExistingTicket failed:', e);
-  }
-}
-
-async function sendEmailFromData(type, data, lang) {
-  // 產生一個臨時票卡轉圖（用於修改後寄圖）
-  try {
-    const tmp = document.createElement('div');
-    tmp.style.position = 'fixed';
-    tmp.style.left = '-20000px';
-    tmp.style.top = '0';
-    tmp.style.width = '520px';
-    tmp.innerHTML = `
-      <div class="ticket-card">
-        <div class="ticket-content">
-          <div class="ticket-qr"><img id="tmpQr" src="${(data.qrUrl || '') || '/images/qr-placeholder.png'}" alt="QR" style="width:200px;height:200px;border-radius:8px;border:1px solid #eee;background:#fff"/></div>
-          <div class="ticket-info">
-            <div class="ticket-field"><span class="ticket-label">${t('labelBookingId')}</span><span class="ticket-value">${data.bookingId||''}</span></div>
-            <div class="ticket-field"><span class="ticket-label">${t('labelScheduleDate')}</span><span class="ticket-value">${data.time||''}</span></div>
-            <div class="ticket-field"><span class="ticket-label">${t('labelDirection')}</span><span class="ticket-value">${data.direction||''}</span></div>
-            <div class="ticket-field"><span class="ticket-label">${t('labelPick')}</span><span class="ticket-value">${data.pickLocation||''}</span></div>
-            <div class="ticket-field"><span class="ticket-label">${t('labelDrop')}</span><span class="ticket-value">${data.dropLocation||''}</span></div>
-            <div class="ticket-field"><span class="ticket-label">${t('labelName')}</span><span class="ticket-value">${data.name||''}</span></div>
-            <div class="ticket-field"><span class="ticket-label">${t('labelPhone')}</span><span class="ticket-value">${data.phone||''}</span></div>
-            <div class="ticket-field"><span class="ticket-label">${t('labelEmail')}</span><span class="ticket-value">${data.email||''}</span></div>
-            <div class="ticket-field"><span class="ticket-label">${t('labelPassengersShort')}</span><span class="ticket-value">${data.passengers||''}</span></div>
-          </div>
-        </div>
-      </div>`;
-    document.body.appendChild(tmp);
-    await new Promise(res => setTimeout(res, 200));
-    const pngDataUrl = await captureTicketPngFromElement(tmp.querySelector('.ticket-card'));
-    tmp.remove();
-
-    const payload = {
-      type,
-      email: data.email,
-      name: data.name,
-      bookingId: data.bookingId,
-      time: data.time,
-      passengers: data.passengers,
-      direction: data.direction,
-      phone: data.phone,
-      pickLocation: data.pickLocation,
-      dropLocation: data.dropLocation,
-      lang: lang || currentLang,
-      ticket_png: pngDataUrl
-    };
-    await fetch(OPS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ action: 'email', data: payload })
-    });
-  } catch (e) {
-    console.error('sendEmailFromData failed:', e);
-  }
-}
 
     /* ====== 查詢：新頁面流程 ====== */
     function showCheckQueryForm(){
@@ -1354,7 +1239,7 @@ async function sendEmailFromData(type, data, lang) {
       document.getElementById('checkTicketStep').style.display='block';
       window.scrollTo({top:0,behavior:'smooth'});
     }
-    function closeCheckTicket(){ // 右上角 X 關閉回日期清單
+    function closeCheckTicket(){
       showCheckDateStep();
     }
 
@@ -1375,8 +1260,7 @@ async function sendEmailFromData(type, data, lang) {
     function buildTicketCard(row, {mask=false}={}){
       const statusCode = getStatusCode(row);
       const date = String(row["日期"]||'');
-      const timeRaw = String(row["班次"]||row["車次"]||'');
-      const time = fmtTimeLabel(timeRaw);
+      const time = fmtTimeLabel(String(row["班次"]||row["車次"]||'')); // ★ 班次顯示時間
       const expired = isExpired(date, time);
       const name = mask ? maskName(String(row["姓名"]||'')) : String(row["姓名"]||'');
       const phone = mask ? maskPhone(String(row["手機"]||'')) : String(row["手機"]||'');
@@ -1412,10 +1296,12 @@ async function sendEmailFromData(type, data, lang) {
 
       const content = document.createElement('div'); content.className='ticket-content';
       const qr = document.createElement('div'); qr.className='ticket-qr';
-      const placeholder = '/images/qr-placeholder.png';
-      let qrImgSrc = qrUrl;
-      if(statusCode==='cancelled' || !qrUrl){ qrImgSrc = placeholder; }
-      qr.innerHTML = `<img src="${qrImgSrc}" alt="QR" />`;
+      if(statusCode==='cancelled'){
+        // ★ 取消用 placeholder
+        qr.innerHTML = `<img src="/images/imagesqr-placeholder.png" alt="QR placeholder" />`;
+      }else{
+        qr.innerHTML = `<img src="${qrUrl}" alt="QR" />`;
+      }
       const info = document.createElement('div'); info.className='ticket-info';
       info.innerHTML = `
         <div class="ticket-field"><span class="ticket-label">${t('labelBookingId')}</span><span class="ticket-value">${bookingId}</span></div>
@@ -1431,7 +1317,6 @@ async function sendEmailFromData(type, data, lang) {
       content.appendChild(qr); content.appendChild(info); card.appendChild(content);
 
       const actions = document.createElement('div'); actions.className='ticket-actions';
-      // 取消或拒絕不提供下載
       if(statusCode!=='cancelled' && statusCode!=='rejected'){
         const dlBtn = document.createElement('button'); dlBtn.className='button'; dlBtn.textContent=ts('download');
         dlBtn.onclick = ()=>{ domtoimage.toPng(card,{bgcolor:'#fff', pixelRatio:2}).then((dataUrl)=>{ const a=document.createElement('a'); a.href=dataUrl; a.download=`ticket_${bookingId}.png`; a.click(); }); };
@@ -1442,7 +1327,7 @@ async function sendEmailFromData(type, data, lang) {
         mdBtn.onclick = ()=> openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax });
         actions.appendChild(mdBtn);
         const delBtn = document.createElement('button'); delBtn.className='button btn-ghost'; delBtn.textContent=ts('remove');
-        delBtn.onclick = ()=> deleteOrder(bookingId, row);
+        delBtn.onclick = ()=> deleteOrder(bookingId);
         actions.appendChild(delBtn);
       }
       card.appendChild(actions);
@@ -1462,7 +1347,7 @@ async function sendEmailFromData(type, data, lang) {
         const arr = Array.isArray(data) ? data : (data.results || []);
         lastQueryResults = arr;
         buildDateListFromResults(arr);
-        showCheckDateStep(); // 跳轉到日期頁（需求）
+        showCheckDateStep();
       }catch(e){ alert('查詢失敗：' + e.message); }
       finally{ showLoading(false); }
     }
@@ -1492,7 +1377,7 @@ async function sendEmailFromData(type, data, lang) {
     function openTicketsForDate(dateIso){
       currentQueryDate = dateIso;
       currentDateRows = lastQueryResults.filter(r=>fmtDateLabel(String(r["日期"]||''))===dateIso)
-                                        .sort((a,b)=> parseTripDateTime(dateIso, a["班次"]||a["車次"]||'00:00') - parseTripDateTime(dateIso, b["班次"]||b["車次"]||'00:00'));
+                                        .sort((a,b)=> parseTripDateTime(dateIso, fmtTimeLabel(a["班次"]||a["車次"]||'00:00')) - parseTripDateTime(dateIso, fmtTimeLabel(b["班次"]||b["車次"]||'00:00')));
       const mount = document.getElementById('checkTicketMount');
       mount.innerHTML='';
       currentDateRows.forEach(row=> mount.appendChild(buildTicketCard(row,{mask:true})));
@@ -1500,7 +1385,6 @@ async function sendEmailFromData(type, data, lang) {
     }
 
     function rerenderQueryPages(){
-      // 語言切換時重繪日期列表與票卡標題
       if(document.getElementById('checkDateStep').style.display!=='none'){
         buildDateListFromResults(lastQueryResults);
       }
@@ -1509,25 +1393,20 @@ async function sendEmailFromData(type, data, lang) {
       }
     }
 
-    // 刪除：顯示綠勾動畫後退出（回日期頁並重查）
-    async function deleteOrder(bookingId, rowRef){
+    // 刪除：顯示綠勾動畫後退出（回日期頁並重查），並寄取消信（無圖）
+    async function deleteOrder(bookingId){
       if(!confirm(`刪除預約 ${bookingId} ？`)) return;
       showLoading(true);
       try{
         const r = await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'delete', data:{booking_id:bookingId}})});
-        var rowRefEmail = rowRef ? String(rowRef['信箱']||'') : '';
         const j = await r.json();
         if(j.status==='success'){
-          // 成功刪除後寄送取消信（無票圖）
-          try {
-            const emailTo = (rowRefEmail||'').trim() || (String((lastQueryResults.find(r=>String(r['預約編號'])===bookingId)||{})['信箱']||'').trim());
-            if(emailTo){
-              await fetch(OPS_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'email', data:{ type:'cancel', email: emailTo, bookingId: bookingId, booking_id: bookingId, lang: currentLang } }) });
-            }
-          } catch (e) { console.error(e); }
+          // 寄取消信
+          try{
+            await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'mail', data:{ booking_id: bookingId, lang: currentLang, kind:'cancel' }})});
+          }catch(e){ console.warn('取消寄信失敗', e); }
           showSuccessAnimation();
           setTimeout(async ()=>{
-            // 重查並回日期頁
             await queryOrders();
             showCheckDateStep();
           }, 3000);
@@ -1537,13 +1416,12 @@ async function sendEmailFromData(type, data, lang) {
       }catch(e){ alert('刪除失敗：'+e.message); }finally{ showLoading(false); }
     }
 
-    /* ====== 修改：新頁面（非彈窗），寬度一致，可整頁捲動 ====== */
+    /* ====== 修改：新頁面 ====== */
     async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax}){
-      await refreshDataIfNeeded(true);
-      showPage('check'); // 留在 check 區域
+      await refreshData();
+      showPage('check');
       document.getElementById('queryForm').style.display='none';
       document.getElementById('checkDateStep').style.display='none';
-      // 動態建立編輯頁
       const holderId = 'editHolder';
       let holder = document.getElementById(holderId);
       if(!holder){
@@ -1598,7 +1476,7 @@ async function sendEmailFromData(type, data, lang) {
         const list=holder.querySelector('#md_schedules'); list.innerHTML='';
         const entries = allRows.filter(r=>String(r["去程 / 回程"]).trim()===mdDirection && fmtDateLabel(r["日期"])===mdDate && String(r["站點"]).trim()===mdStation).sort((a,b)=>fmtTimeLabel(a["班次"]).localeCompare(fmtTimeLabel(b["班次"])));
         entries.forEach(r=>{
-          const timeVal=fmtTimeLabel(r["班次"]);
+          const timeVal=fmtTimeLabel(r["班次"]||r["車次"]);
           const availText=String(r["可預約人數"]||r["可約人數 / Available"]||'').trim();
           const baseAvail=Number(onlyDigits(availText))||0;
           const sameAsOriginal = (rb===mdDirection) && (fmtDateLabel(date)===mdDate) && (mdStation===((rb==='回程')?pick:drop)) && (fmtTimeLabel(time)===timeVal);
@@ -1626,45 +1504,67 @@ async function sendEmailFromData(type, data, lang) {
         const newEmail = (holder.querySelector('#md_email').value||'').trim();
         if(!phoneRegex.test(newPhone)){ alert(t('errPhone')); return; }
         if(!emailRegex.test(newEmail)){ alert(t('errEmail')); return; }
-        if(passengers > (mdAvail||passengers)){ alert('超出可預約人數'); return; }
+
+        // ★ 送出前再次驗證座位（需求 9）
+        await refreshData();
+        const check = allRows.find(r=>
+          String(r["去程 / 回程"]).trim()===mdDirection &&
+          fmtDateLabel(r["日期"])===mdDate &&
+          String(r["站點"]).trim()===mdStation &&
+          fmtTimeLabel(r["班次"]||r["車次"])===mdTime
+        );
+        if(!check){ alert('班次已不存在，請重新查詢'); return; }
+        const baseAvail = Number(onlyDigits(String(check["可預約人數"]||check["可約人數 / Available"]||'0'))) || 0;
+        const sameAsOriginal = (rb===mdDirection) && (fmtDateLabel(date)===mdDate) && (mdStation===((rb==='回程')?pick:drop)) && (fmtTimeLabel(time)===mdTime);
+        const finalAvail = baseAvail + (sameAsOriginal ? pax : 0);
+        if(passengers > finalAvail){ alert(`此班次目前僅剩 ${finalAvail} 位，請重新選擇`); return; }
+
         const payload = {
           booking_id: bookingId, direction: mdDirection, date: mdDate, time: mdTime, passengers,
           pickLocation: mdDirection==='回程' ? mdStation : '福泰大飯店 Forte Hotel',
           dropLocation: mdDirection==='回程' ? '福泰大飯店 Forte Hotel' : mdStation,
           phone: newPhone, email: newEmail, station: mdStation
         };
-        showVerifyLoading(true); // ★ 需求 10 過場
+        showVerifyLoading(true);
         try{
           const r = await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'modify', data:payload})});
           const j = await r.json();
           if(j.status==='success'){
-          // 成功刪除後寄送取消信（無票圖）
-          try {
-            const emailTo = (rowRefEmail||'').trim() || (String((lastQueryResults.find(r=>String(r['預約編號'])===bookingId)||{})['信箱']||'').trim());
-            if(emailTo){
-              await fetch(OPS_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'email', data:{ type:'cancel', email: emailTo, bookingId: bookingId, booking_id: bookingId, lang: currentLang } }) });
-            }
-          } catch (e) { console.error(e); }
-            showSuccessAnimation(); // ★ 需求 8：3 秒綠勾
+            // ★ 準備一張暫時票卡圖供寄信
+            try{
+              const temp = document.createElement('div');
+              temp.style.position='absolute'; temp.style.left='-99999px'; temp.style.top='-99999px';
+              temp.innerHTML = `
+                <div class="ticket-card">
+                  <div class="status-pill status-booked">${ts('booked')}</div>
+                  <div class="ticket-header"><h2>${t('ticketTitle')}</h2></div>
+                  <div class="ticket-content">
+                    <div class="ticket-qr"><img src="${await buildQrUrl(j.booking_id || bookingId, newEmail)}" alt="QR"/></div>
+                    <div class="ticket-info">
+                      <div class="ticket-field"><span class="ticket-label">${t('labelBookingId')}</span><span class="ticket-value">${j.booking_id || bookingId}</span></div>
+                      <div class="ticket-field"><span class="ticket-label">${t('labelScheduleDate')}</span><span class="ticket-value">${mdTime}</span></div>
+                      <div class="ticket-field"><span class="ticket-label">${t('labelDirection')}</span><span class="ticket-value">${mdDirection}</span></div>
+                      <div class="ticket-field"><span class="ticket-label">${t('labelPick')}</span><span class="ticket-value">${payload.pickLocation}</span></div>
+                      <div class="ticket-field"><span class="ticket-label">${t('labelDrop')}</span><span class="ticket-value">${payload.dropLocation}</span></div>
+                      <div class="ticket-field"><span class="ticket-label">${t('labelName')}</span><span class="ticket-value">${(row["姓名"]||'')}</span></div>
+                      <div class="ticket-field"><span class="ticket-label">${t('labelPhone')}</span><span class="ticket-value">${newPhone}</span></div>
+                      <div class="ticket-field"><span class="ticket-label">${t('labelEmail')}</span><span class="ticket-value">${newEmail}</span></div>
+                      <div class="ticket-field"><span class="ticket-label">${t('labelPassengersShort')}</span><span class="ticket-value">${passengers}</span></div>
+                    </div>
+                  </div>
+                </div>`;
+              document.body.appendChild(temp);
+              const png = await domtoimage.toPng(temp.querySelector('.ticket-card'), {bgcolor:'#fff', pixelRatio:2});
+              document.body.removeChild(temp);
+              // 寄變更信
+              await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'mail', data:{ booking_id: j.booking_id || bookingId, lang: currentLang, kind:'modify', ticket_png_base64: png }})});
+            }catch(e){ console.warn('修改寄信失敗', e); }
+
+            showSuccessAnimation();
             setTimeout(async ()=>{
-                            // 成功後寄送修改確認信（含最新票卡圖片）
-              try {
-                await sendEmailFromData('modify', {
-                  bookingId: bookingId,
-                  email: newEmail,
-                  name: String(row['姓名']||''),
-                  time: mdTime,
-                  passengers: passengers,
-                  direction: mdDirection,
-                  phone: newPhone,
-                  pickLocation: (mdDirection==='回程') ? mdStation : '福泰大飯店 Forte Hotel',
-                  dropLocation: (mdDirection==='回程') ? '福泰大飯店 Forte Hotel' : mdStation,
-                  qrUrl: j.qr_url
-                }, currentLang);
-              } catch (e) { console.error(e); }
               holder.style.display='none';
               await queryOrders();
-              showCheckDateStep(); // 關閉該筆，返回日期
+              showCheckDateStep();
             }, 3000);
           } else {
             alert(j.detail || '更新失敗');
@@ -1677,7 +1577,20 @@ async function sendEmailFromData(type, data, lang) {
       window.scrollTo({top:0,behavior:'smooth'});
     }
 
-    /* ====== 捲動監聽（顯示返回頂端鈕） ====== */
+    async function sha256Hex(s){
+      const data = new TextEncoder().encode(String(s||''));
+      const hash = await crypto.subtle.digest('SHA-256', data);
+      const arr = Array.from(new Uint8Array(hash));
+      return arr.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    async function buildQrUrl(bookingId, email){
+      const hex = await sha256Hex(String(email||''));
+      const em6 = hex.slice(0,6);
+      const content = `FT:${bookingId}:${em6}`;
+      return `${QR_ORIGIN}/api/qr/${encodeURIComponent(content)}`;
+    }
+
+    /* ====== 捲動監聽 ====== */
     function handleScroll(){
       const btn = document.getElementById('backToTop');
       const y = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
@@ -1696,11 +1609,16 @@ async function sendEmailFromData(type, data, lang) {
       if(ci) ci.value = tday;
       if(co) co.value = tday;
       if(dining) dining.value = tday;
-      // 初始即確保覆蓋層關閉
       hardResetOverlays();
       showPage('reservation');
       applyI18N();
       handleScroll();
+    }
+
+    function resetQuery(){
+      document.getElementById('qBookId').value='';
+      document.getElementById('qPhone').value='';
+      document.getElementById('qEmail').value='';
     }
 
     document.addEventListener('DOMContentLoaded', () => {
