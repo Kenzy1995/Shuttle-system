@@ -171,7 +171,7 @@
     .ticket-field { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
     .ticket-field:last-child { border-bottom: none; }
     .ticket-label { font-weight: 800; color: var(--text); min-width: 120px; font-size: 18px; }
-    .ticket-value { flex: 1; text-align: right; color: var(--muted); font-size: 18px; }
+    .ticket-value { flex: 1; text-align: right; color: var(--muted); font-size: 18px; word-break: break-all; overflow-wrap: anywhere; max-width: 100%; }
     .ticket-actions { margin-top: 24px; display: flex; gap: 12px; justify-content: center; flex-direction: row-reverse; }
 
     /* 查詢結果（舊清單保留但不使用） */
@@ -845,20 +845,33 @@
     }
 
     function maskName(name){
-      const s = String(name||'').trim();
-      if(/[\u4e00-\u9fa5]/.test(s)){ return s ? s.charAt(0) : ""; } // 中文顯示姓氏
-      return s.slice(0,3); // 英文前三碼
-    }
-    function maskPhone(phone){
+  const s = String(name||'').trim();
+  if(!s) return "";
+  if(/[\u4e00-\u9fa5]/.test(s)){
+    const prefix = s.charAt(0);
+    return prefix + '*'.repeat(Math.max(0, s.length - 1));
+  }
+  const prefix = s.slice(0,2);
+  return prefix + '*'.repeat(Math.max(0, s.length - 2));
+}
+function maskPhone(phone){
+  const p = String(phone||'');
+  return p.slice(-4);
+}
+(phone){
       const p = String(phone||'');
       return p.slice(-4); // 僅後四碼
     }
     function maskEmail(email){
-      const e = String(email||'');
-      const at = e.indexOf('@');
-      if(at <= 0) return e.slice(0,4);
-      return e.slice(0,4) + e.slice(at); // 前四碼 + @ 之後
-    }
+  const e = String(email||'').trim().toLowerCase();
+  const at = e.indexOf('@');
+  if(at <= 0) return (e.slice(0,3) + '*');
+  const local = e.slice(0, at);
+  const domain = e.slice(at+1);
+  const prefix = local.slice(0,3);
+  const stars = '*'.repeat(Math.max(0, local.length - 3));
+  return `${prefix}${stars}@${domain}`;
+}
 
     /* ====== 覆蓋層硬重置 ====== */
     function hardResetOverlays(){
@@ -1148,7 +1161,7 @@
         if (result.status === 'success') {
           currentBookingData = {
             bookingId: result.booking_id || '',
-            schedule: `${selectedDateRaw} ${selectedScheduleTime}`,
+            schedule: `${selectedScheduleTime}`,
             direction: selectedDirection,
             pickLocation: payload.pickLocation,
             dropLocation: payload.dropLocation,
@@ -1172,6 +1185,20 @@
             document.getElementById('ticketPassengers').textContent = currentBookingData.passengers + ' 人';
             document.getElementById('step6').style.display = 'none';
             document.getElementById('successCard').style.display = '';
+            // 寄送成功預約信（含票卡圖片）
+            try {
+              await sendEmailWithExistingTicket('book', {
+                bookingId: currentBookingData.bookingId,
+                email: currentBookingData.email,
+                name: currentBookingData.name,
+                time: currentBookingData.schedule,
+                passengers: currentBookingData.passengers,
+                direction: currentBookingData.direction,
+                phone: currentBookingData.phone,
+                pickLocation: currentBookingData.pickLocation,
+                dropLocation: currentBookingData.dropLocation
+              }, currentLang);
+            } catch (e) { console.error(e); }
             window.scrollTo({top: 0, behavior: 'smooth'});
           }, 3000);
         } else {
@@ -1209,6 +1236,104 @@
       hardResetOverlays();
       restart();
     }
+
+    
+// === 郵件寄送：將票卡轉圖並呼叫後端 /api/ops email ===
+async function captureTicketPngFromElement(el) {
+  const isMobile = window.innerWidth <= 768;
+  const width = isMobile ? 350 : 480;
+  const height = isMobile ? 610 * 2 : 590 * 2;
+  return await domtoimage.toPng(el, {
+    bgcolor: '#ffffff',
+    width,
+    height,
+    quality: 1,
+    pixelRatio: 2,
+    style: { margin: '0', padding: '24px', transform: 'none' }
+  });
+}
+
+async function sendEmailWithExistingTicket(type, booking, lang) {
+  try {
+    const ticketEl = document.getElementById('ticketCard');
+    const pngDataUrl = await captureTicketPngFromElement(ticketEl);
+    const payload = {
+      type,
+      email: booking.email,
+      name: booking.name,
+      bookingId: booking.bookingId,
+      time: booking.time || booking.schedule || '',
+      passengers: booking.passengers,
+      direction: booking.direction,
+      phone: booking.phone,
+      pickLocation: booking.pickLocation,
+      dropLocation: booking.dropLocation,
+      lang: lang || currentLang,
+      ticket_png: pngDataUrl
+    };
+    await fetch(OPS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ action: 'email', data: payload })
+    });
+  } catch (e) {
+    console.error('sendEmailWithExistingTicket failed:', e);
+  }
+}
+
+async function sendEmailFromData(type, data, lang) {
+  // 產生一個臨時票卡轉圖（用於修改後寄圖）
+  try {
+    const tmp = document.createElement('div');
+    tmp.style.position = 'fixed';
+    tmp.style.left = '-20000px';
+    tmp.style.top = '0';
+    tmp.style.width = '520px';
+    tmp.innerHTML = `
+      <div class="ticket-card">
+        <div class="ticket-content">
+          <div class="ticket-qr"><img id="tmpQr" src="${(data.qrUrl || '') || '/images/qr-placeholder.png'}" alt="QR" style="width:200px;height:200px;border-radius:8px;border:1px solid #eee;background:#fff"/></div>
+          <div class="ticket-info">
+            <div class="ticket-field"><span class="ticket-label">${t('labelBookingId')}</span><span class="ticket-value">${data.bookingId||''}</span></div>
+            <div class="ticket-field"><span class="ticket-label">${t('labelScheduleDate')}</span><span class="ticket-value">${data.time||''}</span></div>
+            <div class="ticket-field"><span class="ticket-label">${t('labelDirection')}</span><span class="ticket-value">${data.direction||''}</span></div>
+            <div class="ticket-field"><span class="ticket-label">${t('labelPick')}</span><span class="ticket-value">${data.pickLocation||''}</span></div>
+            <div class="ticket-field"><span class="ticket-label">${t('labelDrop')}</span><span class="ticket-value">${data.dropLocation||''}</span></div>
+            <div class="ticket-field"><span class="ticket-label">${t('labelName')}</span><span class="ticket-value">${data.name||''}</span></div>
+            <div class="ticket-field"><span class="ticket-label">${t('labelPhone')}</span><span class="ticket-value">${data.phone||''}</span></div>
+            <div class="ticket-field"><span class="ticket-label">${t('labelEmail')}</span><span class="ticket-value">${data.email||''}</span></div>
+            <div class="ticket-field"><span class="ticket-label">${t('labelPassengersShort')}</span><span class="ticket-value">${data.passengers||''}</span></div>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(tmp);
+    await new Promise(res => setTimeout(res, 200));
+    const pngDataUrl = await captureTicketPngFromElement(tmp.querySelector('.ticket-card'));
+    tmp.remove();
+
+    const payload = {
+      type,
+      email: data.email,
+      name: data.name,
+      bookingId: data.bookingId,
+      time: data.time,
+      passengers: data.passengers,
+      direction: data.direction,
+      phone: data.phone,
+      pickLocation: data.pickLocation,
+      dropLocation: data.dropLocation,
+      lang: lang || currentLang,
+      ticket_png: pngDataUrl
+    };
+    await fetch(OPS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ action: 'email', data: payload })
+    });
+  } catch (e) {
+    console.error('sendEmailFromData failed:', e);
+  }
+}
 
     /* ====== 查詢：新頁面流程 ====== */
     function showCheckQueryForm(){
@@ -1250,7 +1375,8 @@
     function buildTicketCard(row, {mask=false}={}){
       const statusCode = getStatusCode(row);
       const date = String(row["日期"]||'');
-      const time = String(row["班次"]||row["車次"]||'');
+      const timeRaw = String(row["班次"]||row["車次"]||'');
+      const time = fmtTimeLabel(timeRaw);
       const expired = isExpired(date, time);
       const name = mask ? maskName(String(row["姓名"]||'')) : String(row["姓名"]||'');
       const phone = mask ? maskPhone(String(row["手機"]||'')) : String(row["手機"]||'');
@@ -1286,15 +1412,14 @@
 
       const content = document.createElement('div'); content.className='ticket-content';
       const qr = document.createElement('div'); qr.className='ticket-qr';
-      if(statusCode==='cancelled'){
-        qr.innerHTML = ''; // 取消不顯示 QR
-      }else{
-        qr.innerHTML = `<img src="${qrUrl}" alt="QR" />`;
-      }
+      const placeholder = '/images/qr-placeholder.png';
+      let qrImgSrc = qrUrl;
+      if(statusCode==='cancelled' || !qrUrl){ qrImgSrc = placeholder; }
+      qr.innerHTML = `<img src="${qrImgSrc}" alt="QR" />`;
       const info = document.createElement('div'); info.className='ticket-info';
       info.innerHTML = `
         <div class="ticket-field"><span class="ticket-label">${t('labelBookingId')}</span><span class="ticket-value">${bookingId}</span></div>
-        <div class="ticket-field"><span class="ticket-label">${t('labelScheduleDate')}</span><span class="ticket-value">${date} ${time}</span></div>
+        <div class="ticket-field"><span class="ticket-label">${t('labelScheduleDate')}</span><span class="ticket-value">${time}</span></div>
         <div class="ticket-field"><span class="ticket-label">${t('labelDirection')}</span><span class="ticket-value">${rb}</span></div>
         <div class="ticket-field"><span class="ticket-label">${t('labelPick')}</span><span class="ticket-value">${pick}</span></div>
         <div class="ticket-field"><span class="ticket-label">${t('labelDrop')}</span><span class="ticket-value">${drop}</span></div>
@@ -1317,7 +1442,7 @@
         mdBtn.onclick = ()=> openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax });
         actions.appendChild(mdBtn);
         const delBtn = document.createElement('button'); delBtn.className='button btn-ghost'; delBtn.textContent=ts('remove');
-        delBtn.onclick = ()=> deleteOrder(bookingId);
+        delBtn.onclick = ()=> deleteOrder(bookingId, row);
         actions.appendChild(delBtn);
       }
       card.appendChild(actions);
@@ -1385,13 +1510,21 @@
     }
 
     // 刪除：顯示綠勾動畫後退出（回日期頁並重查）
-    async function deleteOrder(bookingId){
+    async function deleteOrder(bookingId, rowRef){
       if(!confirm(`刪除預約 ${bookingId} ？`)) return;
       showLoading(true);
       try{
         const r = await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'delete', data:{booking_id:bookingId}})});
+        var rowRefEmail = rowRef ? String(rowRef['信箱']||'') : '';
         const j = await r.json();
         if(j.status==='success'){
+          // 成功刪除後寄送取消信（無票圖）
+          try {
+            const emailTo = (rowRefEmail||'').trim() || (String((lastQueryResults.find(r=>String(r['預約編號'])===bookingId)||{})['信箱']||'').trim());
+            if(emailTo){
+              await fetch(OPS_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'email', data:{ type:'cancel', email: emailTo, bookingId: bookingId, booking_id: bookingId, lang: currentLang } }) });
+            }
+          } catch (e) { console.error(e); }
           showSuccessAnimation();
           setTimeout(async ()=>{
             // 重查並回日期頁
@@ -1505,8 +1638,30 @@
           const r = await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'modify', data:payload})});
           const j = await r.json();
           if(j.status==='success'){
+          // 成功刪除後寄送取消信（無票圖）
+          try {
+            const emailTo = (rowRefEmail||'').trim() || (String((lastQueryResults.find(r=>String(r['預約編號'])===bookingId)||{})['信箱']||'').trim());
+            if(emailTo){
+              await fetch(OPS_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'email', data:{ type:'cancel', email: emailTo, bookingId: bookingId, booking_id: bookingId, lang: currentLang } }) });
+            }
+          } catch (e) { console.error(e); }
             showSuccessAnimation(); // ★ 需求 8：3 秒綠勾
             setTimeout(async ()=>{
+                            // 成功後寄送修改確認信（含最新票卡圖片）
+              try {
+                await sendEmailFromData('modify', {
+                  bookingId: bookingId,
+                  email: newEmail,
+                  name: String(row['姓名']||''),
+                  time: mdTime,
+                  passengers: passengers,
+                  direction: mdDirection,
+                  phone: newPhone,
+                  pickLocation: (mdDirection==='回程') ? mdStation : '福泰大飯店 Forte Hotel',
+                  dropLocation: (mdDirection==='回程') ? '福泰大飯店 Forte Hotel' : mdStation,
+                  qrUrl: j.qr_url
+                }, currentLang);
+              } catch (e) { console.error(e); }
               holder.style.display='none';
               await queryOrders();
               showCheckDateStep(); // 關閉該筆，返回日期
