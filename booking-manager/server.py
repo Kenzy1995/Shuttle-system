@@ -246,8 +246,8 @@ class CheckInPayload(BaseModel):
 
 class MailPayload(BaseModel):
     booking_id: str
-    lang: str = Field("zh", regex="^(zh|en|ja|ko)$")
-    kind: str = Field(..., regex="^(book|modify|cancel)$")
+    lang: str = Field("zh", pattern="^(zh|en|ja|ko)$")
+    kind: str = Field(..., pattern="^(book|modify|cancel)$")
     ticket_png_base64: Optional[str] = None
 
 class OpsRequest(BaseModel):
