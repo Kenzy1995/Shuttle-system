@@ -1250,6 +1250,7 @@ async function captureTicketPngFromElement(el) {
   });
 }
 
+// 修正後的 sendEmailWithExistingTicket 函數
 async function sendEmailWithExistingTicket(type, booking, lang) {
   try {
     const ticketEl = document.getElementById('ticketCard');
@@ -1276,8 +1277,9 @@ async function sendEmailWithExistingTicket(type, booking, lang) {
   } catch (e) {
     console.error('sendEmailWithExistingTicket failed:', e);
   }
-}
+} // 補上缺失的大括號
 
+// 修正後的 sendEmailFromData 函數
 async function sendEmailFromData(type, data, lang) {
   // 產生一個臨時票卡轉圖（用於修改後寄圖）
   try {
@@ -1330,8 +1332,8 @@ async function sendEmailFromData(type, data, lang) {
   } catch (e) {
     console.error('sendEmailFromData failed:', e);
   }
-}
-
+} // 補上缺失的大括號
+    
     /* ====== 查詢：新頁面流程 ====== */
     function showCheckQueryForm(){
       document.getElementById('queryForm').style.display='flex';
