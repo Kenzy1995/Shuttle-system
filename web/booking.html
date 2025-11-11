@@ -1171,7 +1171,7 @@
             qrUrl: result.qr_url
           };
           showSuccessAnimation(); // 3 秒成功動畫
-          setTimeout(() => {
+          setTimeout(async () => {
             document.getElementById('ticketQrImg').src = currentBookingData.qrUrl;
             document.getElementById('ticketBookingId').textContent = currentBookingData.bookingId;
             document.getElementById('ticketSchedule').textContent = currentBookingData.schedule;
