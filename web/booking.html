@@ -916,26 +916,14 @@
     // 成功動畫（3秒）
     function showSuccessAnimation() {
       const el = document.getElementById('successAnimation');
-      if (!el) return;
-
-      // 先清掉可能殘留的狀態，確保每次都能重新播放
-      el.classList.remove('show');
-      el.style.display = 'none';
-
-      // 觸發一次 reflow 讓動畫能重頭開始
-      // eslint-disable-next-line no-unused-expressions
-      void el.offsetWidth;
-
-      // 顯示並播放
-      el.style.display = 'flex';
+      el.style.display = 'flex';          // 先打開
       el.classList.add('show');
-
-      // 播放結束後關閉並還原狀態
       setTimeout(() => {
         el.classList.remove('show');
-        el.style.display = 'none';
+        el.style.display = 'none';        // 播完再關
       }, 3000);
     }
+
 
 
     /* ====== 預約流程 ====== */
@@ -1115,7 +1103,10 @@
         showVerifyLoading(false);
       }
     }
+    let bookingSubmitting = false;
+
     async function submitBooking(){
+      if (bookingSubmitting) return;          // 鎖：避免連點
       const pSel = document.getElementById('passengers');
       const p = Number(pSel.value || 0);
       if (!p || p < 1 || p > 4 || p > selectedAvailableSeats) {
@@ -1124,7 +1115,6 @@
       }
       document.getElementById('passengersErr').style.display = 'none';
 
-      // ★ 送出前再次驗證座位（需求 9）
       await refreshData();
       const check = allRows.find(r=>
         String(r["去程 / 回程"]).trim()===selectedDirection &&
