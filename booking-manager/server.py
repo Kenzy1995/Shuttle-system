@@ -57,6 +57,7 @@ HEADER_KEYS = {
     "下車索引",
     "涉及路段範圍",
     "QRCode編碼",
+    "備註",  # 新增備註欄位
 }
 
 # 站點索引（精準雙語字串，完全相同才匹配）
@@ -370,15 +371,22 @@ def ops(req: OpsRequest):
                 if col in hmap:
                     ws.update_cell(rowno, hmap[col], v)
 
-            # 寫入更新欄位
-            upd("預約狀態", BOOKED_TEXT)
+            # 寫入更新欄位 - 按照您的要求
+            upd("預約狀態", BOOKED_TEXT)  # 覆蓋訂單狀態
+            if p.passengers is not None: upd("預約人數", str(p.passengers))  # 覆蓋預約人數
+            if "備註" in hmap:  # 新增備註
+                current_note = ws.cell(rowno, hmap["備註"]).value or ""
+                new_note = f"{_tz_now_str()} 已修改"
+                if current_note:
+                    new_note = f"{current_note}; {new_note}"
+                upd("備註", new_note)
+            
             if p.direction: upd("往返", p.direction)
             if p.date: upd("日期", p.date)
             if time_hm: upd("班次", time_hm)
             if car_display: upd("車次", car_display)
             if p.pickLocation: upd("上車地點", p.pickLocation)
             if p.dropLocation: upd("下車地點", p.dropLocation)
-            if p.passengers is not None: upd("預約人數", str(p.passengers))
             if p.phone: upd("手機", p.phone)
             if p.email:
                 upd("信箱", p.email)
@@ -403,6 +411,12 @@ def ops(req: OpsRequest):
             rowno = target[0]
             if "預約狀態" in hmap:
                 ws.update_cell(rowno, hmap["預約狀態"], CANCELLED_TEXT)
+            if "備註" in hmap:  # 新增備註
+                current_note = ws.cell(rowno, hmap["備註"]).value or ""
+                new_note = f"{_tz_now_str()} 已取消"
+                if current_note:
+                    new_note = f"{current_note}; {new_note}"
+                ws.update_cell(rowno, hmap["備註"], new_note)
             if "最後操作時間" in hmap:
                 ws.update_cell(rowno, hmap["最後操作時間"], _tz_now_str() + " 已刪除")
             return {"status": "success", "booking_id": p.booking_id}
@@ -428,7 +442,7 @@ def ops(req: OpsRequest):
         else:
             raise HTTPException(400, f"未知 action：{action}")
 
-    except HTTPException:
+    except HTTPException: 
         raise
     except Exception as e:
         raise HTTPException(500, f"伺服器錯誤: {str(e)}")
