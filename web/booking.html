@@ -811,56 +811,42 @@
         input.style.borderColor='#ddd';
       }
     }
-    function todayISO(){
-      const t = new Date();
-      const y = t.getFullYear();
-      const m = String(t.getMonth()+1).padStart(2,'0');
-      const d = String(t.getDate()).padStart(2,'0');
-      return `${y}-${m}-${d}`;
+function parseTripDateTime(dateStr, timeStr){
+  const iso = fmtDateLabel(dateStr);
+  let y, m, d;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    const parts = iso.split('-').map(n => parseInt(n, 10));
+    y = parts[0]; m = parts[1]; d = parts[2];
+  } else {
+    const now = new Date();
+    y = now.getFullYear(); m = now.getMonth() + 1; d = now.getDate();
+  }
+
+  let H = 0, M = 0;
+  if (timeStr) {
+    const t = String(timeStr).trim().replace('：', ':');
+    if (/^\d{1,2}\/\d{1,2}/.test(t)) {
+      const [, hmPart] = t.split(' ');
+      const hm = (hmPart || '00:00').slice(0, 5);
+      const hhmm = hm.split(':');
+      H = parseInt(hhmm[0] || '0', 10);
+      M = parseInt(hhmm[1] || '0', 10);
+    } else if (/^\d{1,2}:\d{1,2}/.test(t)) {
+      const hm = t.slice(0, 5);
+      const hhmm = hm.split(':');
+      H = parseInt(hhmm[0] || '0', 10);
+      M = parseInt(hhmm[1] || '0', 10);
     }
-    function parseTripDateTime(dateStr, timeStr){
-      // 1) 先從 dateStr 拿到年月日（優先）
-      const iso = fmtDateLabel(dateStr); // 期望成為 YYYY-MM-DD
-       let y, m, d;
+  }
 
-       if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
-        const parts = iso.split('-').map(n => parseInt(n, 10));
-        y = parts[0]; m = parts[1]; d = parts[2];
-       } else {
-        // 後備：用今天
-        const now = new Date();
-         y = now.getFullYear(); m = now.getMonth() + 1; d = now.getDate();
-       }
+  return new Date(y, m - 1, d, H, M, 0);
+}
 
-      // 2) 從 timeStr 只取 HH:MM；若 timeStr 是 "MM/DD HH:MM"，忽略其中的 MM/DD
-      let H = 0, M = 0;
-       if (timeStr) {
-         const t = String(timeStr).trim().replace('：', ':');
-        if (/^\d{1,2}\/\d{1,2}/.test(t)) {
-          const [, hmPart] = t.split(' ');
-           const hm = (hmPart || '00:00').slice(0, 5);
-           const hhmm = hm.split(':');
-           H = parseInt(hhmm[0] || '0', 10);
-           M = parseInt(hhmm[1] || '0', 10);
-        } else if (/^\d{1,2}:\d{1,2}/.test(t)) {
-          const hm = t.slice(0, 5);
-           const hhmm = hm.split(':');
-           H = parseInt(hhmm[0] || '0', 10);
-          M = parseInt(hhmm[1] || '0', 10);
-        }
-      }
+function isExpired(dateStr, timeStr){
+  const dt = parseTripDateTime(dateStr, timeStr);
+  return dt.getTime() < Date.now();
+}
 
-      return new Date(y, m - 1, d, H, M, 0);
-    }
-
-      
-            const [H,M] = (hm||'00:00').split(':');
-            return new Date(y, mm-1, dd, parseInt(H||'0',10), parseInt(M||'0',10), 0);
-          }
-    function isExpired(dateStr, timeStr){
-      const dt = parseTripDateTime(dateStr, timeStr);
-      return dt.getTime() < Date.now();
-    }
 
     // ★ 個資遮罩（要求：以 * 取代未顯示部分）
     function maskName(name){
