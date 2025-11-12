@@ -1,13 +1,12 @@
 from __future__ import annotations
 import io
 import os
-import re
-import json
 import time
-import urllib.parse
-import urllib.request
+import base64
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
+import urllib.parse
+import hashlib
 
 import qrcode
 from fastapi import FastAPI, HTTPException, Response
@@ -15,19 +14,31 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
 import gspread
 import google.auth
-import hashlib
+
+# ==== Gmail（可選） ====
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+try:
+    from googleapiclient.discovery import build  # type: ignore
+    _GMAIL_AVAILABLE = True
+except Exception:
+    _GMAIL_AVAILABLE = False
 
 # ========== 常數與工具 ==========
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/gmail.send",  # 可寄信
 ]
 SPREADSHEET_ID = "1xp54tKOczklmT8uacW-HMxwV8r0VOR2ui33jYcE2pUQ"
 SHEET_NAME = "預約審核(櫃台)"
+
 BASE_URL = "https://booking-manager-995728097341.asia-east1.run.app"
 
-# 供容量再次驗證的聚合 API（與前端一致）
-AGGREGATOR_URL = "https://booking-api-995728097341.asia-east1.run.app/api/sheet"
+EMAIL_FROM_NAME = "汐止福泰大飯店櫃檯"
+EMAIL_FROM_ADDR = "fortehotels.shuttle@gmail.com"
 
 # 表頭列（1-based）
 HEADER_ROW = 2
@@ -53,7 +64,6 @@ HEADER_KEYS = {
     "預約人數",
     "櫃台審核",
     "預約狀態",
-    "訂單狀態",   # ★ 新增：配合需求 10
     "乘車狀態",
     "身分",
     "房號",
@@ -64,7 +74,9 @@ HEADER_KEYS = {
     "下車索引",
     "涉及路段範圍",
     "QRCode編碼",
-    "備註",       # ★ 新增：配合需求 10
+    "備註",
+    # 只保留這一欄作為寄信紀錄
+    "寄信狀態",
 }
 
 # 站點索引（精準雙語字串）
@@ -102,8 +114,11 @@ def _time_hm_from_any(s: str) -> str:
     return s
 
 def _display_trip_str(date_iso: str, time_hm: str) -> str:
+    # 供 sheet 顯示的「車次」：純文字 mm/dd HH:MM
+    if not date_iso or not time_hm:
+        return ""
     y, m, d = date_iso.split("-")
-    return f"'%s/%s %s" % (int(m), int(d), time_hm)
+    return f"'{int(m)}/{int(d)} {time_hm}"
 
 def _mmdd_prefix(date_iso: str) -> str:
     y, m, d = date_iso.split("-")
@@ -119,22 +134,6 @@ def _compute_indices_and_segments(pickup: str, dropoff: str):
     segs = list(range(pick_idx, drop_idx))
     seg_str = ",".join(str(i) for i in segs)
     return pick_idx, drop_idx, seg_str
-
-def _norm_date(s: str) -> str:
-    s = (s or "").strip()
-    if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
-        return s
-    if re.match(r"^\d{4}/\d{1,2}/\d{1,2}$", s):
-        y, m, d = s.split("/")
-        return f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
-    if re.match(r"^\d{1,2}/\d{1,2}/\d{4}$", s):
-        m, d, y = s.split("/")
-        return f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
-    return s
-
-def _digits(n: str) -> int:
-    m = re.findall(r"\d+", str(n or ""))
-    return int("".join(m)) if m else 0
 
 # ========== Google Sheets ==========
 def open_sheet() -> gspread.Worksheet:
@@ -195,93 +194,6 @@ def _get_max_seq_for_date(ws: gspread.Worksheet, date_iso: str) -> int:
                 pass
     return max_seq
 
-# ========== 聚合容量查詢 ==========
-def _fetch_agg_rows() -> Tuple[List[str], List[List[str]]]:
-    """取回 aggregator 原始資料：第一列 headers、其後 rows。失敗則拋錯。"""
-    try:
-        with urllib.request.urlopen(AGGREGATOR_URL, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        if not (isinstance(data, list) and data and isinstance(data[0], list)):
-            raise RuntimeError("Aggregator 回傳格式異常")
-        headers = data[0]
-        rows = data[1:]
-        return headers, rows
-    except Exception as e:
-        raise HTTPException(503, f"目前無法確認剩餘座位，請稍後再試：{e}")
-
-def _col_idx(headers: List[str], candidates: List[str]) -> Optional[int]:
-    for name in candidates:
-        if name in headers:
-            return headers.index(name)
-    return None
-
-def _match_value(a: str, b: str) -> bool:
-    return (a or "").strip() == (b or "").strip()
-
-def _available_seats_from_agg(direction: str, date_iso: str, station: str, time_hm: str) -> int:
-    """以方向/日期/站點/時間查 aggregator 的『可預約人數』。找不到回 0。"""
-    headers, rows = _fetch_agg_rows()
-    idx_dir = _col_idx(headers, ["去程 / 回程"])
-    idx_date = _col_idx(headers, ["日期"])
-    idx_time = _col_idx(headers, ["班次"])
-    idx_st  = _col_idx(headers, ["站點"])
-    idx_av  = _col_idx(headers, ["可預約人數", "可約人數 / Available"])
-    if None in (idx_dir, idx_date, idx_time, idx_st, idx_av):
-        raise HTTPException(503, "Aggregator 欄位不足，無法確認剩餘座位")
-
-    tgt_date = _norm_date(date_iso)
-    tgt_time = _time_hm_from_any(time_hm)
-    for r in rows:
-        r_dir  = r[idx_dir] if idx_dir < len(r) else ""
-        r_date = _norm_date(r[idx_date] if idx_date < len(r) else "")
-        r_time = _time_hm_from_any(r[idx_time] if idx_time < len(r) else "")
-        r_st   = r[idx_st] if idx_st < len(r) else ""
-        if _match_value(r_dir, direction) and _match_value(r_date, tgt_date) and _match_value(r_time, tgt_time) and _match_value(r_st, station):
-            return max(0, _digits(r[idx_av] if idx_av < len(r) else "0"))
-    # 沒找到就視為 0（不可預約）
-    return 0
-
-def _check_capacity_for_booking(direction: str, date_iso: str, time_hm: str, pick: str, drop: str, passengers: int):
-    """新增預約之容量檢查。"""
-    # 聚合站點鍵與前端一致：
-    agg_station = pick if direction == "回程" else drop
-    avail = _available_seats_from_agg(direction, date_iso, agg_station, time_hm)
-    if passengers > avail:
-        raise HTTPException(400, f"超過可預約人數（剩餘 {avail} 人）")
-
-def _check_capacity_for_modify(ws: gspread.Worksheet, hmap: Dict[str, int], rowno: int, new_direction: str, new_date: str, new_time: str, new_pick: str, new_drop: str, new_passengers: int):
-    """修改預約之容量檢查：同班次可 +本人佔位"""
-    def get_cell(col: str) -> str:
-        if col not in hmap:
-            return ""
-        return ws.cell(rowno, hmap[col]).value or ""
-
-    old_direction = get_cell("往返")
-    old_date      = get_cell("日期")
-    old_time      = get_cell("班次")
-    old_pick      = get_cell("上車地點")
-    old_drop      = get_cell("下車地點")
-    try:
-        old_pax = int(get_cell("預約人數") or "0")
-    except:
-        old_pax = 0
-
-    # aggregator 站點鍵
-    old_station = old_pick if old_direction == "回程" else old_drop
-    new_station = new_pick if new_direction == "回程" else new_drop
-
-    same_trip = (
-        _match_value(old_direction, new_direction) and
-        _match_value(_norm_date(old_date), _norm_date(new_date)) and
-        _match_value(_time_hm_from_any(old_time), _time_hm_from_any(new_time)) and
-        _match_value(old_station, new_station)
-    )
-
-    base_avail = _available_seats_from_agg(new_direction, new_date, new_station, new_time)
-    allowed = base_avail + (old_pax if same_trip else 0)
-    if new_passengers > allowed:
-        raise HTTPException(400, f"超過可預約人數（此班次剩餘 {base_avail}，{ '含本人 ' + str(old_pax) if same_trip else '不可含本人' }）")
-
 # ========== Pydantic ==========
 class BookPayload(BaseModel):
     direction: str
@@ -321,7 +233,6 @@ class ModifyPayload(BaseModel):
     dropLocation: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
-    # 備註可由後端自動寫入時間說明
 
 class DeletePayload(BaseModel):
     booking_id: str
@@ -330,13 +241,147 @@ class CheckInPayload(BaseModel):
     code: Optional[str] = None
     booking_id: Optional[str] = None
 
+class MailPayload(BaseModel):
+    booking_id: str
+    lang: str = Field("zh", pattern="^(zh|en|ja|ko)$")
+    kind: str = Field(..., pattern="^(book|modify|cancel)$")
+    ticket_png_base64: Optional[str] = None
+
 class OpsRequest(BaseModel):
     action: str
     data: Dict[str, Any]
 
-# ========== FastAPI ==========
-app = FastAPI(title="Shuttle Ops API", version="1.2.0")
+# ========== Gmail ==========
+def _gmail_service():
+    if not _GMAIL_AVAILABLE:
+        raise RuntimeError("Gmail API 模組不可用（缺少 googleapiclient）")
+    credentials, _ = google.auth.default(scopes=SCOPES)
+    return build("gmail", "v1", credentials=credentials)
 
+def _send_email_gmail(to_email: str, subject: str, html_body: str,
+                      attachment: Optional[bytes] = None,
+                      attachment_filename: str = "ticket.png"):
+    if not _GMAIL_AVAILABLE:
+        raise RuntimeError("Gmail API 未安裝，無法寄信")
+    msg = MIMEMultipart()
+    msg["To"] = to_email
+    msg["From"] = f"{EMAIL_FROM_NAME} <{EMAIL_FROM_ADDR}>"
+    msg["Subject"] = subject
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+    if attachment:
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(attachment)
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", f'attachment; filename="{attachment_filename}"')
+        msg.attach(part)
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+    svc = _gmail_service()
+    svc.users().messages().send(userId="me", body={"raw": raw}).execute()
+
+def _compose_mail_html(info: Dict[str, str], lang: str, kind: str) -> (str, str):
+    subjects = {
+        "book": {
+            "zh": "汐止福泰大飯店接駁車預約確認",
+            "en": "Forte Hotel Xizhi Shuttle Reservation Confirmation",
+            "ja": "汐止フルオンホテル シャトル予約確認",
+            "ko": "포르테 호텔 시즈 셔틀 예약 확인",
+        },
+        "modify": {
+            "zh": "汐止福泰大飯店接駁車預約變更確認",
+            "en": "Forte Hotel Xizhi Shuttle Reservation Updated",
+            "ja": "汐止フルオンホテ� ル シャトル予約変更完了",
+            "ko": "포르테 호텔 시즈 셔틀 예약 변경 완료",
+        },
+        "cancel": {
+            "zh": "汐止福泰大飯店接駁車預約已取消",
+            "en": "Forte Hotel Xizhi Shuttle Reservation Canceled",
+            "ja": "汐止フルオンホテル シャトル予約キャンセル",
+            "ko": "포르테 호텔 시즈 셔틀 예약 취소됨",
+        },
+    }
+    subject = f'{subjects[kind]["zh"]} / {subjects[kind].get(lang, subjects[kind]["en"])}'
+
+    zh = f"""
+    <div style="color:black">
+      <p>尊敬的 {info.get('name','')} 貴賓，您好！</p>
+      <p>以下為您的接駁車預約資訊：</p>
+      <ul>
+        <li>預約編號：{info.get('booking_id','')}</li>
+        <li>預約班次：{info.get('date','')} {info.get('time','')} (GMT+8)</li>
+        <li>預約人數：{info.get('pax','')}</li>
+        <li>往返方向：{info.get('direction','')}</li>
+        <li>上車站點：{info.get('pick','')}</li>
+        <li>下車站點：{info.get('drop','')}</li>
+        <li>手機：{info.get('phone','')}</li>
+        <li>信箱：{info.get('email','')}</li>
+      </ul>
+      <p>如有任何問題，請致電 (02-2691-9222 #1)。</p>
+      <p>汐止福泰大飯店 敬上</p>
+    </div>
+    """
+    add_map = {
+        "en": f"""
+        <div style="color:black">
+          <p>Dear {info.get('name','')},</p>
+          <p>Here are your shuttle reservation details:</p>
+          <ul>
+            <li>Reservation Number: {info.get('booking_id','')}</li>
+            <li>Reservation Time: {info.get('date','')} {info.get('time','')} (GMT+8)</li>
+            <li>Number of Guests: {info.get('pax','')}</li>
+            <li>Direction: {info.get('direction','')}</li>
+            <li>Pickup: {info.get('pick','')}</li>
+            <li>Dropoff: {info.get('drop','')}</li>
+            <li>Phone: {info.get('phone','')}</li>
+            <li>Email: {info.get('email','')}</li>
+          </ul>
+          <p>If you have questions, call (02-2691-9222 #1).</p>
+          <p>Forte Hotel Xizhi</p>
+        </div>
+        """,
+        "ja": f"""
+        <div style="color:black">
+          <p>{info.get('name','')} 様</p>
+          <p>シャトル予約の詳細は以下の通りです。</p>
+          <ul>
+            <li>予約番号：{info.get('booking_id','')}</li>
+            <li>便：{info.get('date','')} {info.get('time','')} (GMT+8)</li>
+            <li>人数：{info.get('pax','')}</li>
+            <li>方向：{info.get('direction','')}</li>
+            <li>乗車：{info.get('pick','')}</li>
+            <li>降車：{info.get('drop','')}</li>
+            <li>電話：{info.get('phone','')}</li>
+            <li>メール：{info.get('email','')}</li>
+          </ul>
+          <p>ご不明点は (02-2691-9222 #1) まで。</p>
+          <p>汐止フルオンホテル</p>
+        </div>
+        """,
+        "ko": f"""
+        <div style="color:black">
+          <p>{info.get('name','')} 고객님,</p>
+          <p>셔틀 예약 내역은 아래와 같습니다.</p>
+          <ul>
+            <li>예약번호: {info.get('booking_id','')}</li>
+            <li>시간: {info.get('date','')} {info.get('time','')} (GMT+8)</li>
+            <li>인원: {info.get('pax','')}</li>
+            <li>방향: {info.get('direction','')}</li>
+            <li>승차: {info.get('pick','')}</li>
+            <li>하차: {info.get('drop','')}</li>
+            <li>전화: {info.get('phone','')}</li>
+            <li>이메일: {info.get('email','')}</li>
+          </ul>
+          <p>문의: (02-2691-9222 #1)</p>
+          <p>포르테 호텔 시즈</p>
+        </div>
+        """,
+    }
+    body = zh + "<br/><br/>" + add_map.get(lang, add_map["en"])
+    return subject, body
+
+# ========== FastAPI ==========
+app = FastAPI(title="Shuttle Ops API", version="1.3.0")
+
+# CORS 設定
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -349,10 +394,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 健康檢查
 @app.get("/health")
 def health():
     return {"status": "ok", "time": _tz_now_str()}
 
+# 產生 QR
 @app.get("/api/qr/{code}")
 def qr_image(code: str):
     try:
@@ -365,7 +412,15 @@ def qr_image(code: str):
         raise HTTPException(500, f"QR 生成失敗: {str(e)}")
 
 # ========== 主 API ==========
+# 明確允許預檢
+@app.options("/api/ops")
+@app.options("/api/ops/")
+def ops_options():
+    return Response(status_code=204)
+
+# 同路由支援有無尾斜線
 @app.post("/api/ops")
+@app.post("/api/ops/")
 def ops(req: OpsRequest):
     action = (req.action or "").strip().lower()
     data = req.data or {}
@@ -375,21 +430,39 @@ def ops(req: OpsRequest):
         hmap = header_map(ws)
         headers = _sheet_headers(ws)
 
+        # 必要欄位健檢（避免寫出空白列）
+        def _assert_required_headers(required_cols: List[str]):
+            missing = [c for c in required_cols if c not in hmap]
+            if missing:
+                raise HTTPException(
+                    500,
+                    f"試算表缺少必要欄位或 HEADER_ROW 錯誤：{missing}"
+                )
+
+        REQUIRED_FOR_BOOK = [
+            "申請日期","預約狀態","預約編號","往返","日期","班次","車次",
+            "上車地點","下車地點","姓名","手機","信箱","預約人數","QRCode編碼"
+        ]
+
         def setv(row_arr: List[str], col: str, v: Any):
             if col in hmap and 1 <= hmap[col] <= len(row_arr):
                 row_arr[hmap[col] - 1] = v if isinstance(v, str) else str(v)
 
+        def get_by_rowno(rowno: int, key: str) -> str:
+            if key not in hmap:
+                return ""
+            return ws.cell(rowno, hmap[key]).value or ""
+
         # ===== 新增預約 =====
         if action == "book":
             p = BookPayload(**data)
+            _assert_required_headers(REQUIRED_FOR_BOOK)
 
-            # ★ 需求 1：提交前「再次」檢查容量（含本次）
+            # 產生預約編號
+            last_seq = _get_max_seq_for_date(ws, p.date)
+            booking_id = f"{_mmdd_prefix(p.date)}{last_seq + 1:03d}"
             time_hm = _time_hm_from_any(p.time)
-            _check_capacity_for_booking(p.direction, _norm_date(p.date), time_hm, p.pickLocation, p.dropLocation, int(p.passengers))
-
-            last_seq = _get_max_seq_for_date(ws, _norm_date(p.date))
-            booking_id = f"{_mmdd_prefix(_norm_date(p.date))}{last_seq + 1:03d}"
-            car_display = _display_trip_str(_norm_date(p.date), time_hm)
+            car_display = _display_trip_str(p.date, time_hm)
 
             pk_idx, dp_idx, seg_str = _compute_indices_and_segments(p.pickLocation, p.dropLocation)
 
@@ -400,20 +473,19 @@ def ops(req: OpsRequest):
             newrow = [""] * len(headers)
             setv(newrow, "申請日期", _tz_now_str())
             setv(newrow, "預約狀態", BOOKED_TEXT)
-            setv(newrow, "訂單狀態", BOOKED_TEXT)  # ★ 需求 10：同步訂單狀態
             identity_simple = "住宿" if p.identity == "hotel" else "用餐"
 
             setv(newrow, "預約編號", booking_id)
             setv(newrow, "往返", p.direction)
-            setv(newrow, "日期", _norm_date(p.date))
-            setv(newrow, "班次", time_hm)
-            setv(newrow, "車次", car_display)
+            setv(newrow, "日期", p.date)
+            setv(newrow, "班次", time_hm)         # 僅 HH:MM
+            setv(newrow, "車次", car_display)      # mm/dd HH:MM 純文字
             setv(newrow, "上車地點", p.pickLocation)
             setv(newrow, "下車地點", p.dropLocation)
             setv(newrow, "姓名", p.name)
             setv(newrow, "手機", p.phone)
             setv(newrow, "信箱", p.email)
-            setv(newrow, "預約人數", int(p.passengers))
+            setv(newrow, "預約人數", p.passengers)
             setv(newrow, "乘車狀態", "")
             setv(newrow, "身分", identity_simple)
             setv(newrow, "房號", p.roomNumber or "")
@@ -424,7 +496,6 @@ def ops(req: OpsRequest):
             setv(newrow, "下車索引", dp_idx)
             setv(newrow, "涉及路段範圍", seg_str)
             setv(newrow, "QRCode編碼", qr_content)
-            # 備註不寫入
 
             ws.append_row(newrow, value_input_option="USER_ENTERED")
             return {"status": "success", "booking_id": booking_id, "qr_url": qr_url, "qr_content": qr_content}
@@ -447,7 +518,7 @@ def ops(req: OpsRequest):
             for row in all_values[HEADER_ROW:]:
                 date_iso = get(row, "日期")
                 try:
-                    d = datetime.strptime(_norm_date(date_iso), "%Y-%m-%d")
+                    d = datetime.strptime(date_iso, "%Y-%m-%d")
                 except:
                     d = now
                 if d < one_month_ago:
@@ -461,7 +532,6 @@ def ops(req: OpsRequest):
                 rec = {k: get(row, k) for k in hmap}
                 if rec.get("櫃台審核", "").lower() == "n":
                     rec["預約狀態"] = "已拒絕"
-                    rec["訂單狀態"] = "已拒絕"
                 results.append(rec)
 
             return results
@@ -474,61 +544,53 @@ def ops(req: OpsRequest):
                 raise HTTPException(404, "找不到此預約編號")
             rowno = target[0]
 
-            def get_cell(col: str) -> str:
-                if col not in hmap:
-                    return ""
-                return ws.cell(rowno, hmap[col]).value or ""
+            updates: Dict[str, str] = {}
 
-            # 目標值（若未給則取舊值）
-            new_direction = p.direction or get_cell("往返")
-            new_date = _norm_date(p.date or get_cell("日期"))
-            time_hm = _time_hm_from_any(p.time or get_cell("班次"))
-            new_pick = p.pickLocation or get_cell("上車地點")
-            new_drop = p.dropLocation or get_cell("下車地點")
-            try:
-                old_pax = int(get_cell("預約人數") or "0")
-            except:
-                old_pax = 0
-            new_pax = int(p.passengers if p.passengers is not None else old_pax)
+            time_hm = _time_hm_from_any(p.time or "")
+            car_display = _display_trip_str(p.date or "", time_hm) if (p.date and time_hm) else None
 
-            # ★ 需求 1：修改時再次檢查容量（同班次可含本人）
-            _check_capacity_for_modify(ws, hmap, rowno, new_direction, new_date, time_hm, new_pick, new_drop, new_pax)
+            pk_idx = dp_idx = None
+            seg_str = None
+            if p.pickLocation and p.dropLocation:
+                pk_idx, dp_idx, seg_str = _compute_indices_and_segments(p.pickLocation, p.dropLocation)
 
-            car_display = _display_trip_str(new_date, time_hm)
-            pk_idx, dp_idx, seg_str = _compute_indices_and_segments(new_pick, new_drop)
+            updates["預約狀態"] = BOOKED_TEXT
+            if p.passengers is not None:
+                updates["預約人數"] = str(p.passengers)
 
-            def upd(col: str, v: Optional[str]):
-                if v is None:
-                    return
-                if col in hmap:
-                    ws.update_cell(rowno, hmap[col], v)
+            if "備註" in hmap:
+                current_note = ws.cell(rowno, hmap["備註"]).value or ""
+                new_note = f"{_tz_now_str()} 已修改"
+                updates["備註"] = f"{current_note}; {new_note}" if current_note else new_note
 
-            # 寫入更新欄位（★ 需求 10）
-            upd("預約狀態", BOOKED_TEXT)
-            upd("訂單狀態", BOOKED_TEXT)
-            upd("往返", new_direction)
-            upd("日期", new_date)
-            upd("班次", time_hm)
-            upd("車次", car_display)
-            upd("上車地點", new_pick)
-            upd("下車地點", new_drop)
-            upd("預約人數", str(new_pax))
-            if p.phone:
-                upd("手機", p.phone)
+            if p.direction: updates["往返"] = p.direction
+            if p.date: updates["日期"] = p.date
+            if time_hm: updates["班次"] = time_hm
+            if car_display: updates["車次"] = car_display
+            if p.pickLocation: updates["上車地點"] = p.pickLocation
+            if p.dropLocation: updates["下車地點"] = p.dropLocation
+            if p.phone: updates["手機"] = p.phone
             if p.email:
-                upd("信箱", p.email)
-                # 依新 email 重算 QR
+                updates["信箱"] = p.email
                 em6 = _email_hash6(p.email)
                 qr_content = f"FT:{p.booking_id}:{em6}"
-                upd("QRCode編碼", qr_content)
-            upd("上車索引", str(pk_idx))
-            upd("下車索引", str(dp_idx))
-            upd("涉及路段範圍", seg_str)
-            # 備註寫入「當下修改時間 已修改」
-            if "備註" in hmap:
-                ws.update_cell(rowno, hmap["備註"], _tz_now_str() + " 已修改")
+                updates["QRCode編碼"] = qr_content
+            if pk_idx is not None: updates["上車索引"] = str(pk_idx)
+            if dp_idx is not None: updates["下車索引"] = str(dp_idx)
+            if seg_str is not None: updates["涉及路段範圍"] = seg_str
             if "最後操作時間" in hmap:
-                ws.update_cell(rowno, hmap["最後操作時間"], _tz_now_str() + " 已修改")
+                updates["最後操作時間"] = _tz_now_str() + " 已修改"
+
+            if updates:
+                batch_updates = []
+                for col_name, value in updates.items():
+                    if col_name in hmap:
+                        batch_updates.append({
+                            'range': gspread.utils.rowcol_to_a1(rowno, hmap[col_name]),
+                            'values': [[value]]
+                        })
+                if batch_updates:
+                    ws.batch_update(batch_updates)
 
             return {"status": "success", "booking_id": p.booking_id}
 
@@ -539,14 +601,28 @@ def ops(req: OpsRequest):
             if not target:
                 raise HTTPException(404, "找不到此預約編號")
             rowno = target[0]
+
+            updates: Dict[str, str] = {}
             if "預約狀態" in hmap:
-                ws.update_cell(rowno, hmap["預約狀態"], CANCELLED_TEXT)
-            if "訂單狀態" in hmap:
-                ws.update_cell(rowno, hmap["訂單狀態"], CANCELLED_TEXT)
+                updates["預約狀態"] = CANCELLED_TEXT
             if "備註" in hmap:
-                ws.update_cell(rowno, hmap["備註"], _tz_now_str() + " 已刪除")
+                current_note = ws.cell(rowno, hmap["備註"]).value or ""
+                new_note = f"{_tz_now_str()} 已取消"
+                updates["備註"] = f"{current_note}; {new_note}" if current_note else new_note
             if "最後操作時間" in hmap:
-                ws.update_cell(rowno, hmap["最後操作時間"], _tz_now_str() + " 已刪除")
+                updates["最後操作時間"] = _tz_now_str() + " 已刪除"
+
+            if updates:
+                batch_updates = []
+                for col_name, value in updates.items():
+                    if col_name in hmap:
+                        batch_updates.append({
+                            'range': gspread.utils.rowcol_to_a1(rowno, hmap[col_name]),
+                            'values': [[value]]
+                        })
+                if batch_updates:
+                    ws.batch_update(batch_updates)
+
             return {"status": "success", "booking_id": p.booking_id}
 
         # ===== 掃碼上車 =====
@@ -561,11 +637,80 @@ def ops(req: OpsRequest):
             if not target:
                 raise HTTPException(404, "找不到符合條件之訂單")
             rowno = target[0]
+
+            updates: Dict[str, str] = {}
             if "乘車狀態" in hmap:
-                ws.update_cell(rowno, hmap["乘車狀態"], "已上車")
+                updates["乘車狀態"] = "已上車"
             if "最後操作時間" in hmap:
-                ws.update_cell(rowno, hmap["最後操作時間"], _tz_now_str() + " 已上車")
+                updates["最後操作時間"] = _tz_now_str() + " 已上車"
+
+            if updates:
+                batch_updates = []
+                for col_name, value in updates.items():
+                    if col_name in hmap:
+                        batch_updates.append({
+                            'range': gspread.utils.rowcol_to_a1(rowno, hmap[col_name]),
+                            'values': [[value]]
+                        })
+                if batch_updates:
+                    ws.batch_update(batch_updates)
+
             return {"status": "success", "row": rowno}
+
+        # ===== 寄信（book / modify / cancel）=====
+        elif action == "mail":
+            p = MailPayload(**data)
+            target = _find_rows_by_pred(ws, lambda r: r.get("預約編號") == p.booking_id)
+            if not target:
+                raise HTTPException(404, "找不到此預約編號")
+            rowno = target[0]
+
+            get = lambda k: get_by_rowno(rowno, k)
+            info = {
+                "booking_id": get("預約編號"),
+                "date": get("日期"),
+                "time": _time_hm_from_any(get("班次") or get("車次")),
+                "direction": get("往返"),
+                "pick": get("上車地點"),
+                "drop": get("下車地點"),
+                "name": get("姓名"),
+                "phone": get("手機"),
+                "email": get("信箱"),
+                "pax": get("預約人數") or "1",
+            }
+
+            subject, html = _compose_mail_html(info, p.lang, p.kind)
+
+            # 圖片附件（book/modify 可帶票券 PNG）
+            attachment_bytes: Optional[bytes] = None
+            if p.kind in ("book", "modify") and p.ticket_png_base64:
+                b64 = p.ticket_png_base64
+                if "," in b64:  # data:image/png;base64,xxxx
+                    b64 = b64.split(",", 1)[1]
+                try:
+                    attachment_bytes = base64.b64decode(b64, validate=True)
+                except Exception:
+                    attachment_bytes = None
+
+            # 寄信；失敗不阻擋流程，只登記寄信狀態
+            status_text = None
+            try:
+                _send_email_gmail(
+                    info["email"],
+                    subject,
+                    html,
+                    attachment=attachment_bytes,
+                    attachment_filename=f"ticket_{info['booking_id']}.png" if attachment_bytes else "ticket.png",
+                )
+                status_text = f"{_tz_now_str()} 寄信成功"
+            except Exception as e:
+                status_text = f"{_tz_now_str()} 寄信失敗: {str(e)}"
+
+            if "寄信狀態" in hmap and status_text:
+                ws.update_acell(gspread.utils.rowcol_to_a1(rowno, hmap["寄信狀態"]), status_text)
+
+            ok = "success" if "成功" in status_text else "mail_failed"
+            return {"status": ok, "booking_id": p.booking_id, "mail_note": status_text}
 
         else:
             raise HTTPException(400, f"未知 action：{action}")
@@ -575,6 +720,7 @@ def ops(req: OpsRequest):
     except Exception as e:
         raise HTTPException(500, f"伺服器錯誤: {str(e)}")
 
+# 額外除錯端點
 @app.get("/cors_debug")
 def cors_debug():
     return {"status": "ok", "cors_test": True, "time": _tz_now_str()}
@@ -582,4 +728,3 @@ def cors_debug():
 @app.get("/api/debug")
 def debug_endpoint():
     return {"status": "服務正常", "base_url": BASE_URL, "time": _tz_now_str()}
-    
