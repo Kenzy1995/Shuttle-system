@@ -114,7 +114,8 @@ def _display_trip_str(date_iso: str, time_hm: str) -> str:
     if not date_iso or not time_hm:
         return ""
     y, m, d = date_iso.split("-")
-    return f"'{int(m)}/{int(d)} {time_hm}"
+
+    return f"{int(m)}/{int(d)} {time_hm}"
 
 def _mmdd_prefix(date_iso: str) -> str:
     y, m, d = date_iso.split("-")
