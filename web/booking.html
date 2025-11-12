@@ -735,7 +735,9 @@
         download:"下載車票",
         rejectedTip:"如有疑問請聯繫櫃檯",
         scheduleTitle:"查詢可預約班次",
-        noSchedules:"沒有符合條件的班次"
+        noSchedules:"沒有符合條件的班次",
+        dirOutLabel:"去程（飯店出發）",
+        dirInLabel:"回程（前往飯店）"
       },
       en: {
         title:"Hotel Service - Free Shuttle Booking", brand:"Hotel Service",
@@ -764,7 +766,9 @@
         download:"Download Ticket",
         rejectedTip:"If you have questions please contact the front desk.",
         scheduleTitle:"Find Available Schedules",
-        noSchedules:"No matching schedules"
+        noSchedules:"No matching schedules",
+        dirOutLabel:"Outbound (from hotel)",
+        dirInLabel:"Inbound (to hotel)"
       },
       ja: {
         title:"ホテルサービス-無料シャトル予約", brand:"ホテルサービス",
@@ -793,7 +797,9 @@
         download:"乗車券をダウンロード",
         rejectedTip:"不明点はフロントにお問い合わせください。",
         scheduleTitle:"予約可能な便查询",
-        noSchedules:"条件に合う便がありません"
+        noSchedules:"条件に合う便がありません",
+        dirOutLabel:"往路（ホテル発）",
+        dirInLabel:"復路（ホテル行き）"
       },
       ko: {
         title:"호텔 서비스-무료 셔틀 예약", brand:"호텔 서비스",
@@ -822,7 +828,9 @@
         download:"티켓 다운로드",
         rejectedTip:"문의 사항은 프런트에 연락하세요.",
         scheduleTitle:"예약 가능한 일정 조회",
-        noSchedules:"조건에 맞는 일정이 없습니다"
+        noSchedules:"조건에 맞는 일정이 없습니다",
+        dirOutLabel:"가는편(호텔 출발)",
+        dirInLabel:"오는편(호텔 도착)"
       }
     };
 
@@ -848,10 +856,15 @@
       const pill = document.getElementById('successStatusPill');
       if(pill) pill.textContent = ts('booked');
     }
+    
     function onLanguageChange(lang){
       currentLang = lang || "zh";
       applyI18N();
       rerenderQueryPages();
+      // 修復：如果當前在 Step1，重新構建方向選擇按鈕
+      if (document.getElementById('step1').style.display !== 'none') {
+        buildStep1();
+      }
     }
 
     let allRows = [];
@@ -1133,6 +1146,16 @@
       `).join('');
     }
 
+    // ====== 修正的滾動處理函數 ======
+    function handleScroll(){
+      const y = typeof window.scrollY === 'number'
+        ? window.scrollY
+        : (document.documentElement.scrollTop || document.body.scrollTop || 0);
+      const btn = document.getElementById('backToTop');
+      if (!btn) return;
+      btn.style.display = y > 300 ? 'block' : 'none';
+    }
+
     // ====== 頁面切換 ======
     function showPage(id){
       hardResetOverlays();
@@ -1153,6 +1176,8 @@
       if(id==='schedule'){
         loadScheduleData();
       }
+      // 修復：每次切頁後重算回頂按鈕顯示狀態
+      handleScroll();
     }
     function showLoading(s=true){document.getElementById('loading').classList.toggle('show',s)}
     function showVerifyLoading(s=true){document.getElementById('loadingConfirm').classList.toggle('show',s)}
@@ -1194,17 +1219,29 @@
       window.scrollTo({top:0,behavior:'smooth'});
     }
 
+    // ====== 修正的 Step1 構建函數 ======
     function buildStep1(){
       const list = document.getElementById('directionList');
-      list.innerHTML='';
-      const opts=[{zh:'去程', label:'去程（飯店出發）'},{zh:'回程', label:'回程（前往飯店）'}];
+      list.innerHTML = '';
+      const opts = [
+        { valueZh: '去程', labelKey: 'dirOutLabel' },
+        { valueZh: '回程', labelKey: 'dirInLabel' },
+      ];
       opts.forEach(opt=>{
-        const btn=document.createElement('button');
-        btn.type='button'; btn.className='opt-btn'; btn.textContent=opt.label;
-        btn.onclick=()=>{ selectedDirection = opt.zh; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); toStep2(); };
+        const btn = document.createElement('button');
+        btn.type='button';
+        btn.className='opt-btn';
+        btn.textContent = t(opt.labelKey);       // 顯示依語系
+        btn.onclick = () => {
+          selectedDirection = opt.valueZh;       // 值仍用中文，與後端一致
+          list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active'));
+          btn.classList.add('active');
+          toStep2();
+        };
         list.appendChild(btn);
       });
     }
+
     function toStep2(){
       if(!selectedDirection){ alert(t('labelDirection')); return; }
       const dateSet = new Set(allRows.filter(r=>String(r["去程 / 回程"]).trim()===selectedDirection).map(r=>fmtDateLabel(r["日期"])));
@@ -1931,13 +1968,8 @@
     }
 
     /* ====== 捲動監聽 ====== */
-    function handleScroll(){
-      const btn = document.getElementById('backToTop');
-      const y = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-      btn.style.display = y>400 ? 'block':'none';
-    }
+    // 修復：只綁定 window 事件，使用統一的滾動位置計算
     window.addEventListener('scroll', handleScroll, {passive:true});
-    document.addEventListener('scroll', handleScroll, {passive:true});
     window.addEventListener('resize', handleScroll, {passive:true});
 
     /* ====== 初始化 ====== */
@@ -1952,7 +1984,7 @@
       hardResetOverlays();
       showPage('reservation');
       applyI18N();
-      handleScroll();
+      handleScroll(); // 初始化時計算一次
     }
 
     function resetQuery(){
