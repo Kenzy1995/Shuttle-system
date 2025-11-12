@@ -420,14 +420,14 @@ def ops(req: OpsRequest):
         hmap = header_map(ws)
         headers = _sheet_headers(ws)
   
-         # 共同工具：必要欄位健檢（避免寫出空白列）
-         def _assert_required_headers(required_cols: List[str]):
-             missing = [c for c in required_cols if c not in hmap]
-             if missing:
-                 raise HTTPException(
-                     500,
-                     f"試算表缺少必要欄位或 HEADER_ROW 錯誤：{missing}"
-                 )
+        # 共同工具：必要欄位健檢（避免寫出空白列）
+        def _assert_required_headers(required_cols: List[str]):
+          missing = [c for c in required_cols if c not in hmap]
+          if missing:
+             raise HTTPException(
+                 500,
+                    f"試算表缺少必要欄位或 HEADER_ROW 錯誤：{missing}"
+              )
  
          REQUIRED_FOR_BOOK = [
              "申請日期","預約狀態","預約編號","往返","日期","班次","車次",
