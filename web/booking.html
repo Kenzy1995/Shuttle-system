@@ -8,7 +8,7 @@
     :root{
       --primary:#A98570;
       --secondary:#8f7147;
-      --bg:#f9f5ef;
+      --bg:#f5f5f5;
       --card:#fff;
       --text:#333;
       --muted:#777;
@@ -35,6 +35,57 @@
     img, iframe{max-width:100%;}
     a{color:inherit; text-decoration:none}
 
+    /* 跑馬燈 */
+    .marquee-container {
+      position: relative;
+      background: rgba(0,0,0,0.4);
+      color: white;
+      padding: 8px 40px 8px 16px;
+      margin-bottom: 16px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .marquee-close {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .marquee-content {
+      white-space: nowrap;
+      overflow: hidden;
+      animation: marquee 20s linear infinite;
+    }
+    @keyframes marquee {
+      0% { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+
+    /* 圖片展示區 */
+    .image-gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .gallery-image {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+
     .navbar{
       position:sticky;top:0;z-index:50;
       display:flex;align-items:center;
@@ -42,7 +93,8 @@
     }
     .brand{display:flex;align-items:center;gap:10px;margin-right: 30px;}
     .brand img{height:28px;width:auto;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-    .brand-title{font-weight:800;font-size:18px}
+    .brand-title{font-weight:800;font-size:18px; cursor: pointer;}
+    .brand-title:hover{color:var(--primary);}
 
     .nav-right{display:flex;align-items:center;gap:12px;margin-left:auto}
     .lang-wrap span { font-size: 12px; }
@@ -197,6 +249,11 @@
       .footer { font-size: 70%; padding: 15px 10px; }
       .tickets-row{flex-direction:column;overflow-x:hidden}
       .ticket-card{width:100%;max-width:100%}
+      
+      /* 手機版更換logo */
+      .brand img[src="/images/logo.png"] {
+        content: url("/images/logo2.png");
+      }
     }
 
     #step6 .field { margin: 4px 0; }
@@ -328,9 +385,15 @@
   </style>
 </head>
 <body>
+  <!-- 跑馬燈區域 -->
+  <div id="marqueeContainer" class="marquee-container" style="display:none">
+    <button class="marquee-close" onclick="closeMarquee()">×</button>
+    <div id="marqueeContent" class="marquee-content"></div>
+  </div>
+
   <!-- 頂部導覽 -->
   <header class="navbar">
-    <div class="brand">
+    <div class="brand" onclick="window.open('https://www.fortehotelxizhi.com.tw/','_blank')" style="cursor:pointer">
       <img src="/images/logo.png" alt="logo" />
       <div class="brand-title" data-i18n="brand">飯店服務</div>
     </div>
@@ -340,7 +403,6 @@
       <button id="nav-check" onclick="showPage('check')" data-i18n="navCheck">我的預約</button>
       <button id="nav-schedule" onclick="showPage('schedule')" data-i18n="navSchedule">查詢班次</button>
       <button id="nav-station" onclick="showPage('station')" data-i18n="navStation">停靠站點</button>
-      <button id="nav-contact" onclick="showPage('contact')" data-i18n="navContact">回官網</button>
     </div>
 
     <div class="nav-right">
@@ -363,7 +425,6 @@
       <button id="m-check" onclick="showPage('check')" data-i18n="navCheck">我的預約</button>
       <button id="m-schedule" onclick="showPage('schedule')" data-i18n="navSchedule">查詢班次</button>
       <button id="m-station" onclick="showPage('station')" data-i18n="navStation">停靠站點</button>
-      <button id="m-contact" onclick="showPage('contact')" data-i18n="navContact">回官網</button>
     </div>
   </nav>
 
@@ -380,6 +441,9 @@
       <div style="margin-top:16px">
         <img src="/images/時刻表.webp" alt="時刻表" style="width:100%;max-width:820px;border-radius:14px;box-shadow:var(--shadow)"/>
       </div>
+      
+      <!-- 圖片展示區 -->
+      <div id="imageGallery" class="image-gallery"></div>
     </section>
 
     <!-- Step 1：方向 -->
@@ -655,13 +719,6 @@
     </div>
   </main>
 
-  <!-- 回官網 -->
-  <main id="contact" class="page">
-    <div class="hero">
-      <h1><a href="https://www.fortehotelxizhi.com.tw/" target="_blank" rel="noopener" data-i18n="navContact">回官網</a></h1>
-    </div>
-  </main>
-
   <!-- 底部 -->
   <footer class="footer">
     © 2025. Forte Hotel XiZhi汐止福泰大飯店. <a href="https://kz-tech.netlify.app/" target="_blank">Design</a>
@@ -710,7 +767,7 @@
     const TEXTS = {
       zh: {
         title:"飯店服務-免費接駁車預約", brand:"飯店服務",
-        navReservation:"立即預約", navCheck:"我的預約", navSchedule:"查詢班次", navStation:"停靠站點", navContact:"回官網",
+        navReservation:"立即預約", navCheck:"我的預約", navSchedule:"查詢班次", navStation:"停靠站點",
         heroTitle:"免費接駁", bookNow:"立即預約",
         step1Title:"選擇方向", step2Title:"選擇日期", step3Title:"選擇站點", step4Title:"選擇班次", step5Title:"旅客資料填寫", step6Title:"確認班次資訊",
         labelDirection:"請選擇方向", directionHint:"去程固定由飯店出發，回程終點為飯店",
@@ -741,7 +798,7 @@
       },
       en: {
         title:"Hotel Service - Free Shuttle Booking", brand:"Hotel Service",
-        navReservation:"Book Now", navCheck:"My Bookings", navSchedule:"Find Schedules", navStation:"Stops", navContact:"Official Site",
+        navReservation:"Book Now", navCheck:"My Bookings", navSchedule:"Find Schedules", navStation:"Stops",
         heroTitle:"Free Shuttle", bookNow:"Book Now",
         step1Title:"Select Direction", step2Title:"Select Date", step3Title:"Select Stop", step4Title:"Select Time", step5Title:"Passenger Details", step6Title:"Confirm Trip",
         labelDirection:"Select direction", directionHint:"Outbound departs hotel. Inbound ends at hotel.",
@@ -772,7 +829,7 @@
       },
       ja: {
         title:"ホテルサービス-無料シャトル予約", brand:"ホテルサービス",
-        navReservation:"今すぐ予約", navCheck:"予約の確認", navSchedule:"便查询", navStation:"停留所", navContact:"公式サイト",
+        navReservation:"今すぐ予約", navCheck:"予約の確認", navSchedule:"便查询", navStation:"停留所",
         heroTitle:"無料シャトル", bookNow:"今すぐ予約",
         step1Title:"方向を選択", step2Title:"日付を選択", step3Title:"停留所を選択", step4Title:"便を選択", step5Title:"お客様情報", step6Title:"便情報の確認",
         labelDirection:"方向を選択", directionHint:"往路はホテル発。復路はホテル行き。",
@@ -803,7 +860,7 @@
       },
       ko: {
         title:"호텔 서비스-무료 셔틀 예약", brand:"호텔 서비스",
-        navReservation:"바로 예약", navCheck:"내 예약", navSchedule:"일정 조회", navStation:"정차역", navContact:"공식 사이트",
+        navReservation:"바로 예약", navCheck:"내 예약", navSchedule:"일정 조회", navStation:"정차역",
         heroTitle:"무료 셔틀", bookNow:"바로 예약",
         step1Title:"방향 선택", step2Title:"날짜 선택", step3Title:"정차역 선택", step4Title:"시간 선택", step5Title:"탑승자 정보", step6Title:"정보 확인",
         labelDirection:"방향을 선택", directionHint:"가는편은 호텔 출발, 오는편은 호텔 도착.",
@@ -880,6 +937,60 @@
     let queryDateList = [];
     let currentQueryDate = "";
     let currentDateRows = [];
+
+    /* ====== 新增：車次解析與過期判斷函式 ====== */
+    // 解析「車次」：例如 "11/14 14:40"
+    function parseCarDisplay(carText) {
+      const s = String(carText || "").trim().replace(/：/g, ":");
+      // 僅接受 MM/DD HH:mm 格式
+      const m = s.match(/^(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})$/);
+      if (!m) return null;
+
+      const mm = +m[1], dd = +m[2], HH = +m[3], MM = +m[4];
+      if (mm < 1 || mm > 12 || dd < 1 || dd > 31 || HH < 0 || HH > 23 || MM < 0 || MM > 59) return null;
+
+      // 年份推斷：以台北時區的「現在」為基準
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Taipei',
+        year: 'numeric', month: '2-digit'
+      }).formatToParts(new Date());
+      const nowYear  = +parts.find(p => p.type === 'year').value;
+      const nowMonth = +parts.find(p => p.type === 'month').value;
+
+      let year = nowYear;
+      // 跨年防呆：1 月看到 12 月 → 去年；12 月看到 1 月 → 明年
+      if (nowMonth === 1 && mm === 12) year = nowYear - 1;
+      else if (nowMonth === 12 && mm === 1) year = nowYear + 1;
+
+      return { year, mm, dd, HH, MM };
+    }
+
+    function getIsoDateFromCarDisplay(carText) {
+      const p = parseCarDisplay(carText);
+      if (!p) return "";
+      const M = String(p.mm).padStart(2,'0');
+      const D = String(p.dd).padStart(2,'0');
+      return `${p.year}-${M}-${D}`;
+    }
+
+    function getTimeHmFromCarDisplay(carText) {
+      const p = parseCarDisplay(carText);
+      if (!p) return "";
+      return `${String(p.HH).padStart(2,'0')}:${String(p.MM).padStart(2,'0')}`;
+    }
+
+    // 過期判斷：優先用「車次」字串
+    function isExpiredByCar(carText) {
+      const p = parseCarDisplay(carText);
+      if (!p) return true;
+      const Y = String(p.year).padStart(4,'0');
+      const M = String(p.mm).padStart(2,'0');
+      const D = String(p.dd).padStart(2,'0');
+      const H = String(p.HH).padStart(2,'0');
+      const m = String(p.MM).padStart(2,'0');
+      const t = new Date(`${Y}-${M}-${D}T${H}:${m}:00+08:00`).getTime();
+      return Number.isNaN(t) ? true : t < Date.now();
+    }
 
     /* ====== 小工具 ====== */
     function fmtDateLabel(v){
@@ -973,179 +1084,6 @@
       }
     }
 
-    // ====== 修正的過期判斷函數 ======
-    function parseScheduleText(cellText) {
-      const s = String(cellText || "").trim();
-      // 取第一個 "MM/DD HH:mm"
-      const m = s.replace(/^[^\d]+/, "").match(/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/);
-      if (!m) return null;
-      const mm = Number(m[1]);
-      const dd = Number(m[2]);
-      const HH = Number(m[3]);
-      const MM = Number(m[4]);
-      if (
-        !Number.isFinite(mm) || !Number.isFinite(dd) ||
-        !Number.isFinite(HH) || !Number.isFinite(MM) ||
-        mm < 1 || mm > 12 || dd < 1 || dd > 31 || HH < 0 || HH > 23 || MM < 0 || MM > 59
-      ) return null;
-      return { mm, dd, HH, MM };
-    }
-
-    function nowInTzParts(tz = 'Asia/Taipei') {
-      const fmt = new Intl.DateTimeFormat('en-CA', {
-        timeZone: tz,
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        hour12: false,
-      });
-      const parts = Object.fromEntries(fmt.formatToParts(new Date()).map(p => [p.type, p.value]));
-      return {
-        year: Number(parts.year),
-        month: Number(parts.month),
-        day: Number(parts.day),
-        hour: Number(parts.hour),
-        minute: Number(parts.minute),
-        second: Number(parts.second),
-      };
-    }
-
-    function isExpiredByCarDisplay(carDisplayText) {
-      const parsed = parseScheduleText(carDisplayText);
-      if (!parsed) return true; // 解析不到就視為過期，避免誤放行
-      const nowTz = nowInTzParts('Asia/Taipei');
-      let y = nowTz.year;
-      if (nowTz.month === 1 && parsed.mm === 12) y = y - 1;
-
-      const Y = String(y).padStart(4, '0');
-      const M = String(parsed.mm).padStart(2, '0');
-      const D = String(parsed.dd).padStart(2, '0');
-      const H = String(parsed.HH).padStart(2, '0');
-      const m = String(parsed.MM).padStart(2, '0');
-
-      const target = new Date(`${Y}-${M}-${D}T${H}:${m}:00+08:00`).getTime();
-      return Number.isNaN(target) ? true : target < Date.now();
-    }
-
-    window.isExpired = function patchedIsExpired(dateIso, timeHm, carDisplayText) {
-      if (carDisplayText) return isExpiredByCarDisplay(carDisplayText);
-      // 後備：用 ISO + HH:mm（GMT+8）
-      if (!dateIso || !timeHm) return true;
-      const t = new Date(`${dateIso}T${timeHm}:00+08:00`).getTime();
-      return Number.isNaN(t) ? true : t < Date.now();
-    };
-
-    // ====== 查詢班次功能 ======
-    let scheduleData = {
-      rows: [],
-      directions: new Set(),
-      dates: new Set(),
-      stations: new Set(),
-      selectedDirection: null,
-      selectedDate: null,
-      selectedStation: null
-    };
-
-    async function loadScheduleData() {
-      const resultsEl = document.getElementById('scheduleResults');
-      resultsEl.innerHTML = '<div class="loading-text" data-i18n="loading">資料讀取中…</div>';
-      
-      try {
-        const res = await fetch(API_URL + '?sheet=可預約班次(web)');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        
-        // 解析表頭和數據
-        const headers = data[0];
-        const rows = data.slice(1);
-        
-        const directionIndex = headers.indexOf('去程 / 回程');
-        const dateIndex = headers.indexOf('日期');
-        const timeIndex = headers.indexOf('班次');
-        const stationIndex = headers.indexOf('站點');
-        const capacityIndex = headers.indexOf('可預約人數');
-        
-        scheduleData.rows = rows.map(row => ({
-          direction: row[directionIndex] || '',
-          date: row[dateIndex] || '',
-          time: row[timeIndex] || '',
-          station: row[stationIndex] || '',
-          capacity: row[capacityIndex] || ''
-        })).filter(row => row.direction && row.date && row.time && row.station);
-        
-        // 更新篩選選項
-        scheduleData.directions = new Set(scheduleData.rows.map(r => r.direction));
-        scheduleData.dates = new Set(scheduleData.rows.map(r => r.date));
-        scheduleData.stations = new Set(scheduleData.rows.map(r => r.station));
-        
-        renderScheduleFilters();
-        renderScheduleResults();
-        
-      } catch (error) {
-        resultsEl.innerHTML = `<div class="empty-state">查詢失敗: ${error.message}</div>`;
-      }
-    }
-
-    function renderScheduleFilters() {
-      renderFilterPills('directionFilter', [...scheduleData.directions], scheduleData.selectedDirection, (dir) => {
-        scheduleData.selectedDirection = scheduleData.selectedDirection === dir ? null : dir;
-        renderScheduleResults();
-      });
-      
-      renderFilterPills('dateFilter', [...scheduleData.dates], scheduleData.selectedDate, (date) => {
-        scheduleData.selectedDate = scheduleData.selectedDate === date ? null : date;
-        renderScheduleResults();
-      });
-      
-      renderFilterPills('stationFilter', [...scheduleData.stations], scheduleData.selectedStation, (station) => {
-        scheduleData.selectedStation = scheduleData.selectedStation === station ? null : station;
-        renderScheduleResults();
-      });
-    }
-
-    function renderFilterPills(containerId, items, selectedItem, onClick) {
-      const container = document.getElementById(containerId);
-      container.innerHTML = '';
-      
-      items.sort().forEach(item => {
-        const pill = document.createElement('button');
-        pill.type = 'button';
-        pill.className = 'filter-pill' + (selectedItem === item ? ' active' : '');
-        pill.textContent = item;
-        pill.onclick = () => onClick(item);
-        container.appendChild(pill);
-      });
-    }
-
-    function renderScheduleResults() {
-      const container = document.getElementById('scheduleResults');
-      
-      const filtered = scheduleData.rows.filter(row => {
-        if (scheduleData.selectedDirection && row.direction !== scheduleData.selectedDirection) return false;
-        if (scheduleData.selectedDate && row.date !== scheduleData.selectedDate) return false;
-        if (scheduleData.selectedStation && row.station !== scheduleData.selectedStation) return false;
-        return true;
-      });
-      
-      if (filtered.length === 0) {
-        container.innerHTML = `<div class="empty-state" data-i18n="noSchedules">${t('noSchedules')}</div>`;
-        return;
-      }
-      
-      container.innerHTML = filtered.map(row => `
-        <div class="schedule-card">
-          <div class="schedule-line">
-            <span class="schedule-direction">${row.direction}</span>
-            <span class="schedule-date">${row.date}</span>
-            <span class="schedule-time">${row.time}</span>
-          </div>
-          <div class="schedule-line">
-            <span class="schedule-station">${row.station}</span>
-            <span class="schedule-capacity">${row.capacity}</span>
-          </div>
-        </div>
-      `).join('');
-    }
-
     // ====== 修正的滾動處理函數 ======
     function handleScroll(){
       const y = typeof window.scrollY === 'number'
@@ -1167,7 +1105,6 @@
       document.querySelectorAll(".mobile-tabbar button").forEach(b=>b.classList.remove("active"));
       const mId = id==='reservation'?'m-reservation':id==='check'?'m-check':id==='schedule'?'m-schedule':id==='station'?'m-station':'m-contact';
       const mEl = document.getElementById(mId); if(mEl) mEl.classList.add("active");
-      if(id==='contact'){ window.open('https://www.fortehotelxizhi.com.tw/','_blank'); }
       window.scrollTo({top:0,behavior:'smooth'});
       if(id==='reservation'){
         document.getElementById('homeHero').style.display='';
@@ -1616,10 +1553,12 @@
     }
 
     function buildTicketCard(row, {mask=false}={}){
+      const carDisp = String(row["車次"] || row["班次"] || "");
+      const dateIso = getIsoDateFromCarDisplay(carDisp) || String(row["日期"] || "");
+      const time = getTimeHmFromCarDisplay(carDisp) || fmtTimeLabel(String(row["班次"]||row["車次"]||""));
+      const expired = isExpiredByCar(carDisp);
+      
       const statusCode = getStatusCode(row);
-      const date = String(row["日期"]||'');
-      const time = fmtTimeLabel(String(row["班次"]||row["車次"]||'')); // ★ 班次顯示時間
-      const expired = isExpired(date, time);
       const name = mask ? maskName(String(row["姓名"]||'')) : String(row["姓名"]||'');
       const phone = mask ? maskPhone(String(row["手機"]||'')) : String(row["手機"]||'');
       const email = mask ? maskEmail(String(row["信箱"]||'')) : String(row["信箱"]||'');
@@ -1682,7 +1621,7 @@
       }
       if(!expired && statusCode!=='cancelled' && statusCode!=='rejected' && statusCode!=='boarded'){
         const mdBtn = document.createElement('button'); mdBtn.className='button btn-ghost'; mdBtn.textContent=ts('modify');
-        mdBtn.onclick = ()=> openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax });
+        mdBtn.onclick = ()=> openModifyPage({ row, bookingId, rb, date: dateIso, pick, drop, time, pax });
         actions.appendChild(mdBtn);
         const delBtn = document.createElement('button'); delBtn.className='button btn-ghost'; delBtn.textContent=ts('remove');
         delBtn.onclick = ()=> deleteOrder(bookingId);
@@ -1711,11 +1650,13 @@
     }
 
     function buildDateListFromResults(rows){
-      const filtered = (rows||[]).filter(r=>withinOneMonth(String(r["日期"]||'')));
+      const filtered = (rows||[]).filter(r => withinOneMonth(
+        getIsoDateFromCarDisplay(String(r["車次"]||r["班次"]||"")) || String(r["日期"]||"")
+      ));
       const map = new Map();
-      filtered.forEach(r=>{
-        const d = fmtDateLabel(String(r["日期"]||''));
-        map.set(d, (map.get(d)||0)+1);
+      filtered.forEach(r => {
+        const d = getIsoDateFromCarDisplay(String(r["車次"]||r["班次"]||"")) || fmtDateLabel(String(r["日期"]||""));
+        map.set(d, (map.get(d)||0) + 1);
       });
       queryDateList = Array.from(map.entries()).sort((a,b)=> new Date(a[0]) - new Date(b[0]));
       const wrap = document.getElementById('dateChoices');
@@ -1734,8 +1675,17 @@
 
     function openTicketsForDate(dateIso){
       currentQueryDate = dateIso;
-      currentDateRows = lastQueryResults.filter(r=>fmtDateLabel(String(r["日期"]||''))===dateIso)
-                                        .sort((a,b)=> parseTripDateTime(dateIso, fmtTimeLabel(a["班次"]||a["車次"]||'00:00')) - parseTripDateTime(dateIso, fmtTimeLabel(b["班次"]||b["車次"]||'00:00')));
+      currentDateRows = lastQueryResults.filter(r => {
+        const d = getIsoDateFromCarDisplay(String(r["車次"]||r["班次"]||"")) || fmtDateLabel(String(r["日期"]||""));
+        return d === dateIso;
+      }).sort((a, b) => parseTripDateTime(
+          dateIso,
+          getTimeHmFromCarDisplay(String(a["車次"]||a["班次"]||"")) || fmtTimeLabel(String(a["班次"]||a["車次"]||"00:00"))
+        ) - parseTripDateTime(
+          dateIso,
+          getTimeHmFromCarDisplay(String(b["車次"]||b["班次"]||"")) || fmtTimeLabel(String(b["班次"]||b["車次"]||"00:00"))
+        )
+      );
       const mount = document.getElementById('checkTicketMount');
       mount.innerHTML='';
       currentDateRows.forEach(row=> mount.appendChild(buildTicketCard(row,{mask:true})));
@@ -1967,8 +1917,174 @@
       }
     }
 
+    /* ====== 查詢班次功能 ====== */
+    let scheduleData = {
+      rows: [],
+      directions: new Set(),
+      dates: new Set(),
+      stations: new Set(),
+      selectedDirection: null,
+      selectedDate: null,
+      selectedStation: null
+    };
+
+    async function loadScheduleData() {
+      const resultsEl = document.getElementById('scheduleResults');
+      resultsEl.innerHTML = '<div class="loading-text" data-i18n="loading">資料讀取中…</div>';
+      
+      try {
+        const res = await fetch(API_URL + '?sheet=可預約班次(web)');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        
+        // 解析表頭和數據
+        const headers = data[0];
+        const rows = data.slice(1);
+        
+        const directionIndex = headers.indexOf('去程 / 回程');
+        const dateIndex = headers.indexOf('日期');
+        const timeIndex = headers.indexOf('班次');
+        const stationIndex = headers.indexOf('站點');
+        const capacityIndex = headers.indexOf('可預約人數');
+        
+        scheduleData.rows = rows.map(row => ({
+          direction: row[directionIndex] || '',
+          date: row[dateIndex] || '',
+          time: row[timeIndex] || '',
+          station: row[stationIndex] || '',
+          capacity: row[capacityIndex] || ''
+        })).filter(row => row.direction && row.date && row.time && row.station);
+        
+        // 更新篩選選項
+        scheduleData.directions = new Set(scheduleData.rows.map(r => r.direction));
+        scheduleData.dates = new Set(scheduleData.rows.map(r => r.date));
+        scheduleData.stations = new Set(scheduleData.rows.map(r => r.station));
+        
+        renderScheduleFilters();
+        renderScheduleResults();
+        
+      } catch (error) {
+        resultsEl.innerHTML = `<div class="empty-state">查詢失敗: ${error.message}</div>`;
+      }
+    }
+
+    function renderScheduleFilters() {
+      renderFilterPills('directionFilter', [...scheduleData.directions], scheduleData.selectedDirection, (dir) => {
+        scheduleData.selectedDirection = scheduleData.selectedDirection === dir ? null : dir;
+        renderScheduleFilters(); // 重新渲染所有篩選器以更新active狀態
+        renderScheduleResults();
+      });
+      
+      renderFilterPills('dateFilter', [...scheduleData.dates], scheduleData.selectedDate, (date) => {
+        scheduleData.selectedDate = scheduleData.selectedDate === date ? null : date;
+        renderScheduleFilters(); // 重新渲染所有篩選器以更新active狀態
+        renderScheduleResults();
+      });
+      
+      renderFilterPills('stationFilter', [...scheduleData.stations], scheduleData.selectedStation, (station) => {
+        scheduleData.selectedStation = scheduleData.selectedStation === station ? null : station;
+        renderScheduleFilters(); // 重新渲染所有篩選器以更新active狀態
+        renderScheduleResults();
+      });
+    }
+
+    function renderFilterPills(containerId, items, selectedItem, onClick) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      
+      items.sort().forEach(item => {
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = 'filter-pill' + (selectedItem === item ? ' active' : '');
+        pill.textContent = item;
+        pill.onclick = () => onClick(item);
+        container.appendChild(pill);
+      });
+    }
+
+    function renderScheduleResults() {
+      const container = document.getElementById('scheduleResults');
+      
+      const filtered = scheduleData.rows.filter(row => {
+        if (scheduleData.selectedDirection && row.direction !== scheduleData.selectedDirection) return false;
+        if (scheduleData.selectedDate && row.date !== scheduleData.selectedDate) return false;
+        if (scheduleData.selectedStation && row.station !== scheduleData.selectedStation) return false;
+        return true;
+      });
+      
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="empty-state" data-i18n="noSchedules">${t('noSchedules')}</div>`;
+        return;
+      }
+      
+      container.innerHTML = filtered.map(row => `
+        <div class="schedule-card">
+          <div class="schedule-line">
+            <span class="schedule-direction">${row.direction}</span>
+            <span class="schedule-date">${row.date}</span>
+            <span class="schedule-time">${row.time}</span>
+          </div>
+          <div class="schedule-line">
+            <span class="schedule-station">${row.station}</span>
+            <span class="schedule-capacity">${row.capacity}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    /* ====== 新增：跑馬燈和圖片展示功能 ====== */
+    async function loadSystemConfig() {
+      try {
+        const res = await fetch(API_URL + '?sheet=系統');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        
+        // 處理跑馬燈資料 (D2:D5 和 E2:E5)
+        const marqueeTexts = [];
+        for (let i = 1; i <= 4; i++) {
+          if (data[i] && data[i][3] === "是") { // E欄是第4個索引 (0-based)
+            marqueeTexts.push(data[i][2] || ''); // D欄是第3個索引
+          }
+        }
+        
+        // 顯示跑馬燈
+        if (marqueeTexts.length > 0) {
+          const marqueeContainer = document.getElementById('marqueeContainer');
+          const marqueeContent = document.getElementById('marqueeContent');
+          marqueeContent.innerHTML = marqueeTexts.join(' | ');
+          marqueeContainer.style.display = 'block';
+        }
+        
+        // 處理圖片展示 (D8:D12 和 E8:E12)
+        const galleryImages = [];
+        for (let i = 7; i <= 11; i++) {
+          if (data[i] && data[i][3] === "是") { // E欄是第4個索引
+            const imageUrl = data[i][2] || ''; // D欄是第3個索引
+            if (imageUrl) {
+              galleryImages.push(imageUrl);
+            }
+          }
+        }
+        
+        // 顯示圖片展示區
+        if (galleryImages.length > 0) {
+          const imageGallery = document.getElementById('imageGallery');
+          imageGallery.innerHTML = galleryImages.map(url => 
+            `<img src="${url}" class="gallery-image" alt="宣傳圖片" />`
+          ).join('');
+        }
+        
+      } catch (error) {
+        console.warn('載入系統設定失敗:', error);
+      }
+    }
+
+    function closeMarquee() {
+      const marqueeContainer = document.getElementById('marqueeContainer');
+      marqueeContainer.style.display = 'none';
+    }
+
     /* ====== 捲動監聽 ====== */
-    // 修復：只綁定 window 事件，使用統一的滾動位置計算
     window.addEventListener('scroll', handleScroll, {passive:true});
     window.addEventListener('resize', handleScroll, {passive:true});
 
@@ -1985,6 +2101,9 @@
       showPage('reservation');
       applyI18N();
       handleScroll(); // 初始化時計算一次
+      
+      // 載入系統設定（跑馬燈和圖片）
+      await loadSystemConfig();
     }
 
     function resetQuery(){
