@@ -819,19 +819,44 @@
       return `${y}-${m}-${d}`;
     }
     function parseTripDateTime(dateStr, timeStr){
-      const now = new Date();
-      const y = now.getFullYear();
-      let mm = null, dd = null, hm = '00:00';
-      const t = (timeStr||'').trim().replace('：',':');
-      if (/^\d{1,2}\/\d{1,2}/.test(t)){ const [md, hmPart] = t.split(' '); const [m,d] = md.split('/'); mm = parseInt(m,10); dd = parseInt(d,10); hm = (hmPart||'00:00').slice(0,5); }
-      else { hm = t.slice(0,5); }
-      if(!mm || !dd){
-        const dIso = (dateStr||'').trim();
-        try{ const dt = new Date(dIso+'T00:00:00'); mm = dt.getMonth()+1; dd = dt.getDate(); }catch(e){ mm = now.getMonth()+1; dd = now.getDate(); }
+      // 1) 先從 dateStr 拿到年月日（優先）
+      const iso = fmtDateLabel(dateStr); // 期望成為 YYYY-MM-DD
+       let y, m, d;
+
+       if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+        const parts = iso.split('-').map(n => parseInt(n, 10));
+        y = parts[0]; m = parts[1]; d = parts[2];
+       } else {
+        // 後備：用今天
+        const now = new Date();
+         y = now.getFullYear(); m = now.getMonth() + 1; d = now.getDate();
+       }
+
+      // 2) 從 timeStr 只取 HH:MM；若 timeStr 是 "MM/DD HH:MM"，忽略其中的 MM/DD
+      let H = 0, M = 0;
+       if (timeStr) {
+         const t = String(timeStr).trim().replace('：', ':');
+        if (/^\d{1,2}\/\d{1,2}/.test(t)) {
+          const [, hmPart] = t.split(' ');
+           const hm = (hmPart || '00:00').slice(0, 5);
+           const hhmm = hm.split(':');
+           H = parseInt(hhmm[0] || '0', 10);
+           M = parseInt(hhmm[1] || '0', 10);
+        } else if (/^\d{1,2}:\d{1,2}/.test(t)) {
+          const hm = t.slice(0, 5);
+           const hhmm = hm.split(':');
+           H = parseInt(hhmm[0] || '0', 10);
+          M = parseInt(hhmm[1] || '0', 10);
+        }
       }
-      const [H,M] = (hm||'00:00').split(':');
-      return new Date(y, mm-1, dd, parseInt(H||'0',10), parseInt(M||'0',10), 0);
+
+      return new Date(y, m - 1, d, H, M, 0);
     }
+
+      
+            const [H,M] = (hm||'00:00').split(':');
+            return new Date(y, mm-1, dd, parseInt(H||'0',10), parseInt(M||'0',10), 0);
+          }
     function isExpired(dateStr, timeStr){
       const dt = parseTripDateTime(dateStr, timeStr);
       return dt.getTime() < Date.now();
@@ -1128,7 +1153,7 @@ async function submitBooking(){
   if (errEl) errEl.style.display = 'none';
 
   // 最後一刻刷新班次，以防超賣
-  await refreshData(true);
+  await refreshData();
   const check = allRows.find(r =>
     String(r['去程 / 回程']).trim() === selectedDirection &&
     fmtDateLabel(r['日期']) === selectedDateRaw &&
@@ -1268,27 +1293,36 @@ async function downloadTicket() {
   try {
     // 1) 量測目前畫面上的實際尺寸
     const rect = card.getBoundingClientRect();
-    // 2) 以裝置像素比產生高解析輸出（避免文字鋸齒）
+    // 2) 以裝置像素比產生高解析輸出
     const dpr = Math.max(window.devicePixelRatio || 1, 1);
     const width = Math.round(rect.width);
     const height = Math.round(rect.height);
 
-    // 3) 交給 dom-to-image，以容器實際大小為基礎，DPR 放大
+    // 3) dom-to-image 以容器實際大小為基礎輸出
     const dataUrl = await domtoimage.toPng(card, {
-      width,                // 以容器寬度輸出
-      height,               // 以容器高度輸出
+      width,
+      height,
       bgcolor: '#ffffff',
-      pixelRatio: dpr,      // 依設備像素比放大，清晰
+      pixelRatio: dpr,
       style: {
-        // 確保不被外部樣式影響導致縮放或偏移
         margin: '0',
         transform: 'none',
-        // 鎖定渲染時的盒模型，避免動畫或陰影對快照造成抖動
         boxShadow: 'none',
-        // 可選：若父層有 overflow 影響，強制顯示完整
         overflow: 'visible'
       }
     });
+
+    // 4) 下載
+    const a = document.createElement('a');
+    const bid = (document.getElementById('ticketBookingId')?.textContent || 'ticket').trim();
+    a.href = dataUrl;
+    a.download = `ticket_${bid}.png`;
+    a.click();
+  } catch (e) {
+    alert('下載失敗：' + (e?.message || e));
+  }
+}
+
 
     /* ====== 查詢：新頁面流程 ====== */
     function showCheckQueryForm(){
@@ -1368,7 +1402,7 @@ async function downloadTicket() {
       const qr = document.createElement('div'); qr.className='ticket-qr';
       if(statusCode==='cancelled'){
         // ★ 取消用 placeholder
-        qr.innerHTML = `<img src="/images/imagesqr-placeholder.png" alt="QR placeholder" />`;
+        qr.innerHTML = `<img src="/images/qr-placeholder.png" alt="QR placeholder" />`;
       }else{
         qr.innerHTML = `<img src="${qrUrl}" alt="QR" />`;
       }
