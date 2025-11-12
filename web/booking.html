@@ -389,7 +389,8 @@
       <div class="actions">
         <button class="button btn-ghost" onclick="goStep(4)" data-i18n="back">返回</button>
         <button class="button btn-ghost" onclick="restart()" data-i18n="requery">重新查詢</button>
-        <button class="button" onclick="toStep6()" data-i18n="next">下一步</button>
+        <button class="button" type="button" onclick="toStep6()" data-i18n="next">下一步</button>
+
       </div>
     </section>
 
@@ -1060,19 +1061,20 @@
       }
       return true;
     }
+
 async function toStep6(){
-  if(!validateStep5()) return;
+  if (!validateStep5()) return;
 
   // 只做 UI 設定，不打 API
   document.getElementById('cf_direction').value = selectedDirection;
   document.getElementById('cf_date').value = selectedDateRaw;
 
-  const pick = selectedDirection==='回程' ? selectedStationRaw : '福泰大飯店 Forte Hotel';
-  const drop = selectedDirection==='回程' ? '福泰大飯店 Forte Hotel' : selectedStationRaw;
+  const pick = (selectedDirection === '回程') ? selectedStationRaw : '福泰大飯店 Forte Hotel';
+  const drop = (selectedDirection === '回程') ? '福泰大飯店 Forte Hotel' : selectedStationRaw;
   document.getElementById('cf_pick').value = pick;
   document.getElementById('cf_drop').value = drop;
   document.getElementById('cf_time').value = selectedScheduleTime;
-  document.getElementById('cf_name').value = (document.getElementById('guestName').value||'').trim();
+  document.getElementById('cf_name').value = (document.getElementById('guestName').value || '').trim();
 
   // 以 Step4 設好的 selectedAvailableSeats 產生人數選單
   const sel = document.getElementById('passengers');
@@ -1080,12 +1082,12 @@ async function toStep6(){
   const maxPassengers = Math.min(4, Math.max(0, selectedAvailableSeats));
   if (maxPassengers <= 0){
     const opt = document.createElement('option');
-    opt.value=''; opt.textContent='0';
+    opt.value = ''; opt.textContent = '0';
     sel.appendChild(opt);
     sel.disabled = true;
   } else {
     sel.disabled = false;
-    for (let i=1; i<=maxPassengers; i++){
+    for (let i = 1; i <= maxPassengers; i++){
       const opt = document.createElement('option');
       opt.value = String(i);
       opt.textContent = String(i);
@@ -1093,15 +1095,20 @@ async function toStep6(){
     }
     sel.value = '1';
   }
-  document.getElementById('passengersHint').textContent = `此班次可預約：${selectedAvailableSeats} 人；單筆最多 4 人`;
+  document.getElementById('passengersHint').textContent =
+    `此班次可預約：${selectedAvailableSeats} 人；單筆最多 4 人`;
 
   // 顯示 Step6
   ['step1','step2','step3','step4','step5'].forEach(id=>{
     const el = document.getElementById(id);
-    if (el) el.style.display='none';
+    if (el) el.style.display = 'none';
   });
-  document.getElementById('step6').style.display='';
-  window.scrollTo({top:0,behavior:'smooth'});
+  document.getElementById('step6').style.display = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // 清錯誤
+  const errEl = document.getElementById('passengersErr');
+  if (errEl) errEl.style.display = 'none';
 }
 
 let bookingSubmitting = false;
@@ -1109,32 +1116,36 @@ let bookingSubmitting = false;
 async function submitBooking(){
   if (bookingSubmitting) return; // 避免連點
 
+  // 驗證人數選擇
   const pSel = document.getElementById('passengers');
-  const p = Number(pSel.value || 0);
+  const p = Number(pSel?.value || 0);
   if (!p || p < 1 || p > 4) {
-    document.getElementById('passengersErr').style.display = 'block';
+    const errEl = document.getElementById('passengersErr');
+    if (errEl) errEl.style.display = 'block';
     return;
   }
-  document.getElementById('passengersErr').style.display = 'none';
+  const errEl = document.getElementById('passengersErr');
+  if (errEl) errEl.style.display = 'none';
 
-  // ★ 最後一刻再取最新資料，防止超賣
-  await refreshData(/* force */ true);
-  const check = allRows.find(r=>
-    String(r["去程 / 回程"]).trim()===selectedDirection &&
-    fmtDateLabel(r["日期"])===selectedDateRaw &&
-    String(r["站點"]).trim()===selectedStationRaw &&
-    fmtTimeLabel(r["班次"]||r["車次"])===selectedScheduleTime
+  // 最後一刻刷新班次，以防超賣
+  await refreshData(true);
+  const check = allRows.find(r =>
+    String(r['去程 / 回程']).trim() === selectedDirection &&
+    fmtDateLabel(r['日期']) === selectedDateRaw &&
+    String(r['站點']).trim() === selectedStationRaw &&
+    fmtTimeLabel(r['班次'] || r['車次']) === selectedScheduleTime
   );
-  if(!check){
+  if (!check){
     alert('班次已不存在，請重新查詢');
     return;
   }
-  const latestAvail = Number(onlyDigits(String(check["可預約人數"]||check["可約人數 / Available"]||'0'))) || 0;
-  if(p > latestAvail){
+  const latestAvail = Number(onlyDigits(String(check['可預約人數'] || check['可約人數 / Available'] || '0'))) || 0;
+  if (p > latestAvail){
     alert(`此班次目前僅剩 ${latestAvail} 位，請重新選擇`);
     return;
   }
 
+  // 組 payload
   const identity = document.getElementById('identitySelect').value;
   const payload = {
     direction: selectedDirection,
@@ -1156,20 +1167,22 @@ async function submitBooking(){
 
   bookingSubmitting = true;
   showVerifyLoading(true);
+
   try {
+    // 下單
     const res = await fetch(OPS_URL, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json','Accept': 'application/json'},
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ action: 'book', data: payload })
     });
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const result = await res.json();
 
     if (result.status === 'success') {
       currentBookingData = {
         bookingId: result.booking_id || '',
         date: selectedDateRaw,
-        time: selectedScheduleTime, // 只顯示 HH:MM
+        time: selectedScheduleTime,   // 顯示 HH:MM
         direction: selectedDirection,
         pickLocation: payload.pickLocation,
         dropLocation: payload.dropLocation,
@@ -1180,10 +1193,10 @@ async function submitBooking(){
         qrUrl: result.qr_url
       };
 
-      // 先顯示成功動畫
+      // 成功動畫優先
       showSuccessAnimation();
 
-      // 完成後展示票卡；寄信放背景
+      // 動畫後顯示票卡，寄信用背景請求，不阻塞 UI
       setTimeout(async () => {
         document.getElementById('ticketQrImg').src = currentBookingData.qrUrl;
         document.getElementById('ticketBookingId').textContent = currentBookingData.bookingId;
@@ -1195,34 +1208,87 @@ async function submitBooking(){
         document.getElementById('ticketPhone').textContent = currentBookingData.phone;
         document.getElementById('ticketEmail').textContent = currentBookingData.email;
         document.getElementById('ticketPassengers').textContent = currentBookingData.passengers + ' 人';
-        document.getElementById('step6').style.display = 'none';
-        document.getElementById('successCard').style.display = '';
-        window.scrollTo({top: 0, behavior: 'smooth'});
 
-        // 背景寄信，不阻塞 UI
-        try{
+        // 切換畫面
+        const s6 = document.getElementById('step6');
+        if (s6) s6.style.display = 'none';
+        const card = document.getElementById('successCard');
+        if (card) card.style.display = '';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        // 背景寄信，4 秒超時
+        try {
           const controller = new AbortController();
-          const timer = setTimeout(()=>controller.abort(), 4000);
-          const dataUrl = await domtoimage.toPng(document.getElementById('ticketCard'), {bgcolor:'#fff', pixelRatio:2});
+          const timer = setTimeout(() => controller.abort(), 4000);
+          const dataUrl = await domtoimage.toPng(document.getElementById('ticketCard'), { bgcolor: '#fff', pixelRatio: 2 });
           fetch(OPS_URL, {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({action:'mail', data:{ booking_id: currentBookingData.bookingId, lang: currentLang, kind:'book', ticket_png_base64: dataUrl }}),
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'mail',
+              data: {
+                booking_id: currentBookingData.bookingId,
+                lang: currentLang,
+                kind: 'book',
+                ticket_png_base64: dataUrl
+              }
+            }),
             signal: controller.signal
           }).catch(()=>{}).finally(()=>clearTimeout(timer));
-        }catch(e){ console.warn('寄信未完成或超時', e); }
+        } catch (e) {
+          console.warn('寄信未完成或超時', e);
+        }
       }, 3000);
     } else {
       alert(result.detail || result.message || '預約失敗，請稍後再試');
     }
   } catch (e) {
-    alert('提交失敗：' + e.message);
+    alert('提交失敗：' + (e?.message || e));
   } finally {
     showVerifyLoading(false);
     bookingSubmitting = false;
   }
 }
 
+function closeTicketToHome(){
+  const card = document.getElementById('successCard');
+  if (card) card.style.display = 'none';
+  // 你可以選擇回首頁
+  document.getElementById('homeHero').style.display = '';
+  ['step1','step2','step3','step4','step5','step6'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.style.display='none';
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+    
+async function downloadTicket() {
+  const card = document.getElementById('ticketCard');
+  if (!card) { alert('找不到票卡'); return; }
+
+  try {
+    // 1) 量測目前畫面上的實際尺寸
+    const rect = card.getBoundingClientRect();
+    // 2) 以裝置像素比產生高解析輸出（避免文字鋸齒）
+    const dpr = Math.max(window.devicePixelRatio || 1, 1);
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
+    // 3) 交給 dom-to-image，以容器實際大小為基礎，DPR 放大
+    const dataUrl = await domtoimage.toPng(card, {
+      width,                // 以容器寬度輸出
+      height,               // 以容器高度輸出
+      bgcolor: '#ffffff',
+      pixelRatio: dpr,      // 依設備像素比放大，清晰
+      style: {
+        // 確保不被外部樣式影響導致縮放或偏移
+        margin: '0',
+        transform: 'none',
+        // 鎖定渲染時的盒模型，避免動畫或陰影對快照造成抖動
+        boxShadow: 'none',
+        // 可選：若父層有 overflow 影響，強制顯示完整
+        overflow: 'visible'
+      }
+    });
 
     /* ====== 查詢：新頁面流程 ====== */
     function showCheckQueryForm(){
