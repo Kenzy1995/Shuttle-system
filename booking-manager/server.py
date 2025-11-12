@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 import urllib.parse
 import hashlib
+from fastapi import Response
 
 import qrcode
 from fastapi import FastAPI, HTTPException, Response
@@ -406,6 +407,14 @@ def qr_image(code: str):
         raise HTTPException(500, f"QR 生成失敗: {str(e)}")
 
 # ========== 主 API ==========
+# 允許預檢請求
+@app.options("/api/ops")
+@app.options("/api/ops/")
+def ops_options():
+    return Response(status_code=204)
+
+# 同時註冊無尾斜線與尾斜線的 POST
+@app.post("/api/ops/")
 @app.post("/api/ops")
 def ops(req: OpsRequest):
     action = (req.action or "").strip().lower()
