@@ -421,18 +421,20 @@ def ops(req: OpsRequest):
         headers = _sheet_headers(ws)
   
         # 共同工具：必要欄位健檢（避免寫出空白列）
+        # 共同工具：必要欄位健檢（避免寫出空白列）
         def _assert_required_headers(required_cols: List[str]):
-          missing = [c for c in required_cols if c not in hmap]
-          if missing:
-             raise HTTPException(
-                 500,
+            missing = [c for c in required_cols if c not in hmap]
+            if missing:
+                raise HTTPException(
+                    500,
                     f"試算表缺少必要欄位或 HEADER_ROW 錯誤：{missing}"
-              )
- 
-         REQUIRED_FOR_BOOK = [
-             "申請日期","預約狀態","預約編號","往返","日期","班次","車次",
-             "上車地點","下車地點","姓名","手機","信箱","預約人數","QRCode編碼"
-         ]
+                )
+
+        REQUIRED_FOR_BOOK = [
+            "申請日期","預約狀態","預約編號","往返","日期","班次","車次",
+            "上車地點","下車地點","姓名","手機","信箱","預約人數","QRCode編碼"
+        ]
+
 
 
 
@@ -705,26 +707,32 @@ def ops(req: OpsRequest):
                 except Exception:
                     attachment_bytes = None
 
-             # 寄信；失敗不阻擋流程，只登記寄信狀態
-             status_text = None
-             try:
-                 _send_email_gmail(
-                     info["email"],
-                     subject,
-                     html,
-                     attachment=attachment_bytes,
-                     attachment_filename=f"ticket_{info['booking_id']}.png" if attachment_bytes else "ticket.png",
-                 )
-                 status_text = f"{_tz_now_str()} 寄信成功"
-             except Exception as e:
-                 status_text = f"{_tz_now_str()} 寄信失敗: {str(e)}"
- 
-             if "寄信狀態" in hmap and status_text:
-                 ws.update_acell(gspread.utils.rowcol_to_a1(rowno, hmap["寄信狀態"]), status_text)
- 
-             # 回傳不丟 500，交由前端呈現寄信結果
-             ok = "success" if "成功" in status_text else "mail_failed"
-             return {"status": ok, "booking_id": p.booking_id, "mail_note": status_text}
+            # 寄信；失敗不阻擋流程，只登記寄信狀態
+            status_text = None
+            try:
+                _send_email_gmail(
+                    info["email"],
+                    subject,
+                    html,
+                    attachment=attachment_bytes,
+                    attachment_filename=(
+                        f"ticket_{info['booking_id']}.png" if attachment_bytes else "ticket.png"
+                    ),
+                )
+                status_text = f"{_tz_now_str()} 寄信成功"
+            except Exception as e:
+                status_text = f"{_tz_now_str()} 寄信失敗: {str(e)}"
+
+            if "寄信狀態" in hmap and status_text:
+                ws.update_acell(
+                    gspread.utils.rowcol_to_a1(rowno, hmap["寄信狀態"]),
+                    status_text
+                )
+
+            # 回傳不丟 500，交由前端呈現寄信結果
+            ok = "success" if ("成功" in (status_text or "")) else "mail_failed"
+            return {"status": ok, "booking_id": p.booking_id, "mail_note": status_text}
+
 
         else:
             raise HTTPException(400, f"未知 action：{action}")
