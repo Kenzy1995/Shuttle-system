@@ -520,7 +520,12 @@ def ops(req: OpsRequest):
 
         def setv(row_arr: List[str], col: str, v: Any):
             if col in hmap and 1 <= hmap[col] <= len(row_arr):
-                row_arr[hmap[col] - 1] = v if isinstance(v, str) else str(v)
+                if isinstance(v, (int, float)):
+                  row_arr[hmap[col] - 1] = v
+                elif isinstance(v, str):
+                  row_arr[hmap[col] - 1] = v
+                else:
+                  row_arr[hmap[col] - 1] = str(v)
 
         def get_by_rowno(rowno: int, key: str) -> str:
             if key not in hmap:
@@ -728,7 +733,7 @@ def ops(req: OpsRequest):
             if p.pickLocation and p.dropLocation:
                 pk_idx, dp_idx, seg_str = _compute_indices_and_segments(new_pick, new_drop)
             updates["預約狀態"] = BOOKED_TEXT
-            updates["預約人數"] = str(new_pax)
+            updates["預約人數"] = new_pax
             if "備註" in hmap:
                 current_note = ws_main.cell(rowno, hmap["備註"]).value or ""
                 new_note = f"{_tz_now_str()} 已修改"
@@ -758,7 +763,7 @@ def ops(req: OpsRequest):
                         'values': [[value]]
                     })
             if batch_updates:
-                ws_main.batch_update(batch_updates)
+                ws_main.batch_update(batch_updates, value_input_option="USER_ENTERED")
             log.info(f"modify updated booking_id={p.booking_id}")
             # 寄信（失敗不阻擋）
             try:
@@ -810,7 +815,7 @@ def ops(req: OpsRequest):
                         'values': [[value]]
                     })
             if batch_updates:
-                ws_main.batch_update(batch_updates)
+                ws_main.batch_update(batch_updates, value_input_option="USER_ENTERED")
             log.info(f"delete updated booking_id={p.booking_id}")
             # 寄信（失敗不阻擋）
             try:
@@ -863,7 +868,7 @@ def ops(req: OpsRequest):
                         'values': [[value]]
                     })
             if batch_updates:
-                ws_main.batch_update(batch_updates)
+                ws_main.batch_update(batch_updates, value_input_option="USER_ENTERED")
             log.info(f"check_in row={rowno}")
             return {"status": "success", "row": rowno}
         # ===== 寄信（手動補寄） =====
