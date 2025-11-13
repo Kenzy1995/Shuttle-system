@@ -1,0 +1,59 @@
+name: Deploy Hotel Price API to Cloud Run
+
+on:
+  push:
+    paths:
+      - 'hotel-price-api/**'
+    branches: [ main ]
+
+env:
+  PROJECT_ID: '${{ secrets.GCP_PROJECT_ID }}'
+  SERVICE: hotel-price-api
+  REGION: asia-east1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Google Auth
+      id: auth
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+    - name: Set project
+      run: gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
+
+    - name: Configure Docker auth
+      run: |
+        gcloud auth configure-docker gcr.io --quiet
+
+    - name: Build Docker image
+      run: |
+        cd hotel-price-api
+        docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE }} .
+
+    - name: Push Docker image
+      run: |
+        docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE }}
+
+    - name: Deploy to Cloud Run
+      run: |
+        gcloud run deploy ${{ env.SERVICE }} \
+          --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE }} \
+          --region ${{ env.REGION }} \
+          --platform managed \
+          --allow-unauthenticated \
+          --service-account=forte-booking-system@forte-booking-system.iam.gserviceaccount.com \
+          --memory=2Gi \
+          --cpu=2 \
+          --max-instances=10 \
+          --timeout=300s
+
+    - name: Show Service URL
+      run: |
+        echo "Service deployed at: https://${{ env.SERVICE }}-$(gcloud config get-value project).a.run.app"
