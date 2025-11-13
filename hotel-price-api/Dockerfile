@@ -1,9 +1,3 @@
-# 原本
-# FROM python:3.11-slim
-# 或
-# FROM mcr.microsoft.com/playwright/python:v1.42.0-jammy
-
-# 改成這個（關鍵！）
 FROM mcr.microsoft.com/playwright/python:v1.56.0-jammy
 
 WORKDIR /app
