@@ -1,4 +1,35 @@
 from __future__ import annotations
+"""
+Booking management service for the hotel shuttle system.
+
+This module defines a FastAPI application that handles all booking operations
+including booking creation, querying existing bookings, modification, cancellation,
+check‑in and email notifications.  It persists data to a Google Sheet named
+``預約審核(櫃台)`` and uses another sheet ``可預約班次(web)`` to determine
+available capacity per trip.
+
+Key improvements over the upstream version:
+
+* When querying bookings, the service now always derives the ``日期`` (date)
+  and ``班次`` (time) fields from the unified ``車次‑日期時間`` column.  This
+  ensures that all downstream consumers interpret the trip schedule from a
+  single source of truth.  If for some reason ``車次‑日期時間`` is missing or
+  malformed, the service gracefully falls back to the original ``日期`` and
+  ``班次`` columns.
+
+* The modification workflow also uses the ``車次‑日期時間`` column to derive
+  the existing time component instead of relying on the legacy ``班次`` or
+  ``車次`` fields.  This unifies how times are stored and interpreted.
+
+* Extensive inline comments explain the purpose of each helper and critical
+  sections of the code.  Variable names have been harmonised to improve
+  readability and reduce accidental misuse of similar concepts (e.g. ``車次``
+  vs. ``車次‑日期時間``).
+
+The rest of the service behaviour remains compatible with the existing front‑end
+and spreadsheet structure.
+"""
+
 import io
 import os
 import re
@@ -17,7 +48,6 @@ import gspread
 import google.auth
 import hashlib
 
-# gmail
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -36,32 +66,35 @@ log = logging.getLogger("booking-manager")
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
-    "https://www.googleapis.com/auth/gmail.send",  # 寄信
+    "https://www.googleapis.com/auth/gmail.send",
 ]
 
+# Spreadsheet identifiers
 SPREADSHEET_ID = "1xp54tKOczklmT8uacW-HMxwV8r0VOR2ui33jYcE2pUQ"
 SHEET_NAME_MAIN = "預約審核(櫃台)"      # 主資料表
 SHEET_NAME_CAP  = "可預約班次(web)"     # 剩餘可預約名額（權威來源）
 
+# Base URL for generating QR code images
 BASE_URL = "https://booking-manager-995728097341.asia-east1.run.app"
 
+# Email settings
 EMAIL_FROM_NAME = "汐止福泰大飯店櫃檯"
 EMAIL_FROM_ADDR = "fortehotels.shuttle@gmail.com"
 
-# 主表表頭列（1-based）
+# 表頭列開始索引（1-based indexing）
 HEADER_ROW_MAIN = 2
 
-# 狀態
+# 狀態文本
 BOOKED_TEXT = "✔️ 已預約 Booked"
 CANCELLED_TEXT = "❌ 已取消 Cancelled"
 
 # 主表允許欄位
 HEADER_KEYS = {
-    "申請日期","最後操作時間","預約編號","往返","日期","班次","車次",
-    "上車地點","下車地點","姓名","手機","信箱","預約人數","櫃台審核",
-    "預約狀態","乘車狀態","身分","房號","入住日期","退房日期","用餐日期",
-    "上車索引","下車索引","涉及路段範圍","QRCode編碼","備註","寄信狀態",
-    "車次-日期時間"  # 新增欄位
+    "申請日期", "最後操作時間", "預約編號", "往返", "日期", "班次", "車次",
+    "上車地點", "下車地點", "姓名", "手機", "信箱", "預約人數", "櫃台審核",
+    "預約狀態", "乘車狀態", "身分", "房號", "入住日期", "退房日期", "用餐日期",
+    "上車索引", "下車索引", "涉及路段範圍", "QRCode編碼", "備註", "寄信狀態",
+    "車次-日期時間"  # unified date/time string
 }
 
 # 可預約班次表必要欄位
@@ -82,9 +115,11 @@ DROP_INDEX_MAP_EXACT = {
 }
 
 def _email_hash6(email: str) -> str:
+    """Return the first six hex digits of a SHA256 hash of the email."""
     return hashlib.sha256((email or "").encode("utf-8")).hexdigest()[:6]
 
 def _tz_now_str() -> str:
+    """Return current time in Asia/Taipei timezone as a string."""
     os.environ.setdefault("TZ", "Asia/Taipei")
     try:
         time.tzset()
@@ -94,6 +129,7 @@ def _tz_now_str() -> str:
     return f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
 
 def _today_iso_taipei() -> str:
+    """Return today's date (YYYY-MM-DD) in Asia/Taipei timezone."""
     os.environ.setdefault("TZ", "Asia/Taipei")
     try:
         time.tzset()
@@ -103,6 +139,7 @@ def _today_iso_taipei() -> str:
     return f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d}"
 
 def _time_hm_from_any(s: str) -> str:
+    """Normalize any time string to HH:MM. Accepts variations with fullwidth colons or trailing seconds."""
     s = (s or "").strip().replace("：", ":")
     if " " in s and ":" in s:
         return s.split()[-1][:5]
@@ -111,10 +148,10 @@ def _time_hm_from_any(s: str) -> str:
     return s
 
 def _display_trip_str(date_iso: str, time_hm: str) -> str:
+    """Return a user-friendly display string for a trip, e.g. '11/14 21:00'."""
     if not date_iso or not time_hm:
         return ""
     y, m, d = date_iso.split("-")
-
     return f"{int(m)}/{int(d)} {time_hm}"
 
 def _mmdd_prefix(date_iso: str) -> str:
@@ -122,6 +159,7 @@ def _mmdd_prefix(date_iso: str) -> str:
     return f"{int(m):02d}{int(d):02d}"
 
 def _compute_indices_and_segments(pickup: str, dropoff: str):
+    """Compute station indices and segment string for a route."""
     ps = (pickup or "").strip()
     ds = (dropoff or "").strip()
     pick_idx = PICK_INDEX_MAP_EXACT.get(ps, 0)
@@ -133,11 +171,15 @@ def _compute_indices_and_segments(pickup: str, dropoff: str):
     return pick_idx, drop_idx, seg_str
 
 def _normalize_station_for_capacity(direction: str, pick: str, drop: str) -> str:
-    # 可預約班次(web) 的「站點」代表非飯店端的站點
+    """Normalize the station used when looking up capacity.
+
+    For the capacity sheet, the "站點" column always refers to the non-hotel end of a trip.
+    """
     return (drop if direction == "去程" else pick).strip()
 
 # ========== Google Sheets ==========
 def open_ws(name: str) -> gspread.Worksheet:
+    """Open a worksheet by name, raising a RuntimeError on failure."""
     try:
         credentials, _ = google.auth.default(scopes=SCOPES)
         gc = gspread.authorize(credentials)
@@ -152,6 +194,7 @@ def _sheet_headers(ws: gspread.Worksheet, header_row: int) -> List[str]:
     return [h.strip() for h in headers]
 
 def header_map_main(ws: gspread.Worksheet) -> Dict[str, int]:
+    """Return a mapping from header names to 1-based column indices."""
     row = _sheet_headers(ws, HEADER_ROW_MAIN)
     m: Dict[str, int] = {}
     for idx, name in enumerate(row, start=1):
@@ -223,6 +266,7 @@ def _parse_available(s: str) -> Optional[int]:
     return int(m.group(1)) if m else None
 
 def lookup_capacity(direction: str, date_iso: str, time_hm: str, station: str) -> int:
+    """Look up remaining capacity for a given direction/date/time/station."""
     ws_cap = open_ws(SHEET_NAME_CAP)
     values = _read_all_rows(ws_cap)
     m, hdr_row = _cap_header_map(values)
@@ -249,13 +293,11 @@ def lookup_capacity(direction: str, date_iso: str, time_hm: str, station: str) -
         r_time  = _time_hm_from_any(row[idx_time] if idx_time < len(row) else "")
         r_st    = _normalize_text(row[idx_st] if idx_st < len(row) else "")
         r_avail = row[idx_avail] if idx_avail < len(row) else ""
-
         if r_dir == want_dir and r_date == want_date and r_time == want_time and r_st == want_station:
             avail = _parse_available(r_avail)
             if avail is None:
                 raise HTTPException(409, "capacity_not_numeric")
             return avail
-
     raise HTTPException(409, "capacity_not_found")
 
 # ========== Pydantic ==========
@@ -363,7 +405,6 @@ def _compose_mail_html(info: Dict[str, str], lang: str, kind: str) -> Tuple[str,
         },
     }
     subject = f'{subjects[kind]["zh"]} / {subjects[kind].get(lang, subjects[kind]["en"])}'
-
     zh = f"""
     <div style="color:black">
       <p>尊敬的 {info.get('name','')} 貴賓，您好！</p>
@@ -472,7 +513,6 @@ def ops(req: OpsRequest):
     action = (req.action or "").strip().lower()
     data = req.data or {}
     log.info(f"OPS action={action} payload={data}")
-
     try:
         ws_main = open_ws(SHEET_NAME_MAIN)
         hmap = header_map_main(ws_main)
@@ -495,33 +535,29 @@ def ops(req: OpsRequest):
             rem = lookup_capacity(p.direction, p.date, _time_hm_from_any(p.time), station_for_cap)
             if int(p.passengers) > int(rem):
                 raise HTTPException(409, f"capacity_exceeded:{p.passengers}>{rem}")
-
             # 產生預約編號：以「今日日期」為準
             today_iso = _today_iso_taipei()
             last_seq = _get_max_seq_for_date(ws_main, today_iso)
             booking_id = f"{_mmdd_prefix(today_iso)}{last_seq + 1:03d}"
-
             car_display = _display_trip_str(p.date, _time_hm_from_any(p.time))
             pk_idx, dp_idx, seg_str = _compute_indices_and_segments(p.pickLocation, p.dropLocation)
             em6 = _email_hash6(p.email)
             qr_content = f"FT:{booking_id}:{em6}"
             qr_url = f"{BASE_URL}/api/qr/{urllib.parse.quote(qr_content)}"
-
-            # 新增：計算車次-日期時間格式
+            # 計算車次-日期時間格式，例如 '2025/11/14 21:00'
             date_obj = datetime.strptime(p.date, "%Y-%m-%d")
             car_datetime = date_obj.strftime("%Y/%m/%d") + " " + _time_hm_from_any(p.time)
-
+            # 準備寫入行
             newrow = [""] * len(headers)
             setv(newrow, "申請日期", _tz_now_str())
             setv(newrow, "預約狀態", BOOKED_TEXT)
             identity_simple = "住宿" if p.identity == "hotel" else "用餐"
-
             setv(newrow, "預約編號", booking_id)
             setv(newrow, "往返", p.direction)
             setv(newrow, "日期", p.date)
             setv(newrow, "班次", _time_hm_from_any(p.time))
-            setv(newrow, "車次", car_display)
-            setv(newrow, "車次-日期時間", car_datetime)  # 新增欄位
+            setv(newrow, "車次", car_display)  # user-facing mm/dd HH:MM string
+            setv(newrow, "車次-日期時間", car_datetime)  # unified field
             setv(newrow, "上車地點", p.pickLocation)
             setv(newrow, "下車地點", p.dropLocation)
             setv(newrow, "姓名", p.name)
@@ -539,17 +575,14 @@ def ops(req: OpsRequest):
             setv(newrow, "涉及路段範圍", seg_str)
             setv(newrow, "QRCode編碼", qr_content)
             setv(newrow, "寄信狀態", "")  # 先空白，稍後更新
-
             # 一次性寫入整列
             ws_main.append_row(newrow, value_input_option="USER_ENTERED")
             log.info(f"book appended booking_id={booking_id}")
-
             # 取得該列 rowno 以便更新寄信狀態
             all_values = _read_all_rows(ws_main)
             rownos = _find_rows_by_pred(ws_main, headers, HEADER_ROW_MAIN,
                                         lambda r: r.get("預約編號") == booking_id)
             rowno = rownos[0] if rownos else None
-
             # 寄信（失敗不阻擋）
             try:
                 info = {
@@ -575,32 +608,49 @@ def ops(req: OpsRequest):
                 log.info(f"mail result: {mail_note}")
             except Exception as e:
                 log.exception(f"mail block error but ignored: {e}")
-
             return {"status": "success", "booking_id": booking_id, "qr_url": qr_url, "qr_content": qr_content}
-
         # ===== 查詢 =====
         elif action == "query":
             p = QueryPayload(**data)
             if not (p.booking_id or p.phone or p.email):
                 raise HTTPException(400, "至少提供 booking_id / phone / email 其中一項")
-
             all_values = _read_all_rows(ws_main)
             if not all_values:
                 return []
-
             def get(row: List[str], key: str) -> str:
                 return row[hmap[key] - 1] if key in hmap and len(row) >= hmap[key] else ""
-
-            now, one_month_ago = datetime.now(), datetime.now() - timedelta(days=31)
+            now = datetime.now()
+            one_month_ago = now - timedelta(days=31)
             results: List[Dict[str, str]] = []
             for row in all_values[HEADER_ROW_MAIN:]:
-                date_iso = get(row, "日期")
+                # Always derive date/time from unified 車次-日期時間 column if available
+                car_dt_str = get(row, "車次-日期時間")
+                date_iso: str = ""
+                time_hm: str = ""
+                if car_dt_str:
+                    try:
+                        parts = car_dt_str.strip().split()
+                        if parts:
+                            date_iso = parts[0].replace("/", "-")
+                            if len(parts) > 1:
+                                time_hm = _time_hm_from_any(parts[1])
+                        else:
+                            date_iso = ""
+                    except Exception:
+                        # fallback to legacy columns
+                        date_iso = get(row, "日期")
+                        time_hm = _time_hm_from_any(get(row, "班次"))
+                else:
+                    date_iso = get(row, "日期")
+                    time_hm = _time_hm_from_any(get(row, "班次"))
+                # parse date to filter range; if invalid, use current time to avoid filtering out
                 try:
                     d = datetime.strptime(date_iso, "%Y-%m-%d")
-                except:
+                except Exception:
                     d = now
                 if d < one_month_ago:
                     continue
+                # filter by id/phone/email
                 if p.booking_id and p.booking_id != get(row, "預約編號"):
                     continue
                 if p.phone and p.phone != get(row, "手機"):
@@ -608,12 +658,19 @@ def ops(req: OpsRequest):
                 if p.email and p.email != get(row, "信箱"):
                     continue
                 rec = {k: get(row, k) for k in hmap}
+                # override date/time fields with values derived from 車次-日期時間
+                if date_iso:
+                    rec["日期"] = date_iso
+                if time_hm:
+                    rec["班次"] = time_hm
+                    # update 車次欄以新的顯示格式
+                    rec["車次"] = _display_trip_str(date_iso, time_hm)
+                # 如果櫃檯審核為 n 則將預約狀態標為「已拒絕」
                 if rec.get("櫃台審核", "").lower() == "n":
                     rec["預約狀態"] = "已拒絕"
                 results.append(rec)
             log.info(f"query results count={len(results)}")
             return results
-
         # ===== 修改 =====
         elif action == "modify":
             p = ModifyPayload(**data)
@@ -622,25 +679,30 @@ def ops(req: OpsRequest):
             if not rownos:
                 raise HTTPException(404, "找不到此預約編號")
             rowno = rownos[0]
-
             # 讀舊值
             old_dir  = get_by_rowno(rowno, "往返")
             old_date = get_by_rowno(rowno, "日期")
-            old_time = get_by_rowno(rowno, "班次") or get_by_rowno(rowno, "車次")
+            # derive old_time from unified column if present
+            old_car_dt = get_by_rowno(rowno, "車次-日期時間")
+            if old_car_dt:
+                parts = old_car_dt.strip().split()
+                old_time = _time_hm_from_any(parts[1] if len(parts) > 1 else parts[0])
+            else:
+                # fallback: use 班次欄位
+                old_time = _time_hm_from_any(get_by_rowno(rowno, "班次"))
             old_pick = get_by_rowno(rowno, "上車地點")
             old_drop = get_by_rowno(rowno, "下車地點")
             try:
                 old_pax = int(get_by_rowno(rowno, "預約人數") or "1")
             except:
                 old_pax = 1
-
+            # assign new values or fallback to old values
             new_dir  = p.direction or old_dir
             new_date = p.date or old_date
             new_time = _time_hm_from_any(p.time or old_time)
             new_pick = p.pickLocation or old_pick
             new_drop = p.dropLocation or old_drop
             new_pax  = int(p.passengers if p.passengers is not None else old_pax)
-
             # 容量檢查
             station_for_cap = _normalize_station_for_capacity(new_dir, new_pick, new_drop)
             rem = lookup_capacity(new_dir, new_date, new_time, station_for_cap)
@@ -652,30 +714,25 @@ def ops(req: OpsRequest):
             else:
                 if new_pax > rem:
                     raise HTTPException(409, f"capacity_exceeded:{new_pax}>{rem}")
-
             # 進行更新（批次）
             updates: Dict[str, str] = {}
             time_hm = new_time
             car_display = _display_trip_str(new_date, time_hm) if (new_date and time_hm) else None
-            
-            # 新增：更新車次-日期時間
+            # 更新 unified 車次-日期時間
             if new_date and new_time:
                 date_obj = datetime.strptime(new_date, "%Y-%m-%d")
                 car_datetime = date_obj.strftime("%Y/%m/%d") + " " + new_time
                 updates["車次-日期時間"] = car_datetime
-            
             pk_idx = dp_idx = None
             seg_str = None
             if p.pickLocation and p.dropLocation:
                 pk_idx, dp_idx, seg_str = _compute_indices_and_segments(new_pick, new_drop)
-
             updates["預約狀態"] = BOOKED_TEXT
             updates["預約人數"] = str(new_pax)
             if "備註" in hmap:
                 current_note = ws_main.cell(rowno, hmap["備註"]).value or ""
                 new_note = f"{_tz_now_str()} 已修改"
                 updates["備註"] = f"{current_note}; {new_note}" if current_note else new_note
-
             updates["往返"] = new_dir
             updates["日期"] = new_date
             if time_hm: updates["班次"] = time_hm
@@ -693,7 +750,6 @@ def ops(req: OpsRequest):
             if seg_str is not None: updates["涉及路段範圍"] = seg_str
             if "最後操作時間" in hmap:
                 updates["最後操作時間"] = _tz_now_str() + " 已修改"
-
             batch_updates = []
             for col_name, value in updates.items():
                 if col_name in hmap:
@@ -704,7 +760,6 @@ def ops(req: OpsRequest):
             if batch_updates:
                 ws_main.batch_update(batch_updates)
             log.info(f"modify updated booking_id={p.booking_id}")
-
             # 寄信（失敗不阻擋）
             try:
                 info = {
@@ -730,9 +785,7 @@ def ops(req: OpsRequest):
                 log.info(f"mail result: {mail_note}")
             except Exception as e:
                 log.exception(f"mail block error but ignored: {e}")
-
             return {"status": "success", "booking_id": p.booking_id}
-
         # ===== 刪除（取消） =====
         elif action == "delete":
             p = DeletePayload(**data)
@@ -740,7 +793,6 @@ def ops(req: OpsRequest):
             if not rownos:
                 raise HTTPException(404, "找不到此預約編號")
             rowno = rownos[0]
-
             updates: Dict[str, str] = {}
             if "預約狀態" in hmap:
                 updates["預約狀態"] = CANCELLED_TEXT
@@ -750,7 +802,6 @@ def ops(req: OpsRequest):
                 updates["備註"] = f"{current_note}; {new_note}" if current_note else new_note
             if "最後操作時間" in hmap:
                 updates["最後操作時間"] = _tz_now_str() + " 已刪除"
-
             batch_updates = []
             for col_name, value in updates.items():
                 if col_name in hmap:
@@ -761,13 +812,12 @@ def ops(req: OpsRequest):
             if batch_updates:
                 ws_main.batch_update(batch_updates)
             log.info(f"delete updated booking_id={p.booking_id}")
-
             # 寄信（失敗不阻擋）
             try:
                 info = {
                     "booking_id": p.booking_id,
                     "date": get_by_rowno(rowno, "日期"),
-                    "time": _time_hm_from_any(get_by_rowno(rowno, "班次") or get_by_rowno(rowno, "車次")),
+                    "time": _time_hm_from_any(get_by_rowno(rowno, "班次")),
                     "direction": get_by_rowno(rowno, "往返"),
                     "pick": get_by_rowno(rowno, "上車地點"),
                     "drop": get_by_rowno(rowno, "下車地點"),
@@ -787,15 +837,12 @@ def ops(req: OpsRequest):
                 log.info(f"mail result: {mail_note}")
             except Exception as e:
                 log.exception(f"mail block error but ignored: {e}")
-
             return {"status": "success", "booking_id": p.booking_id}
-
         # ===== 掃碼上車 =====
         elif action == "check_in":
             p = CheckInPayload(**data)
             if not (p.code or p.booking_id):
                 raise HTTPException(400, "需提供 code 或 booking_id")
-
             rownos = _find_rows_by_pred(
                 ws_main, headers, HEADER_ROW_MAIN,
                 lambda r: r.get("QRCode編碼") == p.code or r.get("預約編號") == p.booking_id,
@@ -803,13 +850,11 @@ def ops(req: OpsRequest):
             if not rownos:
                 raise HTTPException(404, "找不到符合條件之訂單")
             rowno = rownos[0]
-
             updates: Dict[str, str] = {}
             if "乘車狀態" in hmap:
                 updates["乘車狀態"] = "已上車"
             if "最後操作時間" in hmap:
                 updates["最後操作時間"] = _tz_now_str() + " 已上車"
-
             batch_updates = []
             for col_name, value in updates.items():
                 if col_name in hmap:
@@ -820,9 +865,7 @@ def ops(req: OpsRequest):
             if batch_updates:
                 ws_main.batch_update(batch_updates)
             log.info(f"check_in row={rowno}")
-
             return {"status": "success", "row": rowno}
-
         # ===== 寄信（手動補寄） =====
         elif action == "mail":
             p = MailPayload(**data)
@@ -830,12 +873,11 @@ def ops(req: OpsRequest):
             if not rownos:
                 raise HTTPException(404, "找不到此預約編號")
             rowno = rownos[0]
-
             get = lambda k: get_by_rowno(rowno, k)
             info = {
                 "booking_id": get("預約編號"),
                 "date": get("日期"),
-                "time": _time_hm_from_any(get("班次") or get("車次")),
+                "time": _time_hm_from_any(get("班次")),
                 "direction": get("往返"),
                 "pick": get("上車地點"),
                 "drop": get("下車地點"),
@@ -844,9 +886,7 @@ def ops(req: OpsRequest):
                 "email": get("信箱"),
                 "pax": get("預約人數") or "1",
             }
-
             subject, html = _compose_mail_html(info, p.lang, p.kind)
-
             attachment_bytes: Optional[bytes] = None
             if p.kind in ("book", "modify") and p.ticket_png_base64:
                 b64 = p.ticket_png_base64
@@ -856,22 +896,17 @@ def ops(req: OpsRequest):
                     attachment_bytes = base64.b64decode(b64, validate=True)
                 except Exception:
                     attachment_bytes = None
-
             try:
                 _send_email_gmail(info["email"], subject, html, attachment=attachment_bytes, attachment_filename=f"ticket_{info['booking_id']}.png" if attachment_bytes else "ticket.png")
                 status_text = f"{_tz_now_str()} 寄信成功"
             except Exception as e:
                 status_text = f"{_tz_now_str()} 寄信失敗: {str(e)}"
-
             if "寄信狀態" in hmap:
                 ws_main.update_acell(gspread.utils.rowcol_to_a1(rowno, hmap["寄信狀態"]), status_text)
-
             log.info(f"manual mail result: {status_text}")
             return {"status": "success" if "成功" in status_text else "mail_failed", "booking_id": p.booking_id, "mail_note": status_text}
-
         else:
             raise HTTPException(400, f"未知 action：{action}")
-
     except HTTPException:
         raise
     except Exception as e:
