@@ -1,36 +1,87 @@
-# Byte-compiled / optimized / DLL files
+# -----------------------------
+# Python Basic Cache / Bytecode
+# -----------------------------
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+*.pdb
+*.pkl
+*.pickle
 
-# Distribution / packaging
+# -----------------------------
+# Virtual Environments
+# -----------------------------
+.env
+.env.*
+.venv/
+venv/
+ENV/
+
+# -----------------------------
+# Build / Packaging Files
+# -----------------------------
 build/
 dist/
 *.egg-info/
+*.egg
+pip-wheel-metadata/
 
-# Virtual environments
-.env
-.venv
-ENV/
-
-# IDE files
-.vscode/
-.idea/
-
+# -----------------------------
 # Logs
+# -----------------------------
 *.log
+logs/
+logging/
 
-# OS files
+# -----------------------------
+# Playwright Related
+# -----------------------------
+# Playwright installed browsers
+playwright/.cache/
+playwright/driver/
+ms-playwright/
+
+# If using Node for Playwright helpers
+node_modules/
+package-lock.json
+npm-debug.log
+
+# -----------------------------
+# Docker Related
+# -----------------------------
+docker-cache/
+*.tar
+*.img
+
+# -----------------------------
+# Secrets / Credentials
+# -----------------------------
+*.env
+secrets/
+secret.key
+service-account.json
+key.json
+keys/
+token.json
+
+# Cloud Run Secrets Mount
+/var/secrets/
+
+# -----------------------------
+# OS & Editor Files
+# -----------------------------
 .DS_Store
 Thumbs.db
 
-# Python cache
-*.pickle
-*.pkl
+# VSCode
+.vscode/
+.idea/
 
-# Env vars
-*.env
-
-# Cache
+# -----------------------------
+# User Custom Cache
+# -----------------------------
 .cache/
+tmp/
+temp/
+*.tmp
