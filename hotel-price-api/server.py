@@ -1,6 +1,7 @@
 import datetime
 import os
 import traceback
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
@@ -126,7 +127,11 @@ async def run_all():
         )
 
         results = []
-        now_str = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
+        tz = ZoneInfo("Asia/Taipei")
+        now = datetime.datetime.now(tz)
+        now_str = now.strftime("%Y/%m/%d %H:%M")
+
+        
 
         for row in rows:
             if len(row) < 2:
