@@ -1553,11 +1553,11 @@
     }
 
     function buildTicketCard(row, {mask=false}={}){
-      const carDisp = String(row["車次"] || row["班次"] || "");
-      const dateIso = getIsoDateFromCarDisplay(carDisp) || String(row["日期"] || "");
-      const time = getTimeHmFromCarDisplay(carDisp) || fmtTimeLabel(String(row["班次"]||row["車次"]||""));
-      const expired = isExpiredByCar(carDisp);
-      
+      const carDateTime = String(row["車次-日期時間"] || "");
+      const dateIso = getIsoDateFromCarDisplay(carDateTime) || String(row["日期"] || "");
+      const time = getTimeHmFromCarDisplay(carDateTime) || fmtTimeLabel(String(row["班次"]||row["車次"]||""));
+      const expired = isExpiredByCar(carDateTime);
+  
       const statusCode = getStatusCode(row);
       const name = mask ? maskName(String(row["姓名"]||'')) : String(row["姓名"]||'');
       const phone = mask ? maskPhone(String(row["手機"]||'')) : String(row["手機"]||'');
@@ -1588,21 +1588,21 @@
 
       const header = document.createElement('div');
       header.className='ticket-header';
-      header.innerHTML=`<h2>${t('ticketTitle')}</h2>`;
+      // 修改：標題顯示車次-日期時間
+      header.innerHTML=`<h2>${carDateTime || (dateIso + ' ' + time)}</h2>`;
       card.appendChild(header);
 
       const content = document.createElement('div'); content.className='ticket-content';
       const qr = document.createElement('div'); qr.className='ticket-qr';
       if(statusCode==='cancelled'){
-        // ★ 取消用 placeholder
         qr.innerHTML = `<img src="/images/qr-placeholder.png" alt="QR placeholder" />`;
       }else{
         qr.innerHTML = `<img src="${qrUrl}" alt="QR" />`;
       }
       const info = document.createElement('div'); info.className='ticket-info';
+      // 修改：移除班次欄位，調整顯示順序
       info.innerHTML = `
         <div class="ticket-field"><span class="ticket-label">${t('labelBookingId')}</span><span class="ticket-value">${bookingId}</span></div>
-        <div class="ticket-field"><span class="ticket-label">${t('labelScheduleDate')}</span><span class="ticket-value">${time}</span></div>
         <div class="ticket-field"><span class="ticket-label">${t('labelDirection')}</span><span class="ticket-value">${rb}</span></div>
         <div class="ticket-field"><span class="ticket-label">${t('labelPick')}</span><span class="ticket-value">${pick}</span></div>
         <div class="ticket-field"><span class="ticket-label">${t('labelDrop')}</span><span class="ticket-value">${drop}</span></div>
@@ -1651,28 +1651,45 @@
 
     function buildDateListFromResults(rows){
       const filtered = (rows||[]).filter(r => withinOneMonth(
-        getIsoDateFromCarDisplay(String(r["車次"]||r["班次"]||"")) || String(r["日期"]||"")
+        // 修改：使用車次-日期時間欄位來取得日期
+        getDateFromCarDateTime(String(r["車次-日期時間"] || "")) || 
+        getIsoDateFromCarDisplay(String(r["車次"]||r["班次"]||"")) || 
+        String(r["日期"]||"")
       ));
+  
       const map = new Map();
       filtered.forEach(r => {
-        const d = getIsoDateFromCarDisplay(String(r["車次"]||r["班次"]||"")) || fmtDateLabel(String(r["日期"]||""));
+        // 修改：優先使用車次-日期時間欄位
+        const d = getDateFromCarDateTime(String(r["車次-日期時間"] || "")) || 
+                  getIsoDateFromCarDisplay(String(r["車次"]||r["班次"]||"")) || 
+                  fmtDateLabel(String(r["日期"]||""));
         map.set(d, (map.get(d)||0) + 1);
       });
+  
       queryDateList = Array.from(map.entries()).sort((a,b)=> new Date(a[0]) - new Date(b[0]));
       const wrap = document.getElementById('dateChoices');
       wrap.innerHTML='';
+  
       if(!queryDateList.length){
         const empty = document.createElement('div'); empty.className='card'; empty.style.textAlign='center'; empty.style.color='#666'; empty.textContent = (I18N_STATUS[currentLang]||I18N_STATUS.zh).noRecords;
         wrap.appendChild(empty); return;
       }
+  
       queryDateList.forEach(([date,count])=>{
         const btn = document.createElement('button'); btn.type='button'; btn.className='opt-btn';
         btn.innerHTML = `${date} <span style="color:#777;font-size:13px">(有：${count} 筆預約)</span>`;
         btn.onclick = ()=> openTicketsForDate(date);
         wrap.appendChild(btn);
       });
-    }
+  }
 
+    function getDateFromCarDateTime(carDateTime) {
+      if (!carDateTime) return "";
+      const parts = carDateTime.split(' ');
+      if (parts.length < 1) return "";
+      const datePart = parts[0]; // "2025/11/14"
+      return datePart.replace(/\//g, '-'); // "2025-11-14"
+    }
     function openTicketsForDate(dateIso){
       currentQueryDate = dateIso;
       currentDateRows = lastQueryResults.filter(r => {
@@ -1702,6 +1719,7 @@
     }
 
     // 刪除：顯示綠勾動畫後退出（回日期頁並重查），並寄取消信（無圖）
+    // 修改刪除函數
     async function deleteOrder(bookingId){
       if(!confirm(`刪除預約 ${bookingId} ？`)) return;
       showLoading(true);
@@ -1715,14 +1733,48 @@
           }catch(e){ console.warn('取消寄信失敗', e); }
           showSuccessAnimation();
           setTimeout(async ()=>{
-            await queryOrders();
-            showCheckDateStep();
+            // 修改：重新查詢單一預約並更新車票，而不是回到日期選擇
+            const queryRes = await fetch(OPS_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'query', data: { booking_id: bookingId } })
+            });
+            const queryData = await queryRes.json();
+            const updatedRow = queryData[0];
+        
+            // 更新車票顯示
+            const mount = document.getElementById('checkTicketMount');
+            mount.innerHTML = '';
+            mount.appendChild(buildTicketCard(updatedRow, { mask: true }));
+        
+            // 停留在車票頁面
           }, 3000);
         } else {
           alert(j.detail || '刪除失敗');
         }
       }catch(e){ alert('刪除失敗：'+e.message); }finally{ showLoading(false); }
     }
+
+    // 在修改成功回調中做類似修改
+    // 找到修改成功的 setTimeout 回調，修改為：
+    setTimeout(async ()=>{
+      // 重新查詢該預約編號
+      const queryRes = await fetch(OPS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'query', data: { booking_id: bookingId } })
+      });
+      const queryData = await queryRes.json();
+      const updatedRow = queryData[0];
+
+      // 更新車票顯示
+      const mount = document.getElementById('checkTicketMount');
+      mount.innerHTML = '';
+      mount.appendChild(buildTicketCard(updatedRow, { mask: true }));
+
+      // 關閉修改頁面，停留在車票頁面
+      holder.style.display = 'none';
+    }, 3000);
 
     /* ====== 修改：新頁面 ====== */
     async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax}){
@@ -1796,13 +1848,15 @@
         });
         buildPax();
       }
-      function buildPax(){
-        const sel=holder.querySelector('#md_pax'); sel.innerHTML='';
-        const maxPassengers = Math.min(4, Math.max(0, mdAvail||pax||4));
-        for(let i=1;i<=maxPassengers;i++){const opt=document.createElement('option');opt.value=String(i);opt.textContent=String(i);sel.appendChild(opt);}
-        sel.value = String(Math.min(pax, maxPassengers));
-        const hint = holder.querySelector('#md_hint'); hint.textContent = `此班次可預約：${mdAvail||'-'} 人；單筆最多 4 人`;
-      }
+    function buildPax(){
+      const sel=holder.querySelector('#md_pax'); sel.innerHTML='';
+      const maxPassengers = Math.min(4, Math.max(0, mdAvail||pax||4));
+      for(let i=1;i<=maxPassengers;i++){const opt=document.createElement('option');opt.value=String(i);opt.textContent=String(i);sel.appendChild(opt);}
+      sel.value = String(Math.min(pax, maxPassengers));
+      const hint = holder.querySelector('#md_hint'); 
+      // 修改：顯示實際的可預約人數
+      hint.textContent = `此班次可預約：${mdAvail || 0} 人；單筆最多 4 人`;
+    }
 
       holder.querySelector('#md_dir').addEventListener('change', (e)=>{ mdDirection = e.target.value; mdStation = (mdDirection==='回程') ? pick : drop; buildDateOptions(); });
       holder.querySelector('#md_cancel').onclick = ()=>{ holder.style.display='none'; showCheckDateStep(); };
