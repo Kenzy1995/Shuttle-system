@@ -938,58 +938,38 @@
     let currentQueryDate = "";
     let currentDateRows = [];
 
-    /* ====== 新增：車次解析與過期判斷函式 ====== */
-    // 解析「車次」：例如 "11/14 14:40"
-    function parseCarDisplay(carText) {
-      const s = String(carText || "").trim().replace(/：/g, ":");
-      // 僅接受 MM/DD HH:mm 格式
-      const m = s.match(/^(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})$/);
-      if (!m) return null;
-
-      const mm = +m[1], dd = +m[2], HH = +m[3], MM = +m[4];
-      if (mm < 1 || mm > 12 || dd < 1 || dd > 31 || HH < 0 || HH > 23 || MM < 0 || MM > 59) return null;
-
-      // 年份推斷：以台北時區的「現在」為基準
-      const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Taipei',
-        year: 'numeric', month: '2-digit'
-      }).formatToParts(new Date());
-      const nowYear  = +parts.find(p => p.type === 'year').value;
-      const nowMonth = +parts.find(p => p.type === 'month').value;
-
-      let year = nowYear;
-      // 跨年防呆：1 月看到 12 月 → 去年；12 月看到 1 月 → 明年
-      if (nowMonth === 1 && mm === 12) year = nowYear - 1;
-      else if (nowMonth === 12 && mm === 1) year = nowYear + 1;
-
-      return { year, mm, dd, HH, MM };
+    /* ====== 新增：車次-日期時間解析函式 ====== */
+    // 從 "2025/11/14 21:00" 格式中提取日期部分
+    function getDateFromCarDateTime(carDateTime) {
+      if (!carDateTime) return "";
+      const parts = carDateTime.split(' ');
+      if (parts.length < 1) return "";
+      const datePart = parts[0]; // "2025/11/14"
+      return datePart.replace(/\//g, '-'); // "2025-11-14"
     }
 
-    function getIsoDateFromCarDisplay(carText) {
-      const p = parseCarDisplay(carText);
-      if (!p) return "";
-      const M = String(p.mm).padStart(2,'0');
-      const D = String(p.dd).padStart(2,'0');
-      return `${p.year}-${M}-${D}`;
+    // 從 "2025/11/14 21:00" 格式中提取時間部分
+    function getTimeFromCarDateTime(carDateTime) {
+      if (!carDateTime) return "00:00";
+      const parts = carDateTime.split(' ');
+      return parts.length > 1 ? parts[1] : "00:00";
     }
 
-    function getTimeHmFromCarDisplay(carText) {
-      const p = parseCarDisplay(carText);
-      if (!p) return "";
-      return `${String(p.HH).padStart(2,'0')}:${String(p.MM).padStart(2,'0')}`;
-    }
-
-    // 過期判斷：優先用「車次」字串
-    function isExpiredByCar(carText) {
-      const p = parseCarDisplay(carText);
-      if (!p) return true;
-      const Y = String(p.year).padStart(4,'0');
-      const M = String(p.mm).padStart(2,'0');
-      const D = String(p.dd).padStart(2,'0');
-      const H = String(p.HH).padStart(2,'0');
-      const m = String(p.MM).padStart(2,'0');
-      const t = new Date(`${Y}-${M}-${D}T${H}:${m}:00+08:00`).getTime();
-      return Number.isNaN(t) ? true : t < Date.now();
+    // 從 "2025/11/14 21:00" 判斷是否過期
+    function isExpiredByCarDateTime(carDateTime) {
+      if (!carDateTime) return true;
+      
+      try {
+        // 將 "2025/11/14 21:00" 轉換為 Date 物件
+        const [datePart, timePart] = carDateTime.split(' ');
+        const [year, month, day] = datePart.split('/').map(Number);
+        const [hour, minute] = timePart.split(':').map(Number);
+        
+        const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
+        return tripTime < Date.now();
+      } catch (e) {
+        return true;
+      }
     }
 
     /* ====== 小工具 ====== */
@@ -1436,7 +1416,7 @@
             // 背景寄信，4 秒超時
             try {
               const controller = new AbortController();
-              const timer = setTimeout(() => controller.abort(), 4000);
+              const timer = setTimeout(() => controller.abbit(), 4000);
               const dataUrl = await domtoimage.toPng(document.getElementById('ticketCard'), { bgcolor: '#fff', pixelRatio: 2 });
               fetch(OPS_URL, {
                 method: 'POST',
@@ -1539,8 +1519,17 @@
     }
 
     function withinOneMonth(dateIso){
-      try{ const d = new Date((fmtDateLabel(dateIso)||todayISO())+'T00:00:00'); const now=new Date(); const pastLimit = new Date(now); pastLimit.setMonth(now.getMonth()-1); return d >= pastLimit; }catch(e){ return true; }
+      try{ 
+        const d = new Date((fmtDateLabel(dateIso)||todayISO())+'T00:00:00'); 
+        const now=new Date(); 
+        const pastLimit = new Date(now); 
+        pastLimit.setMonth(now.getMonth()-1); 
+        return d >= pastLimit; 
+      }catch(e){ 
+        return true; 
+      }
     }
+    
     function getStatusCode(row){
       const s = String(row["預約狀態"]||row["訂單狀態"]||'').toLowerCase();
       const audited = String(row["櫃台審核"]||'').trim().toUpperCase();
@@ -1554,10 +1543,14 @@
 
     function buildTicketCard(row, {mask=false}={}){
       const carDateTime = String(row["車次-日期時間"] || "");
-      const dateIso = getIsoDateFromCarDisplay(carDateTime) || String(row["日期"] || "");
-      const time = getTimeHmFromCarDisplay(carDateTime) || fmtTimeLabel(String(row["班次"]||row["車次"]||""));
-      const expired = isExpiredByCar(carDateTime);
-  
+      
+      // 從車次-日期時間提取日期和時間
+      let dateIso = getDateFromCarDateTime(carDateTime);
+      let time = getTimeFromCarDateTime(carDateTime);
+      
+      // 使用新的過期判斷函數
+      const expired = isExpiredByCarDateTime(carDateTime);
+      
       const statusCode = getStatusCode(row);
       const name = mask ? maskName(String(row["姓名"]||'')) : String(row["姓名"]||'');
       const phone = mask ? maskPhone(String(row["手機"]||'')) : String(row["手機"]||'');
@@ -1588,19 +1581,23 @@
 
       const header = document.createElement('div');
       header.className='ticket-header';
-      // 修改：標題顯示車次-日期時間
-      header.innerHTML=`<h2>${carDateTime || (dateIso + ' ' + time)}</h2>`;
+      // 標題顯示完整的車次-日期時間
+      header.innerHTML=`<h2>${carDateTime}</h2>`;
       card.appendChild(header);
 
-      const content = document.createElement('div'); content.className='ticket-content';
-      const qr = document.createElement('div'); qr.className='ticket-qr';
+      const content = document.createElement('div'); 
+      content.className='ticket-content';
+      const qr = document.createElement('div'); 
+      qr.className='ticket-qr';
+      
       if(statusCode==='cancelled'){
         qr.innerHTML = `<img src="/images/qr-placeholder.png" alt="QR placeholder" />`;
       }else{
         qr.innerHTML = `<img src="${qrUrl}" alt="QR" />`;
       }
-      const info = document.createElement('div'); info.className='ticket-info';
-      // 修改：移除班次欄位，調整顯示順序
+      
+      const info = document.createElement('div'); 
+      info.className='ticket-info';
       info.innerHTML = `
         <div class="ticket-field"><span class="ticket-label">${t('labelBookingId')}</span><span class="ticket-value">${bookingId}</span></div>
         <div class="ticket-field"><span class="ticket-label">${t('labelDirection')}</span><span class="ticket-value">${rb}</span></div>
@@ -1611,22 +1608,43 @@
         <div class="ticket-field"><span class="ticket-label">${t('labelEmail')}</span><span class="ticket-value">${email}</span></div>
         <div class="ticket-field"><span class="ticket-label">${t('labelPassengersShort')}</span><span class="ticket-value">${pax}</span></div>
       `;
-      content.appendChild(qr); content.appendChild(info); card.appendChild(content);
+      
+      content.appendChild(qr); 
+      content.appendChild(info); 
+      card.appendChild(content);
 
-      const actions = document.createElement('div'); actions.className='ticket-actions';
+      const actions = document.createElement('div'); 
+      actions.className='ticket-actions';
+      
       if(statusCode!=='cancelled' && statusCode!=='rejected'){
-        const dlBtn = document.createElement('button'); dlBtn.className='button'; dlBtn.textContent=ts('download');
-        dlBtn.onclick = ()=>{ domtoimage.toPng(card,{bgcolor:'#fff', pixelRatio:2}).then((dataUrl)=>{ const a=document.createElement('a'); a.href=dataUrl; a.download=`ticket_${bookingId}.png`; a.click(); }); };
+        const dlBtn = document.createElement('button'); 
+        dlBtn.className='button'; 
+        dlBtn.textContent=ts('download');
+        dlBtn.onclick = ()=>{ 
+          domtoimage.toPng(card,{bgcolor:'#fff', pixelRatio:2}).then((dataUrl)=>{ 
+            const a=document.createElement('a'); 
+            a.href=dataUrl; 
+            a.download=`ticket_${bookingId}.png`; 
+            a.click(); 
+          }); 
+        };
         actions.appendChild(dlBtn);
       }
+      
       if(!expired && statusCode!=='cancelled' && statusCode!=='rejected' && statusCode!=='boarded'){
-        const mdBtn = document.createElement('button'); mdBtn.className='button btn-ghost'; mdBtn.textContent=ts('modify');
+        const mdBtn = document.createElement('button'); 
+        mdBtn.className='button btn-ghost'; 
+        mdBtn.textContent=ts('modify');
         mdBtn.onclick = ()=> openModifyPage({ row, bookingId, rb, date: dateIso, pick, drop, time, pax });
         actions.appendChild(mdBtn);
-        const delBtn = document.createElement('button'); delBtn.className='button btn-ghost'; delBtn.textContent=ts('remove');
+        
+        const delBtn = document.createElement('button'); 
+        delBtn.className='button btn-ghost'; 
+        delBtn.textContent=ts('remove');
         delBtn.onclick = ()=> deleteOrder(bookingId);
         actions.appendChild(delBtn);
       }
+      
       card.appendChild(actions);
       return card;
     }
@@ -1650,62 +1668,85 @@
     }
 
     function buildDateListFromResults(rows){
-      const filtered = (rows||[]).filter(r => withinOneMonth(
-        // 修改：使用車次-日期時間欄位來取得日期
-        getDateFromCarDateTime(String(r["車次-日期時間"] || "")) || 
-        getIsoDateFromCarDisplay(String(r["車次"]||r["班次"]||"")) || 
-        String(r["日期"]||"")
-      ));
-  
-      const map = new Map();
-      filtered.forEach(r => {
-        // 修改：優先使用車次-日期時間欄位
-        const d = getDateFromCarDateTime(String(r["車次-日期時間"] || "")) || 
-                  getIsoDateFromCarDisplay(String(r["車次"]||r["班次"]||"")) || 
-                  fmtDateLabel(String(r["日期"]||""));
-        map.set(d, (map.get(d)||0) + 1);
+      const dateMap = new Map();
+      
+      // 使用新的車次-日期時間欄位來提取日期
+      rows.forEach(r => {
+        const carDateTime = String(r["車次-日期時間"] || "");
+        let dateIso = getDateFromCarDateTime(carDateTime);
+        
+        // 只顯示一個月內的資料
+        if (withinOneMonth(dateIso)) {
+          dateMap.set(dateIso, (dateMap.get(dateIso) || 0) + 1);
+        }
       });
-  
-      queryDateList = Array.from(map.entries()).sort((a,b)=> new Date(a[0]) - new Date(b[0]));
+      
+      queryDateList = Array.from(dateMap.entries()).sort((a, b) => new Date(a[0]) - new Date(b[0]));
       const wrap = document.getElementById('dateChoices');
-      wrap.innerHTML='';
-  
-      if(!queryDateList.length){
-        const empty = document.createElement('div'); empty.className='card'; empty.style.textAlign='center'; empty.style.color='#666'; empty.textContent = (I18N_STATUS[currentLang]||I18N_STATUS.zh).noRecords;
-        wrap.appendChild(empty); return;
+      wrap.innerHTML = '';
+      
+      if (!queryDateList.length) {
+        const empty = document.createElement('div'); 
+        empty.className = 'card'; 
+        empty.style.textAlign = 'center'; 
+        empty.style.color = '#666'; 
+        empty.textContent = (I18N_STATUS[currentLang] || I18N_STATUS.zh).noRecords;
+        wrap.appendChild(empty); 
+        return;
       }
-  
-      queryDateList.forEach(([date,count])=>{
-        const btn = document.createElement('button'); btn.type='button'; btn.className='opt-btn';
+      
+      queryDateList.forEach(([date, count]) => {
+        const btn = document.createElement('button'); 
+        btn.type = 'button'; 
+        btn.className = 'opt-btn';
         btn.innerHTML = `${date} <span style="color:#777;font-size:13px">(有：${count} 筆預約)</span>`;
-        btn.onclick = ()=> openTicketsForDate(date);
+        btn.onclick = () => openTicketsForDate(date);
         wrap.appendChild(btn);
       });
-  }
-
-    function getDateFromCarDateTime(carDateTime) {
-      if (!carDateTime) return "";
-      const parts = carDateTime.split(' ');
-      if (parts.length < 1) return "";
-      const datePart = parts[0]; // "2025/11/14"
-      return datePart.replace(/\//g, '-'); // "2025-11-14"
     }
-    function openTicketsForDate(dateIso){
+
+    function openTicketsForDate(dateIso) {
       currentQueryDate = dateIso;
-      currentDateRows = lastQueryResults.filter(r => {
-        const d = getIsoDateFromCarDisplay(String(r["車次"]||r["班次"]||"")) || fmtDateLabel(String(r["日期"]||""));
-        return d === dateIso;
-      }).sort((a, b) => parseTripDateTime(
-          dateIso,
-          getTimeHmFromCarDisplay(String(a["車次"]||a["班次"]||"")) || fmtTimeLabel(String(a["班次"]||a["車次"]||"00:00"))
-        ) - parseTripDateTime(
-          dateIso,
-          getTimeHmFromCarDisplay(String(b["車次"]||b["班次"]||"")) || fmtTimeLabel(String(b["班次"]||b["車次"]||"00:00"))
-        )
-      );
+      
+      // 過濾出該日期的所有車票
+      const dateRows = lastQueryResults.filter(r => {
+        const carDateTime = String(r["車次-日期時間"] || "");
+        let rowDateIso = getDateFromCarDateTime(carDateTime);
+        return rowDateIso === dateIso;
+      });
+      
+      // 對車票進行排序：有效的在前，失效的在後，有效車票按時間排序
+      currentDateRows = dateRows.sort((a, b) => {
+        const statusA = getStatusCode(a);
+        const statusB = getStatusCode(b);
+        const carDateTimeA = String(a["車次-日期時間"] || "");
+        const carDateTimeB = String(b["車次-日期時間"] || "");
+        
+        // 判斷是否為有效車票（已預約且未過期）
+        const isValidA = (statusA === 'booked' || statusA === 'boarded') && 
+                        !isExpiredByCarDateTime(carDateTimeA);
+        const isValidB = (statusB === 'booked' || statusB === 'boarded') && 
+                        !isExpiredByCarDateTime(carDateTimeB);
+        
+        // 有效車票排在前面
+        if (isValidA && !isValidB) return -1;
+        if (!isValidA && isValidB) return 1;
+        
+        // 如果都是有效車票，按時間排序
+        if (isValidA && isValidB) {
+          const timeA = getTimeFromCarDateTime(carDateTimeA);
+          const timeB = getTimeFromCarDateTime(carDateTimeB);
+          return timeA.localeCompare(timeB);
+        }
+        
+        // 如果都是失效車票，按預約狀態排序（已取消 > 已拒絕 > 已過期）
+        const statusOrder = { 'cancelled': 1, 'rejected': 2, 'expired': 3, 'booked': 4, 'boarded': 5 };
+        return (statusOrder[statusA] || 6) - (statusOrder[statusB] || 6);
+      });
+      
       const mount = document.getElementById('checkTicketMount');
-      mount.innerHTML='';
-      currentDateRows.forEach(row=> mount.appendChild(buildTicketCard(row,{mask:true})));
+      mount.innerHTML = '';
+      currentDateRows.forEach(row => mount.appendChild(buildTicketCard(row, { mask: true })));
       showCheckTicketStep();
     }
 
@@ -1719,62 +1760,78 @@
     }
 
     // 刪除：顯示綠勾動畫後退出（回日期頁並重查），並寄取消信（無圖）
-    // 修改刪除函數
     async function deleteOrder(bookingId){
       if(!confirm(`刪除預約 ${bookingId} ？`)) return;
       showLoading(true);
       try{
-        const r = await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'delete', data:{booking_id:bookingId}})});
+        const r = await fetch(OPS_URL, {
+          method: 'POST', 
+          headers: {'Content-Type':'application/json'}, 
+          body: JSON.stringify({action:'delete', data:{booking_id:bookingId}})
+        });
         const j = await r.json();
         if(j.status==='success'){
           // 寄取消信
           try{
-            await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'mail', data:{ booking_id: bookingId, lang: currentLang, kind:'cancel' }})});
-          }catch(e){ console.warn('取消寄信失敗', e); }
+            await fetch(OPS_URL, {
+              method: 'POST', 
+              headers: {'Content-Type':'application/json'}, 
+              body: JSON.stringify({
+                action: 'mail', 
+                data: { 
+                  booking_id: bookingId, 
+                  lang: currentLang, 
+                  kind: 'cancel' 
+                }
+              })
+            });
+          } catch(e) { 
+            console.warn('取消寄信失敗', e); 
+          }
+          
           showSuccessAnimation();
-          setTimeout(async ()=>{
-            // 修改：重新查詢單一預約並更新車票，而不是回到日期選擇
+          setTimeout(async () => {
+            // 重新查詢所有預約，保持當前查詢條件
+            const id = document.getElementById('qBookId').value.trim();
+            const phone = document.getElementById('qPhone').value.trim();
+            const email = document.getElementById('qEmail').value.trim();
+            
             const queryRes = await fetch(OPS_URL, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'query', data: { booking_id: bookingId } })
+              body: JSON.stringify({ 
+                action: 'query', 
+                data: { 
+                  booking_id: id, 
+                  phone: phone, 
+                  email: email 
+                }
+              })
             });
+            
             const queryData = await queryRes.json();
-            const updatedRow = queryData[0];
-        
-            // 更新車票顯示
-            const mount = document.getElementById('checkTicketMount');
-            mount.innerHTML = '';
-            mount.appendChild(buildTicketCard(updatedRow, { mask: true }));
-        
-            // 停留在車票頁面
+            lastQueryResults = Array.isArray(queryData) ? queryData : (queryData.results || []);
+            
+            // 重新構建日期列表和車票顯示
+            buildDateListFromResults(lastQueryResults);
+            
+            // 如果當前有選擇日期，則更新該日期的車票
+            if (currentQueryDate) {
+              openTicketsForDate(currentQueryDate);
+            } else {
+              // 否則顯示日期選擇頁面
+              showCheckDateStep();
+            }
           }, 3000);
         } else {
           alert(j.detail || '刪除失敗');
         }
-      }catch(e){ alert('刪除失敗：'+e.message); }finally{ showLoading(false); }
+      } catch(e) { 
+        alert('刪除失敗：'+e.message); 
+      } finally { 
+        showLoading(false); 
+      }
     }
-
-    // 在修改成功回調中做類似修改
-    // 找到修改成功的 setTimeout 回調，修改為：
-    setTimeout(async ()=>{
-      // 重新查詢該預約編號
-      const queryRes = await fetch(OPS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'query', data: { booking_id: bookingId } })
-      });
-      const queryData = await queryRes.json();
-      const updatedRow = queryData[0];
-
-      // 更新車票顯示
-      const mount = document.getElementById('checkTicketMount');
-      mount.innerHTML = '';
-      mount.appendChild(buildTicketCard(updatedRow, { mask: true }));
-
-      // 關閉修改頁面，停留在車票頁面
-      holder.style.display = 'none';
-    }, 3000);
 
     /* ====== 修改：新頁面 ====== */
     async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax}){
@@ -1848,15 +1905,15 @@
         });
         buildPax();
       }
-    function buildPax(){
-      const sel=holder.querySelector('#md_pax'); sel.innerHTML='';
-      const maxPassengers = Math.min(4, Math.max(0, mdAvail||pax||4));
-      for(let i=1;i<=maxPassengers;i++){const opt=document.createElement('option');opt.value=String(i);opt.textContent=String(i);sel.appendChild(opt);}
-      sel.value = String(Math.min(pax, maxPassengers));
-      const hint = holder.querySelector('#md_hint'); 
-      // 修改：顯示實際的可預約人數
-      hint.textContent = `此班次可預約：${mdAvail || 0} 人；單筆最多 4 人`;
-    }
+      function buildPax(){
+        const sel=holder.querySelector('#md_pax'); sel.innerHTML='';
+        const maxPassengers = Math.min(4, Math.max(0, mdAvail||pax||4));
+        for(let i=1;i<=maxPassengers;i++){const opt=document.createElement('option');opt.value=String(i);opt.textContent=String(i);sel.appendChild(opt);}
+        sel.value = String(Math.min(pax, maxPassengers));
+        const hint = holder.querySelector('#md_hint'); 
+        // 修改：顯示實際的可預約人數
+        hint.textContent = `此班次可預約：${mdAvail || 0} 人；單筆最多 4 人`;
+      }
 
       holder.querySelector('#md_dir').addEventListener('change', (e)=>{ mdDirection = e.target.value; mdStation = (mdDirection==='回程') ? pick : drop; buildDateOptions(); });
       holder.querySelector('#md_cancel').onclick = ()=>{ holder.style.display='none'; showCheckDateStep(); };
@@ -1867,7 +1924,7 @@
         if(!phoneRegex.test(newPhone)){ alert(t('errPhone')); return; }
         if(!emailRegex.test(newEmail)){ alert(t('errEmail')); return; }
 
-        // ★ 送出前再次驗證座位（需求 9）
+        // ★ 送出前再次驗證座位
         await refreshData();
         const check = allRows.find(r=>
           String(r["去程 / 回程"]).trim()===mdDirection &&
@@ -1892,7 +1949,7 @@
           const r = await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'modify', data:payload})});
           const j = await r.json();
           if(j.status==='success'){
-            // ★ 準備一張暫時票卡圖供寄信
+            // 準備一張暫時票卡圖供寄信
             try{
               const temp = document.createElement('div');
               temp.style.position='absolute'; temp.style.left='-99999px'; temp.style.top='-99999px';
@@ -1924,9 +1981,39 @@
 
             showSuccessAnimation();
             setTimeout(async ()=>{
-              holder.style.display='none';
-              await queryOrders();
-              showCheckDateStep();
+              // 重新查詢所有預約
+              const id = document.getElementById('qBookId').value.trim();
+              const phone = document.getElementById('qPhone').value.trim();
+              const email = document.getElementById('qEmail').value.trim();
+              
+              const queryRes = await fetch(OPS_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  action: 'query', 
+                  data: { 
+                    booking_id: id, 
+                    phone: phone, 
+                    email: email 
+                  }
+                })
+              });
+              
+              const queryData = await queryRes.json();
+              lastQueryResults = Array.isArray(queryData) ? queryData : (queryData.results || []);
+              
+              // 重新構建日期列表
+              buildDateListFromResults(lastQueryResults);
+              
+              // 如果當前有選擇日期，則更新該日期的車票
+              if (currentQueryDate) {
+                openTicketsForDate(currentQueryDate);
+              } else {
+                showCheckDateStep();
+              }
+              
+              // 關閉修改頁面
+              holder.style.display = 'none';
             }, 3000);
           } else {
             alert(j.detail || '更新失敗');
