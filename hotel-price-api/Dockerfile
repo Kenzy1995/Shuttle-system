@@ -4,7 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8080
 
-# 安裝 Playwright 所需系統套件
+# 安裝 Playwright 需要的系統套件
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -13,15 +13,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# 安裝 Python 套件 + Playwright瀏覽器
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
     playwright install --with-deps chromium
 
 COPY . .
 
-CMD ["gunicorn",
-     "-k", "uvicorn.workers.UvicornWorker",
-     "--bind", "0.0.0.0:8080",
-     "--timeout", "300",
-     "server:app"]
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8080", "--timeout", "300", "server:app"]
