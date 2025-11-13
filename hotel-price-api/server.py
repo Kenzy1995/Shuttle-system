@@ -9,9 +9,6 @@ from fastapi.responses import JSONResponse
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
-# ============================
-# 設定
-# ============================
 SPREADSHEET_ID = "1dbJ0jZAG0fcI3-TAYiIm-C2HO1Cb3YHUVBKvlAAJVAg"
 ADR_SHEET = "ADR"
 DATA_SHEET = "Data"
@@ -20,13 +17,11 @@ CLASS_KEY = "Cbys4b"
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-# Cloud Run service account 自動讀取 metadata 取得 credentials
 def get_sheets_service():
     creds = service_account.Credentials.from_service_account_file(
         "/var/secrets/google/key.json", scopes=SCOPES
     ) if os.path.exists("/var/secrets/google/key.json") else None
 
-    # 若 Cloud Run 用 IAM 身分跑，使用默認 credentials
     if creds is None:
         import google.auth
         creds, _ = google.auth.default(scopes=SCOPES)
@@ -34,10 +29,8 @@ def get_sheets_service():
     return build("sheets", "v4", credentials=creds)
 
 
-# ============================
-# FastAPI
-# ============================
 app = FastAPI()
+
 
 HEADERS = {
     "User-Agent": (
@@ -47,17 +40,12 @@ HEADERS = {
     "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8"
 }
 
-# ============================
-# 工具：抓 HTML
-# ============================
 def fetch_html(url: str) -> str:
     resp = requests.get(url, headers=HEADERS, timeout=15)
     resp.raise_for_status()
     return resp.text
 
-# ============================
-# 工具：從 HTML 抓價格
-# ============================
+
 def extract_price(html: str) -> str:
     pattern = rf'<span\b[^>]*class="[^"]*\b{CLASS_KEY}\b[^"]*"[^>]*>([\s\S]*?)<\/span>'
     match = re.search(pattern, html, flags=re.IGNORECASE)
@@ -75,9 +63,7 @@ def extract_price(html: str) -> str:
     number = number.replace(",", "")
     return f"{currency}{number}" if currency else number
 
-# ============================
-# API：單筆查詢
-# ============================
+
 @app.get("/price")
 def get_price(url: str = Query(...)):
     try:
@@ -88,17 +74,43 @@ def get_price(url: str = Query(...)):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-# ============================
-# API：取代 Google Apps Script updatePrices()
-# ============================
+# ⭐ 新增調試用 API：印出 Google Sheets 內容
+@app.get("/debug/sheet")
+def debug_sheet():
+    try:
+        sheets = get_sheets_service()
+
+        adr_range = f"{ADR_SHEET}!A{START_ROW}:B"
+        data_range = f"{DATA_SHEET}!A:C"
+
+        adr_rows = sheets.spreadsheets().values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=adr_range
+        ).execute().get("values", [])
+
+        data_rows = sheets.spreadsheets().values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=data_range
+        ).execute().get("values", [])
+
+        return {
+            "adr_raw": adr_rows,
+            "data_raw": data_rows
+        }
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+
 @app.get("/run")
 def run_all():
     sheets = get_sheets_service()
 
-    # 讀 ADR!A3:B（飯店名稱、網址）
     adr_range = f"{ADR_SHEET}!A{START_ROW}:B"
     rows = sheets.spreadsheets().values().get(
-        spreadsheetId=SPREADSHEET_ID, range=adr_range
+        spreadsheetId=SPREADSHEET_ID,
+        range=adr_range
     ).execute().get("values", [])
 
     results = []
@@ -122,7 +134,6 @@ def run_all():
 
         results.append([now, name, price])
 
-    # 寫入 Data!A:C（追加）
     if results:
         data_range = f"{DATA_SHEET}!A:C"
         body = {"values": results}
