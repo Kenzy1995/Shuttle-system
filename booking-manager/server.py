@@ -94,7 +94,7 @@ HEADER_KEYS = {
     "上車地點", "下車地點", "姓名", "手機", "信箱", "預約人數", "櫃台審核",
     "預約狀態", "乘車狀態", "身分", "房號", "入住日期", "退房日期", "用餐日期",
     "上車索引", "下車索引", "涉及路段範圍", "QRCode編碼", "備註", "寄信狀態",
-    "車次-日期時間"  # unified date/time string
+    "車次-日期時間","主班次時間"  # unified date/time string
 }
 
 # 可預約班次表必要欄位
@@ -169,6 +169,45 @@ def _compute_indices_and_segments(pickup: str, dropoff: str):
     segs = list(range(pick_idx, drop_idx))
     seg_str = ",".join(str(i) for i in segs)
     return pick_idx, drop_idx, seg_str
+
+def _compute_main_departure_datetime(direction: str, pickup: str, date_iso: str, time_hm: str) -> str:
+    """
+    根據「往返方向」與「上車地點」計算主班次時間（去程不調整，回程往前回推）。
+    回傳格式：YYYY/MM/DD HH:MM，如果解析失敗就回空字串。
+    """
+    date_iso = (date_iso or "").strip()
+    time_hm = _time_hm_from_any(time_hm or "")
+    if not date_iso or not time_hm:
+        return ""
+
+    try:
+        dt = datetime.strptime(f"{date_iso} {time_hm}", "%Y-%m-%d %H:%M")
+    except Exception:
+        return ""
+
+    # 去程：不用調整，直接回傳
+    if direction != "回程":
+        return dt.strftime("%Y/%m/%d %H:%M")
+
+    # 回程：依上車地點回推主班次時間
+    p = (pickup or "").strip()
+    offset_min = 0
+
+    # 捷運站 -5 分鐘
+    if "捷運" in p or "Exhibition Center" in p:
+        offset_min = 5
+    # 火車站 -10 分鐘
+    elif "火車" in p or "Train Station" in p:
+        offset_min = 10
+    # LaLaport -10 分鐘
+    elif "LaLaport" in p:
+        offset_min = 10
+
+    if offset_min:
+        dt = dt - timedelta(minutes=offset_min)
+
+    return dt.strftime("%Y/%m/%d %H:%M")
+
 
 def _normalize_station_for_capacity(direction: str, pick: str, drop: str) -> str:
     """Normalize the station used when looking up capacity.
@@ -544,14 +583,25 @@ def ops(req: OpsRequest):
             today_iso = _today_iso_taipei()
             last_seq = _get_max_seq_for_date(ws_main, today_iso)
             booking_id = f"{_mmdd_prefix(today_iso)}{last_seq + 1:03d}"
-            car_display = _display_trip_str(p.date, _time_hm_from_any(p.time))
+            time_hm = _time_hm_from_any(p.time)
+            car_display = _display_trip_str(p.date, time_hm)
             pk_idx, dp_idx, seg_str = _compute_indices_and_segments(p.pickLocation, p.dropLocation)
             em6 = _email_hash6(p.email)
             qr_content = f"FT:{booking_id}:{em6}"
             qr_url = f"{BASE_URL}/api/qr/{urllib.parse.quote(qr_content)}"
+
             # 計算車次-日期時間格式，例如 '2025/11/14 21:00'
             date_obj = datetime.strptime(p.date, "%Y-%m-%d")
-            car_datetime = date_obj.strftime("%Y/%m/%d") + " " + _time_hm_from_any(p.time)
+            car_datetime = date_obj.strftime("%Y/%m/%d") + " " + time_hm
+
+            # ✅ 計算主班次時間（去程＝原時間；回程依站點回推）
+            main_departure = _compute_main_departure_datetime(
+                p.direction,
+                p.pickLocation,
+                p.date,
+                time_hm,
+            )
+
             # 準備寫入行
             newrow = [""] * len(headers)
             setv(newrow, "申請日期", _tz_now_str())
@@ -563,6 +613,7 @@ def ops(req: OpsRequest):
             setv(newrow, "班次", _time_hm_from_any(p.time))
             setv(newrow, "車次", car_display)  # user-facing mm/dd HH:MM string
             setv(newrow, "車次-日期時間", car_datetime)  # unified field
+            setv(newrow, "主班次時間", main_departure)
             setv(newrow, "上車地點", p.pickLocation)
             setv(newrow, "下車地點", p.dropLocation)
             setv(newrow, "姓名", p.name)
@@ -728,6 +779,16 @@ def ops(req: OpsRequest):
                 date_obj = datetime.strptime(new_date, "%Y-%m-%d")
                 car_datetime = date_obj.strftime("%Y/%m/%d") + " " + new_time
                 updates["車次-日期時間"] = car_datetime
+
+                # ✅ 同步更新主班次時間
+                main_departure = _compute_main_departure_datetime(
+                    new_dir,
+                    new_pick,
+                    new_date,
+                    new_time,
+                )
+                updates["主班次時間"] = main_departure
+
             pk_idx = dp_idx = None
             seg_str = None
             if p.pickLocation and p.dropLocation:
