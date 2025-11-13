@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 import io
 import os
@@ -61,7 +60,8 @@ HEADER_KEYS = {
     "申請日期","最後操作時間","預約編號","往返","日期","班次","車次",
     "上車地點","下車地點","姓名","手機","信箱","預約人數","櫃台審核",
     "預約狀態","乘車狀態","身分","房號","入住日期","退房日期","用餐日期",
-    "上車索引","下車索引","涉及路段範圍","QRCode編碼","備註","寄信狀態"
+    "上車索引","下車索引","涉及路段範圍","QRCode編碼","備註","寄信狀態",
+    "車次-日期時間"  # 新增欄位
 }
 
 # 可預約班次表必要欄位
@@ -507,6 +507,10 @@ def ops(req: OpsRequest):
             qr_content = f"FT:{booking_id}:{em6}"
             qr_url = f"{BASE_URL}/api/qr/{urllib.parse.quote(qr_content)}"
 
+            # 新增：計算車次-日期時間格式
+            date_obj = datetime.strptime(p.date, "%Y-%m-%d")
+            car_datetime = date_obj.strftime("%Y/%m/%d") + " " + _time_hm_from_any(p.time)
+
             newrow = [""] * len(headers)
             setv(newrow, "申請日期", _tz_now_str())
             setv(newrow, "預約狀態", BOOKED_TEXT)
@@ -517,6 +521,7 @@ def ops(req: OpsRequest):
             setv(newrow, "日期", p.date)
             setv(newrow, "班次", _time_hm_from_any(p.time))
             setv(newrow, "車次", car_display)
+            setv(newrow, "車次-日期時間", car_datetime)  # 新增欄位
             setv(newrow, "上車地點", p.pickLocation)
             setv(newrow, "下車地點", p.dropLocation)
             setv(newrow, "姓名", p.name)
@@ -652,6 +657,13 @@ def ops(req: OpsRequest):
             updates: Dict[str, str] = {}
             time_hm = new_time
             car_display = _display_trip_str(new_date, time_hm) if (new_date and time_hm) else None
+            
+            # 新增：更新車次-日期時間
+            if new_date and new_time:
+                date_obj = datetime.strptime(new_date, "%Y-%m-%d")
+                car_datetime = date_obj.strftime("%Y/%m/%d") + " " + new_time
+                updates["車次-日期時間"] = car_datetime
+            
             pk_idx = dp_idx = None
             seg_str = None
             if p.pickLocation and p.dropLocation:
