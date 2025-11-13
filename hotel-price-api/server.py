@@ -1,7 +1,8 @@
 import datetime
 import os
 import traceback
-from zoneinfo import ZoneInfo
+import datetime
+
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
@@ -127,8 +128,8 @@ async def run_all():
         )
 
         results = []
-        tz = ZoneInfo("Asia/Taipei")
-        now = datetime.datetime.now(tz)
+        now_utc = datetime.datetime.utcnow()
+        now = now_utc + datetime.timedelta(hours=8)
         now_str = now.strftime("%Y/%m/%d %H:%M")
 
         
