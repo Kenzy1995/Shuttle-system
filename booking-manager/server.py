@@ -201,7 +201,7 @@ def _compute_main_departure_datetime(direction: str, pickup: str, date_iso: str,
         offset_min = 10
     # LaLaport -10 分鐘
     elif "LaLaport" in p:
-        offset_min = 10
+        offset_min = 20
 
     if offset_min:
         dt = dt - timedelta(minutes=offset_min)
