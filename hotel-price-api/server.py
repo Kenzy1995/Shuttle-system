@@ -39,11 +39,14 @@ def get_sheets_service():
 
 
 async def fetch_price(url: str) -> str:
+    browser = None
     try:
         async with async_playwright() as p:
+            # 使用系統安裝的 Chrome
             browser = await p.chromium.launch(
+                executable_path="/usr/bin/google-chrome-stable",
                 headless=True,
-                args=["--no-sandbox", "--disable-gpu"]
+                args=["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"]
             )
             page = await browser.new_page()
 
@@ -53,11 +56,12 @@ async def fetch_price(url: str) -> str:
 
             await page.wait_for_selector(selector, timeout=10000)
             value = await page.inner_text(selector)
-            await browser.close()
             return value.strip()
     except Exception as e:
-        # 這裡不要直接 raise，先讓你看到是哪裡爆
         return f"ERROR: {e}"
+    finally:
+        if browser:
+            await browser.close()
 
 
 app = FastAPI()
