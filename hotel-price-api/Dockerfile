@@ -13,12 +13,11 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# 安裝 Python 套件 + 安裝瀏覽器
+# 安裝 Python 套件 + Playwright瀏覽器
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
     playwright install --with-deps chromium
 
-# 複製程式碼
 COPY . .
 
 CMD ["gunicorn",
