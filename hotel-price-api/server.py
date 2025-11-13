@@ -1,110 +1,80 @@
-# server.py
+import asyncio
+import datetime
 import os
 import re
-import datetime
-import requests
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
+
+from playwright.async_api import async_playwright
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
+
+# ======== Google Sheets 設定 ========
 SPREADSHEET_ID = "1dbJ0jZAG0fcI3-TAYiIm-C2HO1Cb3YHUVBKvlAAJVAg"
 ADR_SHEET = "ADR"
 DATA_SHEET = "Data"
 START_ROW = 3
-CLASS_KEY = "Cbys4b"
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-def get_sheets_service():
-    creds = service_account.Credentials.from_service_account_file(
-        "/var/secrets/google/key.json", scopes=SCOPES
-    ) if os.path.exists("/var/secrets/google/key.json") else None
 
-    if creds is None:
+def get_sheets_service():
+    creds_path = "/var/secrets/google/key.json"
+
+    if os.path.exists(creds_path):
+        creds = service_account.Credentials.from_service_account_file(
+            creds_path, scopes=SCOPES
+        )
+    else:
         import google.auth
         creds, _ = google.auth.default(scopes=SCOPES)
 
     return build("sheets", "v4", credentials=creds)
 
 
+# ======== Playwright 抓 Google Maps 價格 ========
+async def fetch_price(url: str) -> str:
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-gpu"]
+        )
+        page = await browser.new_page()
+
+        await page.goto(url, timeout=60000, wait_until="networkidle")
+
+        # Google Maps 的價格 class
+        selector = "span.Cbys4b"
+
+        try:
+            await page.wait_for_selector(selector, timeout=10000)
+            value = await page.inner_text(selector)
+        except:
+            await browser.close()
+            return "N/A"
+
+        await browser.close()
+        return value.strip()
+
+
+# ======== FastAPI ========
 app = FastAPI()
 
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
-    ),
-    "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8"
-}
-
-def fetch_html(url: str) -> str:
-    resp = requests.get(url, headers=HEADERS, timeout=15)
-    resp.raise_for_status()
-    return resp.text
-
-
-def extract_price(html: str) -> str:
-    pattern = rf'<span\b[^>]*class="[^"]*\b{CLASS_KEY}\b[^"]*"[^>]*>([\s\S]*?)<\/span>'
-    match = re.search(pattern, html, flags=re.IGNORECASE)
-
-    if not match:
-        return "N/A"
-
-    raw = re.sub(r"<[^>]+>", "", match.group(1)).strip()
-
-    clean = re.findall(r"(NT\$|\$|€|£|¥)?\s*([0-9,]+)", raw)
-    if not clean:
-        return raw
-
-    currency, number = clean[0]
-    number = number.replace(",", "")
-    return f"{currency}{number}" if currency else number
-
-
 @app.get("/price")
-def get_price(url: str = Query(...)):
+async def get_price(url: str = Query(...)):
     try:
-        html = fetch_html(url)
-        price = extract_price(html)
+        price = await fetch_price(url)
         return {"url": url, "price": price}
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-# ⭐ 新增調試用 API：印出 Google Sheets 內容
-@app.get("/debug/sheet")
-def debug_sheet():
-    try:
-        sheets = get_sheets_service()
-
-        adr_range = f"{ADR_SHEET}!A{START_ROW}:B"
-        data_range = f"{DATA_SHEET}!A:C"
-
-        adr_rows = sheets.spreadsheets().values().get(
-            spreadsheetId=SPREADSHEET_ID,
-            range=adr_range
-        ).execute().get("values", [])
-
-        data_rows = sheets.spreadsheets().values().get(
-            spreadsheetId=SPREADSHEET_ID,
-            range=data_range
-        ).execute().get("values", [])
-
-        return {
-            "adr_raw": adr_rows,
-            "data_raw": data_rows
-        }
-
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
-
-
-
+# ======== /run → 取代 Apps Script updatePrices() ========
 @app.get("/run")
-def run_all():
+async def run_all():
     sheets = get_sheets_service()
 
     adr_range = f"{ADR_SHEET}!A{START_ROW}:B"
@@ -116,7 +86,7 @@ def run_all():
     results = []
     now = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
 
-    for idx, row in enumerate(rows):
+    for row in rows:
         if len(row) < 2:
             continue
 
@@ -126,12 +96,7 @@ def run_all():
         if not url.startswith("http"):
             continue
 
-        try:
-            html = fetch_html(url)
-            price = extract_price(html)
-        except Exception:
-            price = "N/A"
-
+        price = await fetch_price(url)
         results.append([now, name, price])
 
     if results:
@@ -148,11 +113,10 @@ def run_all():
     return {
         "status": "ok",
         "updated_rows": len(results),
-        "message": "Update completed",
         "data": results
     }
 
 
 @app.get("/")
 def root():
-    return {"message": "Hotel Price API is running"}
+    return {"message": "Hotel Price Playwright API is running"}
