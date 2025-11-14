@@ -43,10 +43,10 @@ def get_sheets_service():
 
 # ========= Playwright 抓 Google Maps 價格 =========
 async def fetch_price(url: str) -> str:
-    """用 Playwright 開啟 Google Maps 頁面，抓第一個 span.Cbys4b 的文字"""
+    """抓整個 Google Maps 頁面的 HTML（用於分析 DOM 結構）"""
     browser = None
 
-    # 確保不被外部環境變數干擾，強制用 Playwright 內建的 Chromium
+    # 避免外部 runtime 注入變數
     for var in ("CHROME_PATH", "GOOGLE_CHROME_SHIM", "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"):
         os.environ.pop(var, None)
 
@@ -56,23 +56,30 @@ async def fetch_price(url: str) -> str:
                 headless=True,
                 args=[
                     "--no-sandbox",
-                    "--disable-setuid-sandbox",
                     "--disable-gpu",
                     "--disable-dev-shm-usage",
                 ],
             )
             page = await browser.new_page()
 
-            # 載入頁面，等到 networkidle（大部分 XHR 都跑完）
-            await page.goto(url, timeout=60000, wait_until="networkidle")
+            await page.goto(url, timeout=90000, wait_until="networkidle")
 
-            selector = "span.Cbys4b"
+            # ⭐⭐ 抓整頁 HTML ⭐⭐
+            html = await page.content()
 
-            # 等價格出現
-            await page.wait_for_selector(selector, timeout=10000)
-            value = await page.inner_text(selector)
+            # 把 HTML 太長 → 只回前 20000 字，避免 API 回傳過大
+            if len(html) > 20000:
+                return html[:20000] + "\n...（HTML 太長已截斷）"
 
-            return value.strip()
+            return html
+
+    except Exception as e:
+        return f"ERROR: {e}"
+
+    finally:
+        if browser:
+            await browser.close()
+
 
     except Exception as e:
         # 這裡直接回傳錯誤字串，方便在 Data 表上看到是哪邊出事
