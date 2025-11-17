@@ -1338,7 +1338,7 @@ async function loadSystemConfig() {
 
       // 顯示邏輯：每次整頁刷新時，只要有內容就顯示
       if (marqueeText.trim()) {
-        marqueeContainer.style.display = "";
+        marqueeContainer.style.display = "flex";
         marqueeContent.textContent = marqueeText.trim();
       } else {
         marqueeContainer.style.display = "none";
