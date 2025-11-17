@@ -96,9 +96,7 @@ const TEXTS = {
     // Stops
     stopsInfoTitle:"Shuttle Info",
     stopsInfoText:`<p><strong>※ Hotel and dining guests ride free with reservation. Non-guests will be charged NT$200 per person per one-way ride. Max 19 passengers per trip; seats are limited.</strong></p>
-                   <p><strong>※ We may adjust departure times and vehicle type. Vehicles: 20-seat white minibus (PAB-311) or 9-seat grey Volkswagen (BLD-0361), depending on reservations.</strong></p>
-                   <p>Depend on reservation status to arrange 20 seats-white shuttle bus (PAB-311) or 9 seats-grey Volkswagen (BLD-0361).</p>
-                   <p>Japanese translation available below.</p>`,
+                   <p><strong>※ We may adjust departure times and vehicle type. Vehicles: 20-seat white minibus (PAB-311) or 9-seat grey Volkswagen (BLD-0361), depending on reservations.</strong></p>`,
     stopHotelTitle:"Forte Hotel Xizhi Departure - Side Entrance",
     stopMRTTitle:"Nangang Exhibition Center - MRT Exit 3",
     stopTrainTitle:"Nangang Train Station",
