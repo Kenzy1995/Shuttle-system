@@ -53,11 +53,14 @@ function showVerifyLoading(s=true){document.getElementById('loadingConfirm').cla
 function showExpiredOverlay(s=true){document.getElementById('expiredOverlay').classList.toggle('show',s)}
 function overlayRestart(){ showExpiredOverlay(false); restart(); }
 function shake(el){ if(!el) return; el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'),500); }
+// 關閉跑馬燈：只在本次載入隱藏，不寫入任何 storage
 function closeMarquee() {
   const marqueeContainer = document.getElementById('marqueeContainer');
-  marqueeContainer.style.display = 'none';
-  localStorage.setItem('marqueeClosed','1');
+  if (marqueeContainer) {
+    marqueeContainer.style.display = 'none';
+  }
 }
+
 function toggleCollapse(id){
   const el = document.getElementById(id);
   if (!el) return;
