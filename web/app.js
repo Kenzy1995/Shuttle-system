@@ -43,6 +43,9 @@ function showPage(id){
   if(id==='schedule'){
     loadScheduleData();
   }
+  if(id==='station'){
+    renderLiveLocationPlaceholder(); // ← 停靠站點頁顯示保留區塊
+  }
   handleScroll();
 }
 function showLoading(s=true){document.getElementById('loading').classList.toggle('show',s)}
@@ -1196,6 +1199,29 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('scroll', handleScroll, {passive:true});
 window.addEventListener('resize', handleScroll, {passive:true});
 
+// === 功能開關（快速開關） ===
+const FEATURE_TOGGLE = {
+  LIVE_LOCATION: true,
+};
+
+// === 即時位置渲染 ===
+function renderLiveLocationPlaceholder() {
+  const sec = document.querySelector('[data-feature="liveLocation"]');
+  if (!sec) return;
+
+  sec.style.display = FEATURE_TOGGLE.LIVE_LOCATION ? '' : 'none';
+
+  const mount = document.getElementById('realtimeMount');
+  if (!mount) return;
+
+  if (FEATURE_TOGGLE.LIVE_LOCATION) {
+    mount.innerHTML =
+      '<iframe src="/realtime.html" width="100%" height="420" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer"></iframe>';
+  } else {
+    mount.innerHTML = '';
+  }
+}
+
 async function init() {
   const tday = todayISO();
   const ci = document.getElementById('checkInDate');
@@ -1209,6 +1235,7 @@ async function init() {
   applyI18N();
   handleScroll();
   await loadSystemConfig();
+  renderLiveLocationPlaceholder();
 }
 
 /* ====== 解析/過期判斷 (查詢頁用) ====== */
