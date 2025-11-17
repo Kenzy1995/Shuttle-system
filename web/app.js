@@ -1368,20 +1368,6 @@ async function loadSystemConfig() {
     console.error("loadSystemConfig error:", err);
   }
 }
-    // 顯示邏輯
-    if (marqueeText && !sessionStorage.getItem("marqueeClosed")) {
-      marqueeContainer.style.display = "";
-      marqueeContent.textContent = marqueeText.trim();
-    } else {
-      marqueeContainer.style.display = "none";
-    }
-
-    // 關閉按鈕
-    function closeMarquee() {
-      sessionStorage.setItem("marqueeClosed", "1");
-      marqueeContainer.style.display = "none";
-    }
-
 
     // ========= 圖片牆（第 8~12 列, D:E 欄）=========
     const gallery = document.getElementById("imageGallery");
