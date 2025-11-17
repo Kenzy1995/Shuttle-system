@@ -20,21 +20,31 @@ let marqueeData = {
 // 全域：顯示跑馬燈及重新啟動動畫
 function showMarquee() {
   const marqueeContainer = document.getElementById("marqueeContainer");
-  const marqueeText = document.getElementById("marqueeText");
-  if (!marqueeData.text) return;
-  marqueeText.textContent = marqueeData.text;
+  const marqueeContent = document.getElementById("marqueeContent");
+  if (!marqueeContainer || !marqueeContent) return;
+
+  if (!marqueeData.text) {
+    // 沒有文案就隱藏
+    marqueeContainer.style.display = "none";
+    return;
+  }
+
+  marqueeContent.textContent = marqueeData.text;
   marqueeContainer.style.display = "block";
   restartMarqueeAnimation();
 }
 
 function restartMarqueeAnimation() {
-  const marqueeText = document.getElementById("marqueeText");
+  const marqueeContent = document.getElementById("marqueeContent");
+  if (!marqueeContent) return;
+
   // Reset animation: 先停用再重新啟動
-  marqueeText.style.animation = "none";
+  marqueeContent.style.animation = "none";
   // 強迫 reflow
-  void marqueeText.offsetHeight;
-  marqueeText.style.animation = null;
+  void marqueeContent.offsetHeight;
+  marqueeContent.style.animation = null;
 }
+
 
 // 查詢分頁狀態
 let queryDateList = [];
