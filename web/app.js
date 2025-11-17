@@ -518,9 +518,14 @@ async function submitBooking(){
       // 回到 Step6 讓使用者修正
       document.getElementById('step6').style.display='';
     }
-  } catch (e) {
-    console.error('submitBooking error', e);
-    showErrorCard(t('submitFailedPrefix') + (e?.message || ''));
+  catch(err){
+      if (err?.error === "capacity_not_found") {
+          showErrorDialog("班次已不存在或已超過可預訂人數，請重新查詢預約。");
+          return;
+      }
+      showErrorDialog(t('submitFailedPrefix') + (err.message || ''));
+  }
+
     document.getElementById('step6').style.display='';
   } finally {
     showVerifyLoading(false);
