@@ -6,7 +6,10 @@ import json
 import os
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=[
+    "https://hotel-web-3addcbkbgq-de.a.run.app",
+    "https://hotel-web-3addcbkbgq-de.a.run.app",
+])
 
 # Scopes and spreadsheet ID for Google Sheets
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
