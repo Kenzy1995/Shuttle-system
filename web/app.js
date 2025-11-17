@@ -17,6 +17,25 @@ let marqueeData = {
   isLoaded: false
 };
 
+// 全域：顯示跑馬燈及重新啟動動畫
+function showMarquee() {
+  const marqueeContainer = document.getElementById("marqueeContainer");
+  const marqueeText = document.getElementById("marqueeText");
+  if (!marqueeData.text) return;
+  marqueeText.textContent = marqueeData.text;
+  marqueeContainer.style.display = "block";
+  restartMarqueeAnimation();
+}
+
+function restartMarqueeAnimation() {
+  const marqueeText = document.getElementById("marqueeText");
+  // Reset animation: 先停用再重新啟動
+  marqueeText.style.animation = "none";
+  // 強迫 reflow
+  void marqueeText.offsetHeight;
+  marqueeText.style.animation = null;
+}
+
 // 查詢分頁狀態
 let queryDateList = [];
 let currentQueryDate = "";
@@ -996,47 +1015,76 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
   }
 
   function buildScheduleOptions(){
-    const list = holder.querySelector('#md_schedules'); 
+  function buildScheduleOptions() {
+    const list = holder.querySelector('#md_schedules');
     list.innerHTML = '';
+
     const entries = allRows
       .filter(r =>
         String(r["去程 / 回程"]).trim() === mdDirection &&
         fmtDateLabel(r["日期"]) === mdDate &&
         String(r["站點"]).trim() === mdStation
       )
-      .sort((a,b)=>fmtTimeLabel(a["班次"]).localeCompare(fmtTimeLabel(b["班次"])));
+      .sort((a, b) =>
+        fmtTimeLabel(a["班次"]).localeCompare(fmtTimeLabel(b["班次"]))
+      );
 
     entries.forEach(r => {
-      const timeVal = fmtTimeLabel(r["班次"] || r["車次"]);
-      const availText = String(r["可預約人數"] || r["可約人數 / Available"] || '').trim();
+      const timeVal   = fmtTimeLabel(r["班次"] || r["車次"]);
+      const availText = String(
+        r["可預約人數"] || r["可約人數 / Available"] || ''
+      ).trim();
+
       const baseAvail = Number(onlyDigits(availText)) || 0;
+
       const sameAsOriginal =
         (rb === mdDirection) &&
         (fmtDateLabel(date) === mdDate) &&
         (mdStation === ((rb === '回程') ? pick : drop)) &&
         (fmtTimeLabel(time) === timeVal);
+
+      // 原邏輯：如果是同一筆原訂單，要把自己的人數加回來
       const availPlusSelf = baseAvail + (sameAsOriginal ? pax : 0);
 
-      const btn = document.createElement('button'); 
-      btn.type='button'; 
-      btn.className='opt-btn'; 
-      if(timeVal === mdTime) btn.classList.add('active');
+      const btn = document.createElement('button');
+      btn.type  = 'button';
+      btn.className = 'opt-btn';
+      if (timeVal === mdTime) btn.classList.add('active');
+
+      // 這裡開始改成多語系顯示
+      const texts      = TEXTS[currentLang] || TEXTS.zh;
+      const prefix     = texts.paxHintPrefix || '';   // 例如：此班次可預約：
+      const suffixRaw  = texts.paxHintSuffix || '';   // 例如： 人；單筆最多 4 人
+      // 為了不要太長，只取到第一個分號前
+      const suffixShort = suffixRaw.split(/[；;]/)[0] || suffixRaw;
+      const includeSelfText = sameAsOriginal
+        ? (I18N_STATUS[currentLang] || I18N_STATUS.zh).includeSelf
+        : '';
+
+      // 組出像 "(此班次可預約：8 人；含本人)" 這種多語句子
+      const paxInfo = `(${prefix}${availPlusSelf}${suffixShort}${includeSelfText})`;
+
       btn.innerHTML = `
         <span style="color:var(--primary);font-weight:700">${timeVal}</span>
         <span style="color:#777;font-size:13px">
-          (可預約：${availPlusSelf} 人${sameAsOriginal ? (I18N_STATUS[currentLang]||I18N_STATUS.zh).includeSelf : ''})
-        </span>`;
-      btn.onclick = () => { 
-        mdTime = timeVal; 
-        mdAvail = availPlusSelf; 
-        list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); 
-        btn.classList.add('active'); 
-        buildPax(); 
+          ${paxInfo}
+        </span>
+      `;
+
+      btn.onclick = () => {
+        mdTime  = timeVal;
+        mdAvail = availPlusSelf;
+        list.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        buildPax();
       };
+
       list.appendChild(btn);
     });
+
     buildPax();
   }
+
 
   function buildPax(){
     const sel = holder.querySelector('#md_pax'); 
@@ -1295,6 +1343,32 @@ function renderFilterPills(containerId, items, selectedItem, onClick) {
     container.appendChild(pill);
   });
 }
+ function renderFilterPills(containerId, items) {
+   const container = document.getElementById(containerId);
+   container.innerHTML = '';
+   items.forEach(item => {
+     const pill = document.createElement('div');
+     pill.className = 'pill';
+     // 對方向篩選翻譯（去程/回程）
+     if (containerId === 'directionFilter') {
+       if (item === '去程') {
+         pill.textContent = t('dirOutLabel');
+       } else if (item === '回程') {
+         pill.textContent = t('dirInLabel');
+       } else {
+         pill.textContent = item;
+       }
+     } else {
+       pill.textContent = item;
+     }
+     pill.addEventListener('click', () => {
+       scheduleFilters[containerId] = item;
+       renderScheduleResults();
+     });
+     container.appendChild(pill);
+   });
+ }
+
 function renderScheduleResults() {
   const container = document.getElementById('scheduleResults');
   const filtered = scheduleData.rows.filter(row => {
