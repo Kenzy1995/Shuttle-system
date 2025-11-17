@@ -460,12 +460,12 @@ async function submitBooking(){
       body: JSON.stringify({ action: 'book', data: payload }),
     });
 
-    // ===  處理 409：班次失效 / 可預約數不足  ===
+    // === 統一處理所有 409 錯誤 ===
     if (res.status === 409) {
-      showErrorCard(t('overPaxOrMissing'));
-      document.getElementById('step6').style.display='';
+      showErrorCard(t("overPaxOrMissing"));
       bookingSubmitting = false;
       showVerifyLoading(false);
+      document.getElementById('step6').style.display = '';
       return;
     }
 
