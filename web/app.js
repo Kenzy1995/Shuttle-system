@@ -1211,24 +1211,28 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
         return;
       }
 
-      // ✅ 修改成功
+      // ✅ 修改成功：先重新查詢 + 顯示車票，再播成功動畫
+      const qId    = document.getElementById('qBookId').value.trim();
+      const qPhone = document.getElementById('qPhone').value.trim();
+      const qEmail = document.getElementById('qEmail').value.trim();
+
+      // 重新查詢目前條件
+      const queryRes = await fetch(OPS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'query', data: { booking_id: qId, phone: qPhone, email: qEmail } })
+      });
+      const queryData = await queryRes.json();
+      lastQueryResults = Array.isArray(queryData) ? queryData : (queryData.results || []);
+
+      // 這筆訂單修改後的日期就是 mdDate，比較直覺就直接打開那一天
+      currentQueryDate = mdDate;
+      buildDateListFromResults(lastQueryResults);
+      openTicketsForDate(mdDate);   // 直接顯示該日期所有票卡（含剛改好的那張）
+
+      // 此時畫面上已經可以看到新票 → 播「成功」動畫
       showSuccessAnimation();
-      setTimeout(async ()=>{
-        // 重新查詢目前條件
-        const id = document.getElementById('qBookId').value.trim();
-        const phone = document.getElementById('qPhone').value.trim();
-        const email = document.getElementById('qEmail').value.trim();
-        const queryRes = await fetch(OPS_URL, { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify({ action: 'query', data: { booking_id: id, phone, email } }) 
-        });
-        const queryData = await queryRes.json();
-        lastQueryResults = Array.isArray(queryData) ? queryData : (queryData.results || []);
-        buildDateListFromResults(lastQueryResults);
-        if (currentQueryDate) openTicketsForDate(currentQueryDate); 
-        else showCheckDateStep();
-      }, 3000);
+
 
     }catch(e){
       showErrorCard(t('updateFailedPrefix') + (e?.message || ''));
@@ -1308,12 +1312,13 @@ async function loadScheduleData() {
     const stationIndex = headers.indexOf('站點');
     const capacityIndex = headers.indexOf('可預約人數');
     scheduleData.rows = rows.map(row => ({
-      direction: row[directionIndex] || '',
-      date: row[dateIndex] || '',
-      time: row[timeIndex] || '',
-      station: row[stationIndex] || '',
-      capacity: row[capacityIndex] || ''
+      direction: String(row[directionIndex] || '').trim(),
+      date: String(row[dateIndex] || '').trim(),
+      time: String(row[timeIndex] || '').trim(),
+      station: String(row[stationIndex] || '').trim(),
+      capacity: String(row[capacityIndex] || '').trim()
     })).filter(row => row.direction && row.date && row.time && row.station);
+
     scheduleData.directions = new Set(scheduleData.rows.map(r => r.direction));
     scheduleData.dates = new Set(scheduleData.rows.map(r => r.date));
     scheduleData.stations = new Set(scheduleData.rows.map(r => r.station));
@@ -1359,27 +1364,28 @@ function renderFilterPills(containerId, items, selectedItem, onClick) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
   items.sort().forEach(item => {
+    const value = String(item).trim();
     const pill = document.createElement('button');
     pill.type = 'button';
     pill.className = 'filter-pill' + (selectedItem === item ? ' active' : '');
 
-    // 方向要多語翻譯（去程/回程）
     if (containerId === 'directionFilter') {
-      if (item === '去程') {
+      if (value === '去程') {
         pill.textContent = t('dirOutLabel');
-      } else if (item === '回程') {
+      } else if (value === '回程') {
         pill.textContent = t('dirInLabel');
       } else {
-        pill.textContent = item;
+        pill.textContent = value;
       }
     } else {
-      pill.textContent = item;
+      pill.textContent = value;
     }
 
     pill.onclick = () => onClick(item);
     container.appendChild(pill);
   });
 }
+
 
 
 function renderScheduleResults() {
