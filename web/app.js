@@ -1369,29 +1369,6 @@ async function loadSystemConfig() {
   }
 }
 
-    // ========= 圖片牆（第 8~12 列, D:E 欄）=========
-    const gallery = document.getElementById("imageGallery");
-    if (!gallery) return;
-    gallery.innerHTML = "";
-
-    for (let i = 7; i <= 11; i++) {
-      const row = data[i] || [];
-      const imgUrl = row[3] || "";
-      const flag = row[4] || "";
-
-      if (/^(是|Y|1|TRUE)$/i.test(flag) && imgUrl.trim()) {
-        const img = document.createElement("img");
-        img.className = "gallery-image";
-        img.src = imgUrl.trim();
-        gallery.appendChild(img);
-      }
-    }
-
-  } catch (err) {
-    console.error("loadSystemConfig error:", err);
-  }
-}
-
 
 /* ====== 其他工具 ====== */
 function parseTripDateTime(dateStr, timeStr){
