@@ -1,6 +1,5 @@
-// i18n.js — texts & status labels and helpers
-/* ====== 語言包 ====== */
-const TEXTS = {
+/* ====== 多語文本與工具 ====== */
+window.TEXTS = {
   zh: {
     title:"飯店服務-免費接駁車預約", brand:"飯店服務",
     navReservation:"立即預約", navCheck:"我的預約", navSchedule:"查詢班次", navStation:"停靠站點",
@@ -31,7 +30,25 @@ const TEXTS = {
     noSchedules:"沒有符合條件的班次",
     dirOutLabel:"去程（飯店出發）",
     dirInLabel:"回程（前往飯店）",
-    all:"全部"
+    all:"全部",
+
+    /* 停靠站點：內容（依語系切換） */
+    stopsInfoText:
+      "※房客、用餐客人可享免費預約接駁，非房客或用餐客人預約接駁須收費每位NT$200/單趟，每趟次可搭乘19名旅客，座位有限，約滿為止。<br/>" +
+      "※本飯店保有彈性調整發車時段，發車與否及車輛型式之權利。<br/>" +
+      "車種介紹：依預約人數安排白色20人中巴(車牌PAB-311)或鐵灰色福斯九人座(車牌BLD-0361)",
+
+    stopMRTDesc:
+      "捷運南港展覽館 3 號出口 - 汽機車臨停接送區。<br/>" +
+      "停靠時間：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+
+    stopTrainDesc:
+      "南港火車站靠興中路一側上下客點（南港車站東側臨停接送區）。<br/>" +
+      "停靠時間：08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+
+    stopLalaDesc:
+      "南港展覽館1號出口大客車臨停區 / 小客車臨停區（視車種有不同停靠區）。<br/>" +
+      "停靠時間：12:15 / 14:45 / 17:20 / 18:50 / 21:15",
   },
   en: {
     title:"Hotel Service - Free Shuttle Booking", brand:"Hotel Service",
@@ -63,7 +80,25 @@ const TEXTS = {
     noSchedules:"No matching schedules",
     dirOutLabel:"Outbound (from hotel)",
     dirInLabel:"Inbound (to hotel)",
-    all:"ALL"
+    all:"ALL",
+
+    /* Stops */
+    stopsInfoText:
+      "※ Hotel and dining guests may ride for free with reservation; non-guests are charged NT$200 per person per one-way. Up to 19 passengers per trip; limited seats, first-come-first-served.<br/>" +
+      "※ The hotel reserves the right to flexibly adjust departure times, operate trips, and vehicle type.<br/>" +
+      "Vehicle types: depending on reservations, we arrange a 20-seat white minibus (PAB-311) or a 9-seat grey Volkswagen (BLD-0361).",
+
+    stopMRTDesc:
+      "MRT Nangang Exhibition Center Exit 3 – temporary pick-up/drop-off area for cars and motorcycles.<br/>" +
+      "Stop times: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+
+    stopTrainDesc:
+      "Nangang Train Station, pick-up/drop-off area on Xingzhong Road side (east-side temporary loading area).<br/>" +
+      "Stop times: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+
+    stopLalaDesc:
+      "Nangang Exhibition Center Exit 1 – coach temporary bay / passenger car bay (different zones depending on vehicle type).<br/>" +
+      "Stop times: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
   },
   ja: {
     title:"ホテルサービス-無料シャトル予約", brand:"ホテルサービス",
@@ -95,7 +130,25 @@ const TEXTS = {
     noSchedules:"条件に合う便がありません",
     dirOutLabel:"往路（ホテル発）",
     dirInLabel:"復路（ホテル行き）",
-    all:"すべて"
+    all:"すべて",
+
+    /* Stops */
+    stopsInfoText:
+      "※ 宿泊客およびレストラン利用客は予約により無料でご乗車いただけます。該当しない場合はお一人様片道 NT$200 を頂戴します。1 便あたり最大 19 名、席数限定、先着順です。<br/>" +
+      "※ 当ホテルは発車時刻の柔軟な調整、運行の有無、車両タイプの決定権を有します。<br/>" +
+      "車種のご案内：予約人数に応じて、白い 20 人乗りミニバス（PAB-311）または鉄灰色の 9 人乗りフォルクスワーゲン（BLD-0361）を手配します。",
+
+    stopMRTDesc:
+      "MRT 南港展覧館駅 3 番出口・車両臨時乗降エリア。<br/>" +
+      "停車時刻：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+
+    stopTrainDesc:
+      "南港駅・興中路側の乗降ポイント（駅東側の臨時送迎エリア）。<br/>" +
+      "停車時刻：08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+
+    stopLalaDesc:
+      "南港展覧館 1 番出口・大型バス臨時乗降エリア／小型車臨時乗降エリア（車種により異なる区画）。<br/>" +
+      "停車時刻：12:15 / 14:45 / 17:20 / 18:50 / 21:15",
   },
   ko: {
     title:"호텔 서비스-무료 셔틀 예약", brand:"호텔 서비스",
@@ -127,39 +180,60 @@ const TEXTS = {
     noSchedules:"조건에 맞는 일정이 없습니다",
     dirOutLabel:"가는편(호텔 출발)",
     dirInLabel:"오는편(호텔 도착)",
-    all:"전체"
+    all:"전체",
+
+    /* Stops */
+    stopsInfoText:
+      "※ 숙박객·식사객은 예약 시 무료로 이용할 수 있으며, 그 외 고객은 1인당 편도 NT$200가 부과됩니다. 한 회차 최대 19명 탑승, 좌석 한정 선착순입니다.<br/>" +
+      "※ 호텔은 운행 시간, 운행 여부 및 차량 종류를 유연하게 조정할 권리를 보유합니다.<br/>" +
+      "차량 안내: 예약 인원에 따라 20인승 흰색 미니버스(PAB-311) 또는 9인승 회색 폭스바겐(BLD-0361)을 배차합니다.",
+
+    stopMRTDesc:
+      "MRT 난강(南港) 전람관 3번 출구 차량 임시 승하차 구역.<br/>" +
+      "정차 시각: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+
+    stopTrainDesc:
+      "난강역 흥중로(興中路) 측 승하차 지점(역 동측 임시 승하차 구역).<br/>" +
+      "정차 시각: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+
+    stopLalaDesc:
+      "난강 전람관 1번 출구 대형버스 임시 정차 구역 / 소형차 임시 정차 구역(차종에 따라 상이).<br/>" +
+      "정차 시각: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
   }
 };
 
-/* ====== 狀態與工具 ====== */
-const I18N_STATUS = {
+window.I18N_STATUS = {
   zh: { booked:"✔️ 已預約", cancelled:"❌ 已取消", rejected:"已拒絕", boarded:"已上車", expired:"已過期", download:"下載車票", modify:"修改", remove:"刪除", noRecords:"查無符合條件的紀錄（僅顯示近一個月）", includeSelf:"（含本人）" },
   en: { booked:"✔️ Booked", cancelled:"❌ Cancelled", rejected:"Rejected", boarded:"Boarded", expired:"Expired", download:"Download ticket", modify:"Edit", remove:"Delete", noRecords:"No matching records (last 30 days only)", includeSelf:" (incl. you)" },
   ja: { booked:"✔️ 予約済み", cancelled:"❌ キャンセル", rejected:"拒否", boarded:"乗車済み", expired:"期限切れ", download:"チケットをダウンロード", modify:"変更", remove:"削除", noRecords:"該当データがありません（直近30日）", includeSelf:"（本人含む）" },
   ko: { booked:"✔️ 예약됨", cancelled:"❌ 취소됨", rejected:"거절됨", boarded:"탑승완료", expired:"만료", download:"티켓 다운로드", modify:"수정", remove:"삭제", noRecords:"일치하는 기록 없음 (최근 30일)", includeSelf:"(본인 포함)" }
 };
 
-let currentLang = "zh";
-function t(key){ return (TEXTS[currentLang]||TEXTS.zh)[key] || key; }
-function ts(key){ return (I18N_STATUS[currentLang]||I18N_STATUS.zh)[key] || key; }
+window.currentLang = "zh";
+window.t = function t(key){ return (window.TEXTS[window.currentLang]||window.TEXTS.zh)[key] || key; }
+window.ts = function ts(key){ return (window.I18N_STATUS[window.currentLang]||window.I18N_STATUS.zh)[key] || key; }
 
-function applyI18N(){
+window.applyI18N = function applyI18N(){
   document.title = t('title');
   document.querySelectorAll('[data-i18n]').forEach(el=>{
     const k = el.getAttribute('data-i18n');
     const v = t(k);
-    if(v) el.textContent = v;
+    if(v!=null) {
+      // 允許多行段落（含 <br/>），這裡用 innerHTML
+      if (v.includes('<br/>')) el.innerHTML = v;
+      else el.textContent = v;
+    }
   });
   const pill = document.getElementById('successStatusPill');
   if(pill) pill.textContent = ts('booked');
 }
 
-function onLanguageChange(lang){
-  currentLang = lang || "zh";
+window.onLanguageChange = function onLanguageChange(lang){
+  window.currentLang = lang || "zh";
   applyI18N();
-  // 這兩個 function 在 app.js 裡；若尚未載入，不會執行
-  if (typeof rerenderQueryPages === 'function') rerenderQueryPages();
-  if (document.getElementById('step1') && document.getElementById('step1').style.display !== 'none' && typeof buildStep1 === 'function') {
-    buildStep1();
+  // 以下兩個函式在 app.js 中，若尚未載入則略過
+  if (typeof window.rerenderQueryPages === 'function') window.rerenderQueryPages();
+  if (document.getElementById('step1') && document.getElementById('step1').style.display !== 'none') {
+    if (typeof window.buildStep1 === 'function') window.buildStep1();
   }
 }
