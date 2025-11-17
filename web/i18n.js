@@ -1,5 +1,5 @@
-/* ====== 多語文本與工具 ====== */
-window.TEXTS = {
+/* ====== 語言包 ====== */
+const TEXTS = {
   zh: {
     title:"飯店服務-免費接駁車預約", brand:"飯店服務",
     navReservation:"立即預約", navCheck:"我的預約", navSchedule:"查詢班次", navStation:"停靠站點",
@@ -31,24 +31,35 @@ window.TEXTS = {
     dirOutLabel:"去程（飯店出發）",
     dirInLabel:"回程（前往飯店）",
     all:"全部",
+    // 停靠站點
+    stopsInfoTitle:"接駁車資訊",
+    stopsInfoText:`<p><strong>※房客、用餐客人可享免費預約接駁，非房客或用餐客人預約接駁須收費每位NT$200/單趟，每趟次可搭乘19名旅客，座位有限，約滿為止。</strong></p>
+                   <p><strong>※本飯店保有彈性調整發車時段，發車與否及車輛型式之權利。 車種介紹： 依預約人數安排白色20人中巴(車牌PAB-311)或鐵灰 色福斯九人座(車牌BLD-0361)</strong></p>
+                   <p>Depend on reservation status to arrange 20 seats-white shuttle bus (PAB-311) or 9 seats-grey Volkswagen (BLD-0361)</p>
+                   <p>予約人数に応じて、白い20人乗りミニバス（ナンバープレートPAB-311）または鉄灰色の9人乗りフォルクスワーゲン（ナンバープレートBLD-0361）を手配します。</p>`,
+    stopHotelTitle:"福泰大飯店發車-側門出口 / Forte Hotel Xizhi Departure - Side Entrance",
+    stopMRTTitle:"南港展覽館-捷運3號出口 / Nangang Exhibition Center - MRT Exit 3",
+    stopTrainTitle:"南港火車站 / Nangang Train Station",
+    stopLalaTitle:"南港 LaLaport Shopping Park",
+    stopMRTDesc:"捷運南港展覽館 3 號出口 - 汽機車臨停接送區。 停靠時間：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+    stopTrainDesc:"南港火車站靠興中路一側上下客點(南港車站東側臨停接送區) 停靠時間:08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+    stopLalaDesc:"南港展覽館1號出口大客車臨停區/小客車臨停區(視車種有不同停靠區) 停靠時間：12:15 / 14:45 / 17:20 / 18:50 / 21:15",
 
-    /* 停靠站點：內容（依語系切換） */
-    stopsInfoText:
-      "※房客、用餐客人可享免費預約接駁，非房客或用餐客人預約接駁須收費每位NT$200/單趟，每趟次可搭乘19名旅客，座位有限，約滿為止。<br/>" +
-      "※本飯店保有彈性調整發車時段，發車與否及車輛型式之權利。<br/>" +
-      "車種介紹：依預約人數安排白色20人中巴(車牌PAB-311)或鐵灰色福斯九人座(車牌BLD-0361)",
-
-    stopMRTDesc:
-      "捷運南港展覽館 3 號出口 - 汽機車臨停接送區。<br/>" +
-      "停靠時間：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
-
-    stopTrainDesc:
-      "南港火車站靠興中路一側上下客點（南港車站東側臨停接送區）。<br/>" +
-      "停靠時間：08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
-
-    stopLalaDesc:
-      "南港展覽館1號出口大客車臨停區 / 小客車臨停區（視車種有不同停靠區）。<br/>" +
-      "停靠時間：12:15 / 14:45 / 17:20 / 18:50 / 21:15",
+    // 對話框
+    errorTitle:"提交失敗",
+    errorGeneric:"操作失敗，請稍後再試",
+    ok:"確定",
+    confirmDeleteTitle:"刪除預約",
+    confirmDeleteText:"是否確認刪除此筆訂單？",
+    cancel:"取消",
+    confirm:"確認",
+    submitFailedPrefix:"提交失敗：",
+    deleteFailedPrefix:"刪除失敗：",
+    updateFailedPrefix:"更新失敗：",
+    refreshFailedPrefix:"資料更新失敗：",
+    queryFailedPrefix:"查詢失敗：",
+    paxHintPrefix:"此班次可預約：",
+    paxHintSuffix:" 人；單筆最多 4 人",
   },
   en: {
     title:"Hotel Service - Free Shuttle Booking", brand:"Hotel Service",
@@ -81,24 +92,35 @@ window.TEXTS = {
     dirOutLabel:"Outbound (from hotel)",
     dirInLabel:"Inbound (to hotel)",
     all:"ALL",
+    // Stops
+    stopsInfoTitle:"Shuttle Info",
+    stopsInfoText:`<p><strong>※ Hotel and dining guests ride free with reservation. Non-guests will be charged NT$200 per person per one-way ride. Max 19 passengers per trip; seats are limited.</strong></p>
+                   <p><strong>※ We may adjust departure times and vehicle type. Vehicles: 20-seat white minibus (PAB-311) or 9-seat grey Volkswagen (BLD-0361), depending on reservations.</strong></p>
+                   <p>Depend on reservation status to arrange 20 seats-white shuttle bus (PAB-311) or 9 seats-grey Volkswagen (BLD-0361).</p>
+                   <p>Japanese translation available below.</p>`,
+    stopHotelTitle:"Forte Hotel Xizhi Departure - Side Entrance",
+    stopMRTTitle:"Nangang Exhibition Center - MRT Exit 3",
+    stopTrainTitle:"Nangang Train Station",
+    stopLalaTitle:"Nangang LaLaport Shopping Park",
+    stopMRTDesc:"MRT Nangang Exhibition Center Exit 3 — Temporary pick-up/drop-off zone. Times: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+    stopTrainDesc:"Nangang Station, Xingzhong Rd. side (East-side temporary pick-up/drop-off). Times: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+    stopLalaDesc:"Nangang Exhibition Hall Exit 1 (bus/van temporary stops vary by vehicle). Times: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
 
-    /* Stops */
-    stopsInfoText:
-      "※ Hotel and dining guests may ride for free with reservation; non-guests are charged NT$200 per person per one-way. Up to 19 passengers per trip; limited seats, first-come-first-served.<br/>" +
-      "※ The hotel reserves the right to flexibly adjust departure times, operate trips, and vehicle type.<br/>" +
-      "Vehicle types: depending on reservations, we arrange a 20-seat white minibus (PAB-311) or a 9-seat grey Volkswagen (BLD-0361).",
-
-    stopMRTDesc:
-      "MRT Nangang Exhibition Center Exit 3 – temporary pick-up/drop-off area for cars and motorcycles.<br/>" +
-      "Stop times: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
-
-    stopTrainDesc:
-      "Nangang Train Station, pick-up/drop-off area on Xingzhong Road side (east-side temporary loading area).<br/>" +
-      "Stop times: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
-
-    stopLalaDesc:
-      "Nangang Exhibition Center Exit 1 – coach temporary bay / passenger car bay (different zones depending on vehicle type).<br/>" +
-      "Stop times: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
+    // Dialogs
+    errorTitle:"Submission failed",
+    errorGeneric:"Operation failed. Please try again later.",
+    ok:"OK",
+    confirmDeleteTitle:"Delete booking",
+    confirmDeleteText:"Are you sure you want to delete this booking?",
+    cancel:"Cancel",
+    confirm:"Confirm",
+    submitFailedPrefix:"Submit failed: ",
+    deleteFailedPrefix:"Delete failed: ",
+    updateFailedPrefix:"Update failed: ",
+    refreshFailedPrefix:"Refresh failed: ",
+    queryFailedPrefix:"Query failed: ",
+    paxHintPrefix:"Available: ",
+    paxHintSuffix:"; up to 4 per order",
   },
   ja: {
     title:"ホテルサービス-無料シャトル予約", brand:"ホテルサービス",
@@ -131,24 +153,34 @@ window.TEXTS = {
     dirOutLabel:"往路（ホテル発）",
     dirInLabel:"復路（ホテル行き）",
     all:"すべて",
+    // Stops
+    stopsInfoTitle:"シャトル案内",
+    stopsInfoText:`<p><strong>※ 宿泊客・レストラン客は予約により無料で乗車できます。非宿泊・非利用の場合は1名片道NT$200を頂戴します。1便最大19名、席数に限りがあります。</strong></p>
+                   <p><strong>※ 出発時刻や車両は変更となる場合があります。予約状況により、白い20人乗りミニバス(PAB-311)または鉄灰色の9人乗りフォルクスワーゲン(BLD-0361)を手配します。</strong></p>
+                   <p>予約人数に応じて、白い20人乗りミニバス（PAB-311）または鉄灰色の9人乗りフォルクスワーゲン（BLD-0361）を手配します。</p>`,
+    stopHotelTitle:"福泰大飯店発-側門出口 / Forte Hotel Xizhi Departure - Side Entrance",
+    stopMRTTitle:"南港展示館-MRT3番出口 / Nangang Exhibition Center - MRT Exit 3",
+    stopTrainTitle:"南港駅 / Nangang Train Station",
+    stopLalaTitle:"南港LaLaportショッピングパーク",
+    stopMRTDesc:"MRT南港展示館3番出口 - 車・バイク一時停車送迎エリア。 停車時刻：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+    stopTrainDesc:"南港駅 興中路側の乗降場所（南港駅東側の一時停車送迎エリア） 停車時刻：08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+    stopLalaDesc:"南港展示館1番出口 大型/小型車一時停車エリア（車種により停車位置が異なります） 停車時刻：12:15 / 14:45 / 17:20 / 18:50 / 21:15",
 
-    /* Stops */
-    stopsInfoText:
-      "※ 宿泊客およびレストラン利用客は予約により無料でご乗車いただけます。該当しない場合はお一人様片道 NT$200 を頂戴します。1 便あたり最大 19 名、席数限定、先着順です。<br/>" +
-      "※ 当ホテルは発車時刻の柔軟な調整、運行の有無、車両タイプの決定権を有します。<br/>" +
-      "車種のご案内：予約人数に応じて、白い 20 人乗りミニバス（PAB-311）または鉄灰色の 9 人乗りフォルクスワーゲン（BLD-0361）を手配します。",
-
-    stopMRTDesc:
-      "MRT 南港展覧館駅 3 番出口・車両臨時乗降エリア。<br/>" +
-      "停車時刻：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
-
-    stopTrainDesc:
-      "南港駅・興中路側の乗降ポイント（駅東側の臨時送迎エリア）。<br/>" +
-      "停車時刻：08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
-
-    stopLalaDesc:
-      "南港展覧館 1 番出口・大型バス臨時乗降エリア／小型車臨時乗降エリア（車種により異なる区画）。<br/>" +
-      "停車時刻：12:15 / 14:45 / 17:20 / 18:50 / 21:15",
+    // Dialogs
+    errorTitle:"送信失敗",
+    errorGeneric:"操作に失敗しました。しばらくしてからお試しください。",
+    ok:"OK",
+    confirmDeleteTitle:"予約を削除",
+    confirmDeleteText:"この予約を削除してもよろしいですか？",
+    cancel:"キャンセル",
+    confirm:"確認",
+    submitFailedPrefix:"送信失敗：",
+    deleteFailedPrefix:"削除失敗：",
+    updateFailedPrefix:"更新失敗：",
+    refreshFailedPrefix:"更新失敗：",
+    queryFailedPrefix:"検索失敗：",
+    paxHintPrefix:"空席数：",
+    paxHintSuffix:" 人（1回最大4名）",
   },
   ko: {
     title:"호텔 서비스-무료 셔틀 예약", brand:"호텔 서비스",
@@ -181,59 +213,70 @@ window.TEXTS = {
     dirOutLabel:"가는편(호텔 출발)",
     dirInLabel:"오는편(호텔 도착)",
     all:"전체",
+    // Stops
+    stopsInfoTitle:"셔틀 정보",
+    stopsInfoText:`<p><strong>※ 숙박/식사 고객은 예약 시 무료 탑승. 비고객은 1인 편도 NT$200. 회당 최대 19명, 좌석 한정.</strong></p>
+                   <p><strong>※ 출발 시간과 차량은 변동될 수 있습니다. 예약 인원에 따라 20인승 백색 미니버스(PAB-311) 또는 9인승 회색 폭스바겐(BLD-0361)을 배차합니다.</strong></p>
+                   <p>예약 상황에 따라 20인승 백색 버스(PAB-311) 또는 9인승 회색 폭스바겐(BLD-0361)을 배치합니다.</p>`,
+    stopHotelTitle:"포르테 호텔 시즈 출발 - 측문",
+    stopMRTTitle:"난강 전람관 - MRT 3번 출구",
+    stopTrainTitle:"난강역",
+    stopLalaTitle:"난강 라라포트 쇼핑파크",
+    stopMRTDesc:"MRT 난강 전람관 3번 출구 — 임시 승하차 구역. 시간: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+    stopTrainDesc:"난강역 흥중로 측 승하차 (동측 임시 승하차 구역). 시간: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+    stopLalaDesc:"난강 전람관 1번 출구 대형/소형차 임시 정차 구역(차종에 따라 다름). 시간: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
 
-    /* Stops */
-    stopsInfoText:
-      "※ 숙박객·식사객은 예약 시 무료로 이용할 수 있으며, 그 외 고객은 1인당 편도 NT$200가 부과됩니다. 한 회차 최대 19명 탑승, 좌석 한정 선착순입니다.<br/>" +
-      "※ 호텔은 운행 시간, 운행 여부 및 차량 종류를 유연하게 조정할 권리를 보유합니다.<br/>" +
-      "차량 안내: 예약 인원에 따라 20인승 흰색 미니버스(PAB-311) 또는 9인승 회색 폭스바겐(BLD-0361)을 배차합니다.",
-
-    stopMRTDesc:
-      "MRT 난강(南港) 전람관 3번 출구 차량 임시 승하차 구역.<br/>" +
-      "정차 시각: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
-
-    stopTrainDesc:
-      "난강역 흥중로(興中路) 측 승하차 지점(역 동측 임시 승하차 구역).<br/>" +
-      "정차 시각: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
-
-    stopLalaDesc:
-      "난강 전람관 1번 출구 대형버스 임시 정차 구역 / 소형차 임시 정차 구역(차종에 따라 상이).<br/>" +
-      "정차 시각: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
+    // Dialogs
+    errorTitle:"제출 실패",
+    errorGeneric:"작업에 실패했습니다. 잠시 후 다시 시도하세요.",
+    ok:"확인",
+    confirmDeleteTitle:"예약 삭제",
+    confirmDeleteText:"이 예약을 삭제하시겠습니까?",
+    cancel:"취소",
+    confirm:"확인",
+    submitFailedPrefix:"제출 실패: ",
+    deleteFailedPrefix:"삭제 실패: ",
+    updateFailedPrefix:"업데이트 실패: ",
+    refreshFailedPrefix:"새로고침 실패: ",
+    queryFailedPrefix:"조회 실패: ",
+    paxHintPrefix:"예약 가능: ",
+    paxHintSuffix:"명 (최대 4명)",
   }
 };
 
-window.I18N_STATUS = {
+/* 狀態文案 */
+const I18N_STATUS = {
   zh: { booked:"✔️ 已預約", cancelled:"❌ 已取消", rejected:"已拒絕", boarded:"已上車", expired:"已過期", download:"下載車票", modify:"修改", remove:"刪除", noRecords:"查無符合條件的紀錄（僅顯示近一個月）", includeSelf:"（含本人）" },
   en: { booked:"✔️ Booked", cancelled:"❌ Cancelled", rejected:"Rejected", boarded:"Boarded", expired:"Expired", download:"Download ticket", modify:"Edit", remove:"Delete", noRecords:"No matching records (last 30 days only)", includeSelf:" (incl. you)" },
   ja: { booked:"✔️ 予約済み", cancelled:"❌ キャンセル", rejected:"拒否", boarded:"乗車済み", expired:"期限切れ", download:"チケットをダウンロード", modify:"変更", remove:"削除", noRecords:"該当データがありません（直近30日）", includeSelf:"（本人含む）" },
   ko: { booked:"✔️ 예약됨", cancelled:"❌ 취소됨", rejected:"거절됨", boarded:"탑승완료", expired:"만료", download:"티켓 다운로드", modify:"수정", remove:"삭제", noRecords:"일치하는 기록 없음 (최근 30일)", includeSelf:"(본인 포함)" }
 };
 
-window.currentLang = "zh";
-window.t = function t(key){ return (window.TEXTS[window.currentLang]||window.TEXTS.zh)[key] || key; }
-window.ts = function ts(key){ return (window.I18N_STATUS[window.currentLang]||window.I18N_STATUS.zh)[key] || key; }
+let currentLang = "zh";
+function t(key){ return (TEXTS[currentLang]||TEXTS.zh)[key] || key; }
+function ts(key){ return (I18N_STATUS[currentLang]||I18N_STATUS.zh)[key] || key; }
 
-window.applyI18N = function applyI18N(){
+function applyI18N(){
   document.title = t('title');
   document.querySelectorAll('[data-i18n]').forEach(el=>{
     const k = el.getAttribute('data-i18n');
     const v = t(k);
-    if(v!=null) {
-      // 允許多行段落（含 <br/>），這裡用 innerHTML
-      if (v.includes('<br/>')) el.innerHTML = v;
-      else el.textContent = v;
-    }
+    if(v) el.textContent = v;
+  });
+  // 支援 innerHTML
+  document.querySelectorAll('[data-i18n-html]').forEach(el=>{
+    const k = el.getAttribute('data-i18n-html');
+    const v = t(k);
+    if(v) el.innerHTML = v;
   });
   const pill = document.getElementById('successStatusPill');
   if(pill) pill.textContent = ts('booked');
 }
-
-window.onLanguageChange = function onLanguageChange(lang){
-  window.currentLang = lang || "zh";
+function onLanguageChange(lang){
+  currentLang = lang || "zh";
   applyI18N();
-  // 以下兩個函式在 app.js 中，若尚未載入則略過
-  if (typeof window.rerenderQueryPages === 'function') window.rerenderQueryPages();
-  if (document.getElementById('step1') && document.getElementById('step1').style.display !== 'none') {
-    if (typeof window.buildStep1 === 'function') window.buildStep1();
+  if (typeof rerenderQueryPages === 'function') rerenderQueryPages();
+  if (document.getElementById('step1') && document.getElementById('step1').style.display !== 'none' && typeof buildStep1 === 'function') {
+    buildStep1();
   }
 }
