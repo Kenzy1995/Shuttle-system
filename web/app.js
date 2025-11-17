@@ -1023,11 +1023,7 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
         list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); 
         btn.classList.add('active'); 
         buildScheduleOptions(); 
-      }; 
-      list.appendChild(btn); 
-    });
-    buildScheduleOptions();
-  }
+      }
 
   function buildScheduleOptions() {
     const list = holder.querySelector('#md_schedules');
