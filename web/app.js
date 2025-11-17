@@ -1113,40 +1113,60 @@ function renderScheduleResults() {
   `).join('');
 }
 
-/* ====== 跑馬燈與圖片展示 ====== */
+/* ====== 系統設定載入（跑馬燈 + 圖片牆） ====== */
 async function loadSystemConfig() {
   try {
-    const res = await fetch(API_URL + '?sheet=系統');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const url = `${API_URL}?sheet=系統`;
+    const res = await fetch(url);
     const data = await res.json();
-    const marqueeTexts = [];
+
+    if (!Array.isArray(data) || data.length === 0) return;
+
+    // ========= 跑馬燈（第 2 ~ 6 列, D:E 欄）=========
+    const marqueeContainer = document.getElementById("marqueeContainer");
+    const marqueeContent = document.getElementById("marqueeContent");
+
+    let marqueeText = "";
     for (let i = 1; i <= 5; i++) {
       const row = data[i] || [];
-      const text = row[3] || '';
-      const flag = row[4] || '';
-      if (String(flag).trim() === '是' && text) marqueeTexts.push(text);
+      const text = row[3] || "";   // D 欄
+      const flag = row[4] || "";   // E 欄 (啟用 = "是")
+
+      if (/^(是|Y|1|TRUE)$/i.test(flag) && text.trim()) {
+        marqueeText += text.trim() + "　　";
+      }
     }
-    if (marqueeTexts.length > 0 && !localStorage.getItem('marqueeClosed')) {
-      const marqueeContainer = document.getElementById('marqueeContainer');
-      const marqueeContent = document.getElementById('marqueeContent');
-      marqueeContent.innerHTML = marqueeTexts.map(sanitize).join(' | ');
-      marqueeContainer.style.display = 'block';
+
+    if (marqueeText && !localStorage.getItem("marqueeClosed")) {
+      marqueeContainer.style.display = "";
+      marqueeContent.textContent = marqueeText.trim();
+    } else {
+      marqueeContainer.style.display = "none";
     }
-    const galleryImages = [];
+
+    // ========= 圖片牆（第 8~12 列, D:E 欄）=========
+    const gallery = document.getElementById("imageGallery");
+    if (!gallery) return;
+    gallery.innerHTML = "";
+
     for (let i = 7; i <= 11; i++) {
       const row = data[i] || [];
-      const url = row[3] || '';
-      const flag = row[4] || '';
-      if (String(flag).trim() === '是' && url) galleryImages.push(url);
+      const imgUrl = row[3] || "";
+      const flag = row[4] || "";
+
+      if (/^(是|Y|1|TRUE)$/i.test(flag) && imgUrl.trim()) {
+        const img = document.createElement("img");
+        img.className = "gallery-image";
+        img.src = imgUrl.trim();
+        gallery.appendChild(img);
+      }
     }
-    if (galleryImages.length > 0) {
-      const imageGallery = document.getElementById('imageGallery');
-      imageGallery.innerHTML = galleryImages.map(u => `<img src="${sanitize(u)}" class="gallery-image" alt="宣傳圖片" />`).join('');
-    }
-  } catch (error) {
-    console.warn('載入系統設定失敗:', error);
+
+  } catch (err) {
+    console.error("loadSystemConfig error:", err);
   }
 }
+
 
 /* ====== 其他工具 ====== */
 function parseTripDateTime(dateStr, timeStr){
