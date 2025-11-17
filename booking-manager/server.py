@@ -528,7 +528,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://hotel-web-995728097341.asia-east1.run.app",
-        "http://127.0.0.1:8080",
+        "https://hotel-web-3addcbkbgq-de.a.run.app",
         "http://localhost:8080",
     ],
     allow_credentials=True,
