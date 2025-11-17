@@ -1369,7 +1369,6 @@ async function loadSystemConfig() {
   }
 }
 
-
 /* ====== 其他工具 ====== */
 function parseTripDateTime(dateStr, timeStr){
   const iso = fmtDateLabel(dateStr);
@@ -1483,3 +1482,7 @@ function isExpiredByCarDateTime(carDateTime) {
     return tripTime < Date.now();
   } catch (e) { return true; }
 }
+
+
+=======
+幫我檢查一下是不是有錯誤的括號之類的問題? 按鈕全部都失效了
