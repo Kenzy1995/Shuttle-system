@@ -12,6 +12,10 @@ let selectedScheduleTime = "";
 let selectedAvailableSeats = 0;
 let currentBookingData = {};
 let lastQueryResults = [];
+let marqueeData = {
+  text: "",
+  isLoaded: false
+};
 
 // 查詢分頁狀態
 let queryDateList = [];
@@ -27,6 +31,8 @@ function handleScroll(){
 }
 function showPage(id){
   hardResetOverlays();
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
   document.getElementById(id).classList.add("active");
   document.querySelectorAll(".nav-links button").forEach(b=>b.classList.remove("active"));
@@ -46,6 +52,11 @@ function showPage(id){
   if(id==='station'){
     renderLiveLocationPlaceholder(); // ← 停靠站點頁顯示保留區塊
   }
+  // 在所有頁面都顯示跑馬燈
+  if (marqueeData.isLoaded) {
+    showMarquee();
+  }
+
   handleScroll();
 }
 function showLoading(s=true){document.getElementById('loading').classList.toggle('show',s)}
@@ -1312,6 +1323,7 @@ function renderScheduleResults() {
 }
 
 /* ====== 系統設定載入（跑馬燈 + 圖片牆） ====== */
+// 修改 loadSystemConfig 函數
 async function loadSystemConfig() {
   try {
     const url = `${API_URL}?sheet=系統`;
@@ -1320,36 +1332,56 @@ async function loadSystemConfig() {
 
     if (!Array.isArray(data) || data.length === 0) return;
 
-    // ========= 跑馬燈（第 2 ~ 6 列, D:E 欄）=========
-    const marqueeContainer = document.getElementById("marqueeContainer");
-    const marqueeContent = document.getElementById("marqueeContent");
+    // ========= 跑馬燈處理 =========
+    let marqueeText = "";
+    for (let i = 1; i <= 5; i++) {
+      const row = data[i] || [];
+      const text = row[3] || "";   // d 欄
+      const flag = row[4] || "";   // E 欄
 
-    if (marqueeContainer && marqueeContent) {
-      let marqueeText = "";
-      for (let i = 1; i <= 5; i++) {
-        const row = data[i] || [];
-        const text = row[3] || "";   // D 欄
-        const flag = row[4] || "";   // E 欄 (啟用 = "是")
-
-        if (/^(是|Y|1|TRUE)$/i.test(String(flag).trim()) && String(text).trim()) {
-          marqueeText += String(text).trim() + "　　";
-        }
-      }
-
-      // 顯示邏輯：每次整頁刷新時，只要有內容就顯示
-      if (marqueeText.trim()) {
-        marqueeContainer.style.display = "flex";
-        marqueeContent.textContent = marqueeText.trim();
-      } else {
-        marqueeContainer.style.display = "none";
+      if (/^(是|Y|1|TRUE)$/i.test(String(flag).trim()) && String(text).trim()) {
+        marqueeText += String(text).trim() + "　　";
       }
     }
+    
+// 專門顯示跑馬燈的函數
+function showMarquee() {
+  const marqueeContainer = document.getElementById("marqueeContainer");
+  const marqueeContent = document.getElementById("marqueeContent");
+  
+  if (marqueeContainer && marqueeContent && marqueeData.text) {
+    marqueeContent.textContent = marqueeData.text;
+    marqueeContainer.style.display = "";
+    
+    // 重新啟動動畫
+    restartMarqueeAnimation();
+    
+    console.log('✓ 跑馬燈已顯示:', marqueeData.text);
+  } else {
+    console.log('✗ 跑馬燈顯示失敗');
+  }
+}
 
-    // ========= 圖片牆（第 8~12 列, D:E 欄）=========
+// 重新啟動動畫
+function restartMarqueeAnimation() {
+  const marqueeContent = document.getElementById("marqueeContent");
+  if (!marqueeContent) return;
+  
+  marqueeContent.style.animation = 'none';
+  void marqueeContent.offsetWidth; // 強制重排
+  marqueeContent.style.animation = '';
+}
+    // 保存跑馬燈數據
+    marqueeData.text = marqueeText.trim();
+    marqueeData.isLoaded = true;
+
+    // 立即顯示跑馬燈
+    showMarquee();
+
+    // ========= 圖片牆處理 =========
     const gallery = document.getElementById("imageGallery");
     if (gallery) {
       gallery.innerHTML = "";
-
       for (let i = 7; i <= 11; i++) {
         const row = data[i] || [];
         const imgUrl = row[3] || "";
@@ -1365,10 +1397,9 @@ async function loadSystemConfig() {
     }
 
   } catch (err) {
-    console.error("loadSystemConfig error:", err);
+    console.error("loadSystemConfig 錯誤:", err);
   }
 }
-
 /* ====== 其他工具 ====== */
 function parseTripDateTime(dateStr, timeStr){
   const iso = fmtDateLabel(dateStr);
