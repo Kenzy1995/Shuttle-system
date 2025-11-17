@@ -418,6 +418,8 @@ function showSuccessAnimation() {
 let bookingSubmitting = false;
 async function submitBooking(){
   if (bookingSubmitting) return;
+
+  // 人數驗證
   const pSel = document.getElementById('passengers');
   const p = Number(pSel?.value || 0);
   if (!p || p < 1 || p > 4) {
@@ -425,9 +427,10 @@ async function submitBooking(){
     if (errEl) errEl.style.display = 'block';
     return;
   }
-  const errEl = document.getElementById('passengersErr'); if (errEl) errEl.style.display = 'none';
+  const errEl = document.getElementById('passengersErr'); 
+  if (errEl) errEl.style.display = 'none';
 
-  // 不再重拉資料；完全交由後端檢查
+  // 準備資料
   const identity = document.getElementById('identitySelect').value;
   const payload = {
     direction: selectedDirection,
@@ -448,7 +451,6 @@ async function submitBooking(){
   };
 
   bookingSubmitting = true;
-  // 送出前關閉 Step6，避免誤觸
   document.getElementById('step6').style.display='none';
   showVerifyLoading(true);
 
@@ -460,21 +462,28 @@ async function submitBooking(){
       body: JSON.stringify({ action: 'book', data: payload }),
     });
 
-    // === 統一處理所有 409 錯誤 ===
+    // 後端丟 409 ＝ 班次失效或人數超過
     if (res.status === 409) {
-      showErrorCard(t("overPaxOrMissing"));
-      bookingSubmitting = false;
-      showVerifyLoading(false);
-      document.getElementById('step6').style.display = '';
+      showErrorCard("班次已不存在或已超過可預訂人數，請重新查詢預約。");
       return;
     }
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
     const result = await res.json();
 
+    // 後端自帶錯誤格式
+    if (result.error === "capacity_not_found") {
+      showErrorCard("班次已不存在或已超過可預訂人數，請重新查詢預約。");
+      return;
+    }
 
     if (result.status === 'success') {
-      const qrPath = result.qr_content ? (`${QR_ORIGIN}/api/qr/${encodeURIComponent(result.qr_content)}`) : (result.qr_url || '');
+      // 成功 → 顯示車票
+      const qrPath = result.qr_content 
+        ? (`${QR_ORIGIN}/api/qr/${encodeURIComponent(result.qr_content)}`) 
+        : (result.qr_url || '');
+
       currentBookingData = {
         bookingId: result.booking_id || '',
         date: selectedDateRaw,
@@ -489,14 +498,16 @@ async function submitBooking(){
         qrUrl: qrPath
       };
 
-      // 先顯示車票，再播成功動畫
       mountTicketAndShow(currentBookingData);
 
-      // 背景寄信
+      // 寄信（背景）
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 4000);
-        const dataUrl = await domtoimage.toPng(document.getElementById('ticketCard'), { bgcolor: '#fff', pixelRatio: 2 });
+        const dataUrl = await domtoimage.toPng(
+          document.getElementById('ticketCard'),
+          { bgcolor: '#fff', pixelRatio: 2 }
+        );
         fetch(OPS_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -511,27 +522,29 @@ async function submitBooking(){
           }),
           signal: controller.signal
         }).catch(()=>{}).finally(()=>clearTimeout(timer));
-      } catch (e) { console.warn('寄信未完成或超時', e); }
+      } catch (e) {
+        console.warn('寄信未完成或超時', e);
+      }
 
     } else {
       showErrorCard(result.detail || result.message || t('errorGeneric'));
-      // 回到 Step6 讓使用者修正
       document.getElementById('step6').style.display='';
     }
-  catch(err){
-      if (err?.error === "capacity_not_found") {
-          showErrorDialog("班次已不存在或已超過可預訂人數，請重新查詢預約。");
-          return;
-      }
-      showErrorDialog(t('submitFailedPrefix') + (err.message || ''));
-  }
 
-    document.getElementById('step6').style.display='';
+  } catch(err){
+    // 捕捉 JSON 錯誤格式
+    if (err?.error === "capacity_not_found") {
+      showErrorDialog("班次已不存在或已超過可預訂人數，請重新查詢預約。");
+      return;
+    }
+    showErrorDialog(t('submitFailedPrefix') + (err.message || ''));
   } finally {
+    document.getElementById('step6').style.display='';
     showVerifyLoading(false);
     bookingSubmitting = false;
   }
 }
+
 function mountTicketAndShow(ticket){
   document.getElementById('ticketQrImg').src = ticket.qrUrl;
   document.getElementById('ticketBookingId').textContent = ticket.bookingId;
