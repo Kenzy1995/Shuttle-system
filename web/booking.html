@@ -129,6 +129,7 @@
       border:none;border-radius:14px;padding:14px 18px;font-size:16px;font-weight:700;cursor:pointer;background:var(--primary);color:#fff;
       transition:transform .06s ease,filter .2s ease
     }
+    .button:disabled{ opacity:.6; cursor:not-allowed; }
     .button:active{transform:translateY(1px)}
     .btn-ghost{background:#eee;color:#333}
 
@@ -167,6 +168,11 @@
     .overlay-card{background:#fff;border-radius:16px;box-shadow:var(--shadow-lg);padding:22px;max-width:680px;text-align:left}
     .overlay-card h3{margin:0 0 8px;font-size:20px}
 
+    /* 對話框（錯誤/確認） */
+    .dialog-content p{ margin:8px 0 0; color:#444; line-height:1.6; }
+    .dialog-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
+    .dialog-actions .button{ min-width:120px; }
+
     @keyframes shake {0%,100%{transform:translateX(0)}10%,30%,50%,70%,90%{transform:translateX(-5px)}20%,40%,60%,80%{transform:translateX(5px)}}
     .shake{animation:shake .5s ease-in-out}
 
@@ -190,13 +196,9 @@
     /* 成功動畫（3秒） */
     .success-animation{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10000;background:rgba(255,255,255,.95);border-radius:16px;padding:30px;box-shadow:var(--shadow-lg);display:none;align-items:center;justify-content:center;flex-direction:column;pointer-events:none}
     .success-animation.show{display:flex;animation:fadeInOut 3s ease-in-out;pointer-events:auto}
-
-    /* 打勾圖示 */
     .checkmark{width:80px;height:80px;border-radius:50%;display:block;stroke:#4CAF50;stroke-width:2;stroke-miterlimit:10;margin:20px auto;box-shadow:inset 0 0 0 0 #4CAF50;animation:fill .4s ease-in-out .4s forwards,scale .3s ease-in-out .9s both}
     .checkmark__circle{stroke-dasharray:166;stroke-dashoffset:166;stroke:#4CAF50;stroke-width:2;stroke-miterlimit:10;fill:none;animation:stroke .6s cubic-bezier(.65,0,.45,1) forwards}
     .checkmark__check{transform-origin:50% 50%;stroke-dasharray:48;stroke-dashoffset:48;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;animation:stroke .3s cubic-bezier(.65,0,.45,1) .8s forwards}
-
-    /* 動畫 */
     @keyframes stroke{100%{stroke-dashoffset:0}}
     @keyframes scale{0%,100%{transform:none}50%{transform:scale3d(1.1,1.1,1)}}
     @keyframes fill{100%{box-shadow:inset 0 0 0 40px #4CAF50}}
@@ -287,96 +289,31 @@
     }
 
     /* === 查詢班次頁面樣式 === */
-    .filter-controls {
-      margin-bottom: 20px;
-    }
-    .filter-group {
-      margin-bottom: 15px;
-    }
-    .filter-pills {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 8px;
-    }
-    .filter-pill {
-      padding: 8px 16px;
-      border: 1px solid #ddd;
-      border-radius: 20px;
-      background: white;
-      cursor: pointer;
-      font-size: 14px;
-      transition: all 0.2s;
-    }
-    .filter-pill.active {
-      background: var(--primary);
-      color: white;
-      border-color: var(--primary);
-    }
-    .filter-pill:hover {
-      box-shadow: var(--shadow);
-    }
-    .schedule-results {
-      margin-top: 20px;
-    }
-    .schedule-card {
-      background: white;
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 12px;
-      box-shadow: var(--shadow);
-      border-left: 4px solid var(--primary);
-    }
-    .schedule-line {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      align-items: center;
-    }
-    .schedule-line:last-child {
-      margin-bottom: 0;
-    }
-    .schedule-direction {
-      font-weight: 800;
-      color: var(--primary);
-      font-size: 16px;
-    }
-    .schedule-time {
-      font-weight: 700;
-      color: var(--text);
-    }
-    .schedule-date {
-      color: var(--muted);
-    }
-    .schedule-station {
-      flex: 1;
-      color: var(--text);
-    }
-    .schedule-capacity {
-      color: var(--green);
-      font-weight: 700;
-    }
-    .empty-state {
-      text-align: center;
-      padding: 40px 20px;
-      color: var(--muted);
-    }
-    .loading-text {
-      text-align: center;
-      padding: 20px;
-      color: var(--muted);
-    }
+    .filter-controls { margin-bottom: 20px; }
+    .filter-group { margin-bottom: 15px; }
+    .filter-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .filter-pill { padding: 8px 16px; border: 1px solid #ddd; border-radius: 20px; background: white; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+    .filter-pill.active { background: var(--primary); color: white; border-color: var(--primary); }
+    .filter-pill:hover { box-shadow: var(--shadow); }
+    .schedule-results { margin-top: 20px; }
+    .schedule-card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); border-left: 4px solid var(--primary); }
+    .schedule-line { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center; }
+    .schedule-line:last-child { margin-bottom: 0; }
+    .schedule-direction { font-weight: 800; color: var(--primary); font-size: 16px; }
+    .schedule-time { font-weight: 700; color: var(--text); }
+    .schedule-date { color: var(--muted); }
+    .schedule-station { flex: 1; color: var(--text); }
+    .schedule-capacity { color: var(--green); font-weight: 700; }
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+    .loading-text { text-align: center; padding: 20px; color: var(--muted); }
 
     /* === 可收合區塊 === */
-    .collapsible { border-radius: 16px; box-shadow: var(--shadow); background: #fff; margin-bottom: 14px; }
-    .collapsible .collapsible-header {
-      display:flex; align-items:center; justify-content:space-between;
-      padding: 12px 14px; cursor:pointer; border-bottom:1px solid #eee;
+    .collapsible .collapsible-header{
+      display:flex; align-items:center; justify-content:space-between; cursor:pointer;
     }
-    .collapsible .collapsible-title { font-weight: 900; }
-    .collapsible .collapsible-arrow { font-size: 16px; color:#777; }
-    .collapsible .collapsible-content { padding: 14px; display: none; }
-    .collapsible.open .collapsible-content { display: block; }
+    .collapsible .toggle-icon{ font-size:18px; color:#777; }
+    .collapsible .collapsible-content{ display:none; margin-top:12px; }
+    .collapsible.open .collapsible-content{ display:block; }
   </style>
 </head>
 <body>
@@ -654,11 +591,9 @@
     <section class="card wizard-fixed">
       <h2 data-i18n="scheduleTitle">查詢可預約班次</h2>
       
-      <!-- ALL 快速重置 -->
+      <!-- 單一 ALL 清除鈕 -->
       <div class="filter-group">
-        <div class="filter-pills">
-          <button id="filterAll" class="filter-pill" data-i18n="all">全部</button>
-        </div>
+        <div id="allFilter" class="filter-pills"></div>
       </div>
 
       <!-- 篩選控件 -->
@@ -689,62 +624,70 @@
   <!-- 停靠站點 -->
   <main id="station" class="page station-page">
     <div class="grid">
-      <!-- 第一區塊：接駁車資訊（不收合） -->
+      <!-- 第一區：接駁車資訊（不收合） -->
       <section class="card">
-        <h2 style="text-align:center;">接駁車資訊</h2>
-        <div data-i18n="stopsInfoText" style="line-height:1.7"></div>
-      </section>
-
-      <!-- 第二區塊：福泰大飯店（原樣，不收合需求中指明不用改） -->
-      <section class="card">
-        <h2>福泰大飯店發車-側門出口 / Forte Hotel Xizhi Departure - Side Entrance</h2>
-        <img src="/images/飯店1.jpg" class="station-img" alt="飯店發車點"/>
-        <div style="margin-top:12px">
-          <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5965295503805!2d121.631097!3d25.054899!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzE3LjQiTiAxMjHCsDM3JzUyLjEiRQ!5e0!3m2!1szh-TW!2sus!4v1762533754549!5m2!1szh-TW!2us" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+        <h2 class="station-title" style="text-align:center" data-i18n="stopsInfoTitle">接駁車資訊</h2>
+        <div class="station-info" data-i18n-html="stopsInfoText">
+          <p><strong>※房客、用餐客人可享免費預約接駁，非房客或用餐客人預約接駁須收費每位NT$200/單趟，每趟次可搭乘19名旅客，座位有限，約滿為止。</strong></p>
+          <p><strong>※本飯店保有彈性調整發車時段，發車與否及車輛型式之權利。車種介紹：依預約人數安排白色20人中巴(車牌PAB-311)或鐵灰色福斯九人座(車牌BLD-0361)</strong></p>
         </div>
       </section>
 
-      <!-- 第三區塊：南港展覽館（可收合，預設收合） -->
-      <section class="collapsible" id="blk-mrt">
-        <div class="collapsible-header" onclick="toggleCollapse('blk-mrt')">
-          <div class="collapsible-title">南港展覽館-捷運3號出口 / Nangang Exhibition Center - MRT Exit 3</div>
-          <div class="collapsible-arrow">▼</div>
+      <!-- 第二區：福泰大飯店發車（可收合，預設收起） -->
+      <section class="card collapsible" id="stopHotel">
+        <div class="collapsible-header" onclick="toggleCollapse('stopHotel')">
+          <h2 data-i18n="stopHotelTitle">福泰大飯店發車-側門出口 / Forte Hotel Xizhi Departure - Side Entrance</h2>
+          <span class="toggle-icon">▸</span>
         </div>
         <div class="collapsible-content">
-          <div data-i18n="stopMRTDesc" style="margin:6px 0 12px; line-height:1.7;"></div>
-          <img src="/images/捷運站1.png" class="station-img" alt="捷運3號出口"/>
+          <img src="/images/飯店1.jpg" class="station-img" alt="飯店發車點"/>
+          <div style="margin-top:12px">
+            <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5965295503805!2d121.631097!3d25.054899!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzE3LjQiTiAxMjHCsDM3JzUyLjEiRQ!5e0!3m2!1szh-TW!2sus!4v1762533754549!5m2!1szh-TW!2us" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+          </div>
+        </div>
+      </section>
+
+      <!-- 第三區：南港展覽館（可收合，預設收起） -->
+      <section class="card collapsible" id="stopMRT">
+        <div class="collapsible-header" onclick="toggleCollapse('stopMRT')">
+          <h2 data-i18n="stopMRTTitle">南港展覽館-捷運3號出口 / Nangang Exhibition Center - MRT Exit 3</h2>
+          <span class="toggle-icon">▸</span>
+        </div>
+        <div class="collapsible-content">
+          <div class="station-desc" data-i18n="stopMRTDesc">捷運南港展覽館 3 號出口 - 汽機車臨停接送區。 停靠時間：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05</div>
+          <img src="/images/捷運站1.jpg" class="station-img" alt="捷運3號出口"/>
           <div style="margin-top:12px">
             <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5957185825895!2d121.61843600000002!3d25.055009!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzE4LjEiTiAxMjHCsDM3JzA1LjUiRQ!5e0!3m2!1szh-TW!2us!4v1762600714030!5m2!1szh-TW!2us" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
           </div>
         </div>
       </section>
 
-      <!-- 第四區塊：南港火車站（可收合，預設收合） -->
-      <section class="collapsible" id="blk-train">
-        <div class="collapsible-header" onclick="toggleCollapse('blk-train')">
-          <div class="collapsible-title">南港火車站 / Nangang Train Station</div>
-          <div class="collapsible-arrow">▼</div>
+      <!-- 第四區：南港火車站（可收合，預設收起） -->
+      <section class="card collapsible" id="stopTrain">
+        <div class="collapsible-header" onclick="toggleCollapse('stopTrain')">
+          <h2 data-i18n="stopTrainTitle">南港火車站 / Nangang Train Station</h2>
+          <span class="toggle-icon">▸</span>
         </div>
         <div class="collapsible-content">
-          <div data-i18n="stopTrainDesc" style="margin:6px 0 12px; line-height:1.7;"></div>
-          <img src="/images/火車站1.png" class="station-img" alt="南港火車站"/>
-          <img src="/images/火車站2.png" class="station-img" alt="南港火車站2" style="margin-top:8px"/>
+          <div class="station-desc" data-i18n="stopTrainDesc">南港火車站靠興中路一側上下客點(南港車站東側臨停接送區) 停靠時間:08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10</div>
+          <img src="/images/火車站1.jpg" class="station-img" alt="南港火車站1"/>
+          <img src="/images/火車站2.jpg" class="station-img" alt="南港火車站2"/>
           <div style="margin-top:12px">
             <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.6109052447401!2d121.60801199999999!3d25.052949!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzEwLjMiTiAxMjHCsDM2JzI4LjAiRQ!5e0!3m2!1szh-TW!2us!4v1762600699115!5m2!1szh-TW!2us" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
           </div>
         </div>
       </section>
 
-      <!-- 第五區塊：LaLaport（可收合，預設收合） -->
-      <section class="collapsible" id="blk-lala">
-        <div class="collapsible-header" onclick="toggleCollapse('blk-lala')">
-          <div class="collapsible-title">南港 LaLaport Shopping Park</div>
-          <div class="collapsible-arrow">▼</div>
+      <!-- 第五區：LaLaport（可收合，預設收起） -->
+      <section class="card collapsible" id="stopLala">
+        <div class="collapsible-header" onclick="toggleCollapse('stopLala')">
+          <h2 data-i18n="stopLalaTitle">南港 LaLaport Shopping Park</h2>
+          <span class="toggle-icon">▸</span>
         </div>
         <div class="collapsible-content">
-          <div data-i18n="stopLalaDesc" style="margin:6px 0 12px; line-height:1.7;"></div>
-          <img src="/images/商場1.png" class="station-img" alt="LaLaport"/>
-          <img src="/images/商場2.png" class="station-img" alt="LaLaport2" style="margin-top:8px"/>
+          <div class="station-desc" data-i18n="stopLalaDesc">南港展覽館1號出口大客車臨停區/小客車臨停區(視車種有不同停靠區) 停靠時間：12:15 / 14:45 / 17:20 / 18:50 / 21:15</div>
+          <img src="/images/商場1.jpg" class="station-img" alt="LaLaport1"/>
+          <img src="/images/商場2.jpg" class="station-img" alt="LaLaport2"/>
           <div style="margin-top:12px">
             <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5851167154738!2d121.617376!3d25.056447!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzIyLjciTiAxMjHCsDM3JzAxLjQiRQ!5e0!3m2!1szh-TW!2us!4v1762600680118!5m2!1szh-TW!2us" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
           </div>
@@ -781,8 +724,20 @@
     </div>
   </div>
 
+  <!-- 通用對話框（錯誤/確認） -->
+  <div id="dialogOverlay" class="overlay">
+    <div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+      <h3 id="dialogTitle">訊息</h3>
+      <div id="dialogContent" class="dialog-content"></div>
+      <div class="dialog-actions">
+        <button id="dialogCancelBtn" class="button btn-ghost" style="display:none"></button>
+        <button id="dialogConfirmBtn" class="button"></button>
+      </div>
+    </div>
+  </div>
+
   <!-- 成功動畫 -->
-  <div id="successAnimation" class="success-animation">
+  <div id="successAnimation" class="success-animation" aria-live="polite">
     <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
       <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none"/>
       <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
@@ -790,11 +745,8 @@
     <div id="successText" style="font-size: 24px; font-weight: 700; color: #4CAF50;" data-i18n="successText">已完成</div>
   </div>
 
-  <!-- 外部套件 -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js" defer></script>
-  <!-- 多語 -->
-  <script src="./i18n.js" defer></script>
-  <!-- 主程式 -->
-  <script src="./app.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js"></script>
+  <script src="./i18n.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
