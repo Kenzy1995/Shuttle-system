@@ -18,25 +18,6 @@ let queryDateList = [];
 let currentQueryDate = "";
 let currentDateRows = [];
 
-// === 功能開關（快速開/關）===
-const FEATURE_TOGGLE = {
-  LIVE_LOCATION: true,  // <- 改成 false 就全部隱藏
-};
-
-// === 即時位置（保留殼）渲染 ===
-function renderLiveLocationPlaceholder() {
-  const sec = document.querySelector('[data-feature="liveLocation"]');
-  if (!sec) return;
-  sec.style.display = FEATURE_TOGGLE.LIVE_LOCATION ? '' : 'none';
-  if (FEATURE_TOGGLE.LIVE_LOCATION) {
-    // 你要嵌入的內容（暫時用 iframe；之後你可替換為真實地圖/追蹤）
-    const mount = document.getElementById('realtimeMount');
-    if (mount) {
-      mount.innerHTML = '<iframe src="/realtime.html" width="100%" height="420" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer"></iframe>';
-    }
-  }
-}
-
 /* ====== 小工具 ====== */
 function handleScroll(){
   const y = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
@@ -59,16 +40,11 @@ function showPage(id){
     document.getElementById('homeHero').style.display='';
     ['step1','step2','step3','step4','step5','step6','successCard'].forEach(s=>{ const el=document.getElementById(s); if(el) el.style.display='none'; });
   }
-
   if(id==='schedule'){
-    loadScheduleData(); 
-  }
-  if(id==='station'){
-    renderLiveLocationPlaceholder(); 
+    loadScheduleData();
   }
   handleScroll();
 }
-
 function showLoading(s=true){document.getElementById('loading').classList.toggle('show',s)}
 function showVerifyLoading(s=true){document.getElementById('loadingConfirm').classList.toggle('show',s)}
 function showExpiredOverlay(s=true){document.getElementById('expiredOverlay').classList.toggle('show',s)}
@@ -93,42 +69,6 @@ function hardResetOverlays(){
     if(id==='successAnimation'){ el.classList.remove('show'); el.style.display='none'; }
     else{ el.classList.remove('show'); }
   });
-}
-
-// === 語言切換：立即重繪 ===
-function onLanguageChange(lang){
-  try {
-    // 依你的 i18n.js 實作：更新 currentLang 並即時套用
-    if (typeof setLanguage === 'function') setLanguage(lang);
-    if (typeof applyAll === 'function') applyAll();
-
-    // 重新渲染會用到 t(...) 的動態元件
-    // 例如 Step1 方向按鈕
-    const reservationPageActive = document.getElementById('reservation')?.classList.contains('active');
-    if (reservationPageActive) {
-      // 只重建第一步，避免打亂使用者已選狀態；若要更完整可依需要重建後續步驟
-      const dirList = document.getElementById('directionList');
-      if (dirList) {
-        // 若尚未選方向 -> 重建；已選擇則保留
-        if (!selectedDirection) {
-          buildStep1();  // 內部用 t('dirOutLabel') / t('dirInLabel')【:contentReference[oaicite:12]{index=12}】
-        } else {
-          // 已選，至少把按鈕文字更新
-          dirList.querySelectorAll('.opt-btn')?.forEach((btn, i)=>{
-            btn.textContent = i === 0 ? t('dirOutLabel') : t('dirInLabel');
-          });
-        }
-      }
-    }
-
-    // 動態提示也更新（例：Step6 人數短語）
-    const tp = document.getElementById('ticketPassengers');
-    if (tp && currentBookingData?.passengers) {
-      tp.textContent = currentBookingData.passengers + ' ' + t('labelPassengersShort');
-    }
-  } catch(e){
-    console.warn('onLanguageChange failed', e);
-  }
 }
 
 /* ====== 對話框（卡片） ====== */
@@ -1170,51 +1110,40 @@ function renderScheduleResults() {
   `).join('');
 }
 
-// === 系統設定（跑馬燈 / 圖片）===
+/* ====== 跑馬燈與圖片展示 ====== */
 async function loadSystemConfig() {
   try {
-    const res = await fetch(`${API_URL}?sheet=${encodeURIComponent('系統')}`, { mode: 'cors' });
+    const res = await fetch(API_URL + '?sheet=系統');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json(); // 預期為二維陣列（第一列表頭）
-    if (!Array.isArray(data) || data.length === 0) return;
-
-    // 旗標解析：相容 是 / Y / TRUE / 1
-    const isEnabled = (v) => /^(是|Y|TRUE|1)$/i.test(String(v||'').trim());
-
-    // 跑馬燈：data[1..5] 的 D 欄(索引3) = 文字、E 欄(索引4) = 啟用
-    const marqueeRows = (data.slice(1, 6) || []);
-    const msgs = marqueeRows
-      .filter(r => isEnabled(r?.[4]))
-      .map(r => String(r?.[3] || '').trim())
-      .filter(s => s);
-
-    const marquee = document.getElementById('marqueeContainer');
-    const marqueeContent = document.getElementById('marqueeContent');
-    if (marquee && marqueeContent) {
-      if (msgs.length && localStorage.getItem('marqueeClosed') !== '1') {
-        marqueeContent.innerHTML = msgs.map(s => `<span style="margin-right:40px">${s}</span>`).join('');
-        marquee.style.display = 'block';
-      } else {
-        marquee.style.display = 'none';
-      }
+    const data = await res.json();
+    const marqueeTexts = [];
+    for (let i = 1; i <= 5; i++) {
+      const row = data[i] || [];
+      const text = row[3] || '';
+      const flag = row[4] || '';
+      if (String(flag).trim() === '是' && text) marqueeTexts.push(text);
     }
-
-    // 圖片牆：data[7..11] 的 D 欄(索引3) = 圖片 URL、E 欄(索引4) = 啟用
-    const galleryRows = (data.slice(7, 12) || []);
-    const imgs = galleryRows
-      .filter(r => isEnabled(r?.[4]))
-      .map(r => String(r?.[3] || '').trim())
-      .filter(u => u);
-
-    const gallery = document.getElementById('imageGallery');
-    if (gallery) {
-      gallery.innerHTML = imgs.map(u => `<img class="gallery-image" src="${u}" alt="gallery">`).join('');
+    if (marqueeTexts.length > 0 && !localStorage.getItem('marqueeClosed')) {
+      const marqueeContainer = document.getElementById('marqueeContainer');
+      const marqueeContent = document.getElementById('marqueeContent');
+      marqueeContent.innerHTML = marqueeTexts.map(sanitize).join(' | ');
+      marqueeContainer.style.display = 'block';
     }
-  } catch (e) {
-    console.warn('loadSystemConfig failed', e);
+    const galleryImages = [];
+    for (let i = 7; i <= 11; i++) {
+      const row = data[i] || [];
+      const url = row[3] || '';
+      const flag = row[4] || '';
+      if (String(flag).trim() === '是' && url) galleryImages.push(url);
+    }
+    if (galleryImages.length > 0) {
+      const imageGallery = document.getElementById('imageGallery');
+      imageGallery.innerHTML = galleryImages.map(u => `<img src="${sanitize(u)}" class="gallery-image" alt="宣傳圖片" />`).join('');
+    }
+  } catch (error) {
+    console.warn('載入系統設定失敗:', error);
   }
 }
-
 
 /* ====== 其他工具 ====== */
 function parseTripDateTime(dateStr, timeStr){
