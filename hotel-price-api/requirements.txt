@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-gunicorn
-playwright==1.42.0
-google-auth
-google-auth-httplib2
-google-auth-oauthlib
-google-api-python-client
