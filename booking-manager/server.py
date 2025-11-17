@@ -94,7 +94,7 @@ HEADER_KEYS = {
     "上車地點", "下車地點", "姓名", "手機", "信箱", "預約人數", "櫃台審核",
     "預約狀態", "乘車狀態", "身分", "房號", "入住日期", "退房日期", "用餐日期",
     "上車索引", "下車索引", "涉及路段範圍", "QRCode編碼", "備註", "寄信狀態",
-    "車次-日期時間","主班次時間"  # unified date/time string
+    "車次-日期時間","主班次時間","確認人數"  # unified date/time string
 }
 
 # 可預約班次表必要欄位
@@ -748,10 +748,17 @@ def ops(req: OpsRequest):
                 old_time = _time_hm_from_any(get_by_rowno(rowno, "班次"))
             old_pick = get_by_rowno(rowno, "上車地點")
             old_drop = get_by_rowno(rowno, "下車地點")
+
             try:
-                old_pax = int(get_by_rowno(rowno, "預約人數") or "1")
-            except:
+                # 舊的人數優先使用「確認人數」，沒有才回退到「預約人數」
+                confirm_pax = (get_by_rowno(rowno, "確認人數") or "").strip()
+                if confirm_pax:
+                    old_pax = int(confirm_pax)
+                else:
+                    old_pax = int(get_by_rowno(rowno, "預約人數") or "1")
+            except Exception:
                 old_pax = 1
+
             # assign new values or fallback to old values
             new_dir  = p.direction or old_dir
             new_date = p.date or old_date
@@ -890,7 +897,11 @@ def ops(req: OpsRequest):
                     "name": get_by_rowno(rowno, "姓名"),
                     "phone": get_by_rowno(rowno, "手機"),
                     "email": get_by_rowno(rowno, "信箱"),
-                    "pax": get_by_rowno(rowno, "預約人數") or "1",
+                    "pax": (
+                        get_by_rowno(rowno, "確認人數")
+                        or get_by_rowno(rowno, "預約人數")
+                        or "1"
+                    ),
                 }
                 subject, html = _compose_mail_html(info, "zh", "cancel")
                 try:
@@ -950,7 +961,7 @@ def ops(req: OpsRequest):
                 "name": get("姓名"),
                 "phone": get("手機"),
                 "email": get("信箱"),
-                "pax": get("預約人數") or "1",
+                "pax": (get("確認人數") or get("預約人數") or "1"),
             }
             subject, html = _compose_mail_html(info, p.lang, p.kind)
             attachment_bytes: Optional[bytes] = None
