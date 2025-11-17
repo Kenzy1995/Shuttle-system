@@ -1004,41 +1004,29 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
     });
   }
 
-  function buildStationOptions() {
+  function buildStationOptions(){
     const stations = new Set(
       allRows
-        .filter(r =>
-          String(r["去程 / 回程"]).trim() === mdDirection &&
-          fmtDateLabel(r["日期"]) === mdDate
-        )
+        .filter(r => String(r["去程 / 回程"]).trim() === mdDirection && fmtDateLabel(r["日期"]) === mdDate)
         .map(r => String(r["站點"]).trim())
     );
-
-    const list = holder.querySelector('#md_stations');
+    const list = holder.querySelector('#md_stations'); 
     list.innerHTML = '';
-
     [...stations].forEach(st => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'opt-btn';
-      btn.textContent = st;
-      if (st === mdStation) btn.classList.add('active');
-
-      btn.onclick = () => {
-        mdStation = st;
-        list.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        buildScheduleOptions();
+      const btn = document.createElement('button'); 
+      btn.type='button'; 
+      btn.className='opt-btn'; 
+      btn.textContent = st; 
+      if(st === mdStation) btn.classList.add('active');
+      btn.onclick = () => { 
+        mdStation = st; 
+        list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); 
+        btn.classList.add('active'); 
+        buildScheduleOptions(); 
       };
-
       list.appendChild(btn);
     });
-
-    // 如果目前選的站點不在列表裡，預設選第一個並重建班次
-    if (!stations.has(mdStation) && stations.size > 0) {
-      mdStation = [...stations][0];
-      buildScheduleOptions();
-    }
+    buildScheduleOptions();
   }
 
   function buildScheduleOptions() {
@@ -1069,6 +1057,7 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
         (mdStation === ((rb === '回程') ? pick : drop)) &&
         (fmtTimeLabel(time) === timeVal);
 
+      // 如果是同一班同一筆訂單，要把原本預約人數加回可用名額
       const availPlusSelf = baseAvail + (sameAsOriginal ? pax : 0);
 
       const btn = document.createElement('button');
@@ -1076,10 +1065,11 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
       btn.className = 'opt-btn';
       if (timeVal === mdTime) btn.classList.add('active');
 
-      const texts        = TEXTS[currentLang] || TEXTS.zh;
-      const prefix       = texts.paxHintPrefix || '';
-      const suffixRaw    = texts.paxHintSuffix || '';
-      const suffixShort  = suffixRaw.split(/[；;]/)[0] || suffixRaw;
+      // 多語系顯示「可預約人數」
+      const texts      = TEXTS[currentLang] || TEXTS.zh;
+      const prefix     = texts.paxHintPrefix || '';   // 例：此班次可預約：
+      const suffixRaw  = texts.paxHintSuffix || '';   // 例： 人；單筆最多 4 人
+      const suffixShort = suffixRaw.split(/[；;]/)[0] || suffixRaw;
       const includeSelfText = sameAsOriginal
         ? (I18N_STATUS[currentLang] || I18N_STATUS.zh).includeSelf
         : '';
@@ -1106,9 +1096,6 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
 
     buildPax();
   }
-
-
-
 
   function buildPax(){
     const sel = holder.querySelector('#md_pax'); 
@@ -1216,23 +1203,19 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
       const qPhone = document.getElementById('qPhone').value.trim();
       const qEmail = document.getElementById('qEmail').value.trim();
 
-      // 重新查詢目前條件
-      const queryRes = await fetch(OPS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'query', data: { booking_id: qId, phone: qPhone, email: qEmail } })
+      const queryRes = await fetch(OPS_URL, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ action: 'query', data: { booking_id: qId, phone: qPhone, email: qEmail } }) 
       });
       const queryData = await queryRes.json();
       lastQueryResults = Array.isArray(queryData) ? queryData : (queryData.results || []);
 
-      // 這筆訂單修改後的日期就是 mdDate，比較直覺就直接打開那一天
       currentQueryDate = mdDate;
       buildDateListFromResults(lastQueryResults);
-      openTicketsForDate(mdDate);   // 直接顯示該日期所有票卡（含剛改好的那張）
+      openTicketsForDate(mdDate);
 
-      // 此時畫面上已經可以看到新票 → 播「成功」動畫
       showSuccessAnimation();
-
 
     }catch(e){
       showErrorCard(t('updateFailedPrefix') + (e?.message || ''));
@@ -1247,28 +1230,6 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
 }
 
 /* ====== 系統與資料 ====== */
-function getDateFromCarDateTime(carDateTime) {
-  if (!carDateTime) return "";
-  const parts = String(carDateTime).split(' ');
-  if (parts.length < 1) return "";
-  const datePart = parts[0];
-  return datePart.replace(/\//g, '-');
-}
-function getTimeFromCarDateTime(carDateTime) {
-  if (!carDateTime) return "00:00";
-  const parts = String(carDateTime).split(' ');
-  return parts.length > 1 ? parts[1] : "00:00";
-}
-function isExpiredByCarDateTime(carDateTime) {
-  if (!carDateTime) return true;
-  try {
-    const [datePart, timePart] = String(carDateTime).split(' ');
-    const [year, month, day] = datePart.split('/').map(Number);
-    const [hour, minute] = timePart.split(':').map(Number);
-    const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
-    return tripTime < Date.now();
-  } catch (e) { return true; }
-}
 async function refreshData(){
   showLoading(true);
   try{
@@ -1318,7 +1279,6 @@ async function loadScheduleData() {
       station: String(row[stationIndex] || '').trim(),
       capacity: String(row[capacityIndex] || '').trim()
     })).filter(row => row.direction && row.date && row.time && row.station);
-
     scheduleData.directions = new Set(scheduleData.rows.map(r => r.direction));
     scheduleData.dates = new Set(scheduleData.rows.map(r => r.date));
     scheduleData.stations = new Set(scheduleData.rows.map(r => r.station));
@@ -1369,6 +1329,7 @@ function renderFilterPills(containerId, items, selectedItem, onClick) {
     pill.type = 'button';
     pill.className = 'filter-pill' + (selectedItem === item ? ' active' : '');
 
+    // 方向要多語翻譯（去程/回程）
     if (containerId === 'directionFilter') {
       if (value === '去程') {
         pill.textContent = t('dirOutLabel');
@@ -1385,7 +1346,6 @@ function renderFilterPills(containerId, items, selectedItem, onClick) {
     container.appendChild(pill);
   });
 }
-
 
 
 function renderScheduleResults() {
@@ -1416,7 +1376,6 @@ function renderScheduleResults() {
 }
 
 /* ====== 系統設定載入（跑馬燈 + 圖片牆） ====== */
-// 修改 loadSystemConfig 函數
 async function loadSystemConfig() {
   try {
     const url = `${API_URL}?sheet=系統`;
@@ -1556,4 +1515,26 @@ async function init() {
   renderLiveLocationPlaceholder();
 }
 
-
+/* ====== 解析/過期判斷 (查詢頁用) ====== */
+function getDateFromCarDateTime(carDateTime) {
+  if (!carDateTime) return "";
+  const parts = String(carDateTime).split(' ');
+  if (parts.length < 1) return "";
+  const datePart = parts[0];
+  return datePart.replace(/\//g, '-');
+}
+function getTimeFromCarDateTime(carDateTime) {
+  if (!carDateTime) return "00:00";
+  const parts = String(carDateTime).split(' ');
+  return parts.length > 1 ? parts[1] : "00:00";
+}
+function isExpiredByCarDateTime(carDateTime) {
+  if (!carDateTime) return true;
+  try {
+    const [datePart, timePart] = String(carDateTime).split(' ');
+    const [year, month, day] = datePart.split('/').map(Number);
+    const [hour, minute] = timePart.split(':').map(Number);
+    const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
+    return tripTime < Date.now();
+  } catch (e) { return true; }
+}
