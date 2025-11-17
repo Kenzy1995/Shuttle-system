@@ -459,8 +459,19 @@ async function submitBooking(){
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ action: 'book', data: payload }),
     });
+
+    // ===  處理 409：班次失效 / 可預約數不足  ===
+    if (res.status === 409) {
+      showErrorCard(t('overPaxOrMissing'));
+      document.getElementById('step6').style.display='';
+      bookingSubmitting = false;
+      showVerifyLoading(false);
+      return;
+    }
+
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const result = await res.json();
+
 
     if (result.status === 'success') {
       const qrPath = result.qr_content ? (`${QR_ORIGIN}/api/qr/${encodeURIComponent(result.qr_content)}`) : (result.qr_url || '');
