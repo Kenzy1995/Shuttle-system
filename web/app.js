@@ -1324,17 +1324,50 @@ async function loadSystemConfig() {
     const marqueeContainer = document.getElementById("marqueeContainer");
     const marqueeContent = document.getElementById("marqueeContent");
 
-    let marqueeText = "";
-    for (let i = 1; i <= 5; i++) {
-      const row = data[i] || [];
-      const text = row[3] || "";   // D 欄
-      const flag = row[4] || "";   // E 欄 (啟用 = "是")
+    if (marqueeContainer && marqueeContent) {
+      let marqueeText = "";
+      for (let i = 1; i <= 5; i++) {
+        const row = data[i] || [];
+        const text = row[3] || "";   // D 欄
+        const flag = row[4] || "";   // E 欄 (啟用 = "是")
 
-      if (/^(是|Y|1|TRUE)$/i.test(flag) && text.trim()) {
-        marqueeText += text.trim() + "　　";
+        if (/^(是|Y|1|TRUE)$/i.test(String(flag).trim()) && String(text).trim()) {
+          marqueeText += String(text).trim() + "　　";
+        }
+      }
+
+      // 顯示邏輯：每次整頁刷新時，只要有內容就顯示
+      if (marqueeText.trim()) {
+        marqueeContainer.style.display = "";
+        marqueeContent.textContent = marqueeText.trim();
+      } else {
+        marqueeContainer.style.display = "none";
       }
     }
 
+    // ========= 圖片牆（第 8~12 列, D:E 欄）=========
+    const gallery = document.getElementById("imageGallery");
+    if (gallery) {
+      gallery.innerHTML = "";
+
+      for (let i = 7; i <= 11; i++) {
+        const row = data[i] || [];
+        const imgUrl = row[3] || "";
+        const flag = row[4] || "";
+
+        if (/^(是|Y|1|TRUE)$/i.test(String(flag).trim()) && String(imgUrl).trim()) {
+          const img = document.createElement("img");
+          img.className = "gallery-image";
+          img.src = String(imgUrl).trim();
+          gallery.appendChild(img);
+        }
+      }
+    }
+
+  } catch (err) {
+    console.error("loadSystemConfig error:", err);
+  }
+}
     // 顯示邏輯
     if (marqueeText && !sessionStorage.getItem("marqueeClosed")) {
       marqueeContainer.style.display = "";
