@@ -37,13 +37,13 @@
     /* 跑馬燈 */
     .marquee-container {
       position: relative;
-      /* 使用 30% 透明度的黑底 */
       background: rgba(0,0,0,0.3);
       color: white;
       padding: 8px 40px 8px 16px;
       margin-bottom: 16px;
       border-radius: 8px;
       overflow: hidden;
+      display:none;
     }
     .marquee-close {
       position: absolute;
@@ -286,22 +286,19 @@
       width:28px;height:28px;border-radius:50%;border:none;background:#ffcc80;color:#8a4b08;font-weight:900;cursor:pointer;
     }
 
-    /* === 新增：查詢班次頁面樣式 === */
+    /* === 查詢班次頁面樣式 === */
     .filter-controls {
       margin-bottom: 20px;
     }
-
     .filter-group {
       margin-bottom: 15px;
     }
-
     .filter-pills {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
       margin-top: 8px;
     }
-
     .filter-pill {
       padding: 8px 16px;
       border: 1px solid #ddd;
@@ -311,21 +308,17 @@
       font-size: 14px;
       transition: all 0.2s;
     }
-
     .filter-pill.active {
       background: var(--primary);
       color: white;
       border-color: var(--primary);
     }
-
     .filter-pill:hover {
       box-shadow: var(--shadow);
     }
-
     .schedule-results {
       margin-top: 20px;
     }
-
     .schedule-card {
       background: white;
       border-radius: 12px;
@@ -334,59 +327,61 @@
       box-shadow: var(--shadow);
       border-left: 4px solid var(--primary);
     }
-
     .schedule-line {
       display: flex;
       justify-content: space-between;
       margin-bottom: 8px;
       align-items: center;
     }
-
     .schedule-line:last-child {
       margin-bottom: 0;
     }
-
     .schedule-direction {
       font-weight: 800;
       color: var(--primary);
       font-size: 16px;
     }
-
     .schedule-time {
       font-weight: 700;
       color: var(--text);
     }
-
     .schedule-date {
       color: var(--muted);
     }
-
     .schedule-station {
       flex: 1;
       color: var(--text);
     }
-
     .schedule-capacity {
       color: var(--green);
       font-weight: 700;
     }
-
     .empty-state {
       text-align: center;
       padding: 40px 20px;
       color: var(--muted);
     }
-
     .loading-text {
       text-align: center;
       padding: 20px;
       color: var(--muted);
     }
+
+    /* === 可收合區塊 === */
+    .collapsible { border-radius: 16px; box-shadow: var(--shadow); background: #fff; margin-bottom: 14px; }
+    .collapsible .collapsible-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 12px 14px; cursor:pointer; border-bottom:1px solid #eee;
+    }
+    .collapsible .collapsible-title { font-weight: 900; }
+    .collapsible .collapsible-arrow { font-size: 16px; color:#777; }
+    .collapsible .collapsible-content { padding: 14px; display: none; }
+    .collapsible.open .collapsible-content { display: block; }
   </style>
 </head>
 <body>
   <!-- 跑馬燈 -->
-  <div id="marqueeContainer" class="marquee-container" style="display:none">
+  <div id="marqueeContainer" class="marquee-container">
     <button class="marquee-close" onclick="closeMarquee()">×</button>
     <div id="marqueeContent" class="marquee-content"></div>
   </div>
@@ -557,7 +552,6 @@
         <button class="button btn-ghost" onclick="goStep(4)" data-i18n="back">返回</button>
         <button class="button btn-ghost" onclick="restart()" data-i18n="requery">重新查詢</button>
         <button class="button" type="button" onclick="toStep6()" data-i18n="next">下一步</button>
-
       </div>
     </section>
 
@@ -660,6 +654,13 @@
     <section class="card wizard-fixed">
       <h2 data-i18n="scheduleTitle">查詢可預約班次</h2>
       
+      <!-- ALL 快速重置 -->
+      <div class="filter-group">
+        <div class="filter-pills">
+          <button id="filterAll" class="filter-pill" data-i18n="all">全部</button>
+        </div>
+      </div>
+
       <!-- 篩選控件 -->
       <div class="filter-controls">
         <div class="filter-group">
@@ -688,6 +689,13 @@
   <!-- 停靠站點 -->
   <main id="station" class="page station-page">
     <div class="grid">
+      <!-- 第一區塊：接駁車資訊（不收合） -->
+      <section class="card">
+        <h2 style="text-align:center;">接駁車資訊</h2>
+        <div data-i18n="stopsInfoText" style="line-height:1.7"></div>
+      </section>
+
+      <!-- 第二區塊：福泰大飯店（原樣，不收合需求中指明不用改） -->
       <section class="card">
         <h2>福泰大飯店發車-側門出口 / Forte Hotel Xizhi Departure - Side Entrance</h2>
         <img src="/images/飯店1.jpg" class="station-img" alt="飯店發車點"/>
@@ -695,25 +703,51 @@
           <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5965295503805!2d121.631097!3d25.054899!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzE3LjQiTiAxMjHCsDM3JzUyLjEiRQ!5e0!3m2!1szh-TW!2sus!4v1762533754549!5m2!1szh-TW!2us" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
         </div>
       </section>
-      <section class="card">
-        <h2>南港展覽館-捷運3號出口 / Nangang Exhibition Center - MRT Exit 3</h2>
-        <img src="/images/捷運站1.jpg" class="station-img" alt="捷運3號出口"/>
-        <div style="margin-top:12px">
-          <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5957185825895!2d121.61843600000002!3d25.055009!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzE4LjEiTiAxMjHCsDM3JzA1LjUiRQ!5e0!3m2!1szh-TW!2us!4v1762600714030!5m2!1szh-TW!2us" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+
+      <!-- 第三區塊：南港展覽館（可收合，預設收合） -->
+      <section class="collapsible" id="blk-mrt">
+        <div class="collapsible-header" onclick="toggleCollapse('blk-mrt')">
+          <div class="collapsible-title">南港展覽館-捷運3號出口 / Nangang Exhibition Center - MRT Exit 3</div>
+          <div class="collapsible-arrow">▼</div>
+        </div>
+        <div class="collapsible-content">
+          <div data-i18n="stopMRTDesc" style="margin:6px 0 12px; line-height:1.7;"></div>
+          <img src="/images/捷運站1.jpg" class="station-img" alt="捷運3號出口"/>
+          <div style="margin-top:12px">
+            <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5957185825895!2d121.61843600000002!3d25.055009!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzE4LjEiTiAxMjHCsDM3JzA1LjUiRQ!5e0!3m2!1szh-TW!2us!4v1762600714030!5m2!1szh-TW!2us" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+          </div>
         </div>
       </section>
-      <section class="card">
-        <h2>南港火車站 / Nangang Train Station</h2>
-        <img src="/images/火車站1.jpg" class="station-img" alt="南港火車站"/>
-        <div style="margin-top:12px">
-          <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.6109052447401!2d121.60801199999999!3d25.052949!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzEwLjMiTiAxMjHCsDM2JzI4LjAiRQ!5e0!3m2!1szh-TW!2us!4v1762600699115!5m2!1szh-TW!2us" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+
+      <!-- 第四區塊：南港火車站（可收合，預設收合） -->
+      <section class="collapsible" id="blk-train">
+        <div class="collapsible-header" onclick="toggleCollapse('blk-train')">
+          <div class="collapsible-title">南港火車站 / Nangang Train Station</div>
+          <div class="collapsible-arrow">▼</div>
+        </div>
+        <div class="collapsible-content">
+          <div data-i18n="stopTrainDesc" style="margin:6px 0 12px; line-height:1.7;"></div>
+          <img src="/images/火車站1.jpg" class="station-img" alt="南港火車站"/>
+          <img src="/images/火車站2.jpg" class="station-img" alt="南港火車站2" style="margin-top:8px"/>
+          <div style="margin-top:12px">
+            <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.6109052447401!2d121.60801199999999!3d25.052949!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzEwLjMiTiAxMjHCsDM2JzI4LjAiRQ!5e0!3m2!1szh-TW!2us!4v1762600699115!5m2!1szh-TW!2us" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+          </div>
         </div>
       </section>
-      <section class="card">
-        <h2>南港 LaLaport Shopping Park</h2>
-        <img src="/images/商場1.jpg" class="station-img" alt="LaLaport"/>
-        <div style="margin-top:12px">
-          <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5851167154738!2d121.617376!3d25.056447!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzIyLjciTiAxMjHCsDM3JzAxLjQiRQ!5e0!3m2!1szh-TW!2us!4v1762600680118!5m2!1szh-TW!2us" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+
+      <!-- 第五區塊：LaLaport（可收合，預設收合） -->
+      <section class="collapsible" id="blk-lala">
+        <div class="collapsible-header" onclick="toggleCollapse('blk-lala')">
+          <div class="collapsible-title">南港 LaLaport Shopping Park</div>
+          <div class="collapsible-arrow">▼</div>
+        </div>
+        <div class="collapsible-content">
+          <div data-i18n="stopLalaDesc" style="margin:6px 0 12px; line-height:1.7;"></div>
+          <img src="/images/商場1.jpg" class="station-img" alt="LaLaport"/>
+          <img src="/images/商場2.jpg" class="station-img" alt="LaLaport2" style="margin-top:8px"/>
+          <div style="margin-top:12px">
+            <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5851167154738!2d121.617376!3d25.056447!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzIyLjciTiAxMjHCsDM3JzAxLjQiRQ!5e0!3m2!1szh-TW!2us!4v1762600680118!5m2!1szh-TW!2us" width="100%" height="380" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+          </div>
         </div>
       </section>
     </div>
@@ -756,9 +790,11 @@
     <div id="successText" style="font-size: 24px; font-weight: 700; color: #4CAF50;" data-i18n="successText">已完成</div>
   </div>
 
-  <!-- Libraries & App Scripts -->
+  <!-- 外部套件 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js" defer></script>
+  <!-- 多語 -->
   <script src="./i18n.js" defer></script>
+  <!-- 主程式 -->
   <script src="./app.js" defer></script>
 </body>
 </html>
