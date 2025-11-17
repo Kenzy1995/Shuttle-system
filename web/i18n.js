@@ -1,6 +1,8 @@
 /* ====== 語言包 ====== */
 const TEXTS = {
   zh: {
+    confirm: "確定",
+    cancel: "取消",
     title:"飯店服務-免費接駁車預約", brand:"飯店服務",
     navReservation:"立即預約", navCheck:"我的預約", navSchedule:"查詢班次", navStation:"停靠站點",
     heroTitle:"免費接駁", bookNow:"立即預約",
@@ -32,6 +34,8 @@ const TEXTS = {
     dirInLabel:"回程（前往飯店）",
     realtimeTitle: "即時位置",
     all:"全部",
+    editBookingTitle: "修改預約",
+    phoneHint: "請輸入正確的手機號碼（可填寫非台灣手機號碼）",
     // 停靠站點
     stopsInfoTitle:"接駁車資訊",
     stopsInfoText:`<p><strong>※房客、用餐客人可享免費預約接駁，非房客或用餐客人預約接駁須收費每位NT$200/單趟，每趟次可搭乘19名旅客，座位有限，約滿為止。</strong></p>
@@ -62,7 +66,10 @@ const TEXTS = {
     updateFailedPrefix:"更新失敗：",
     refreshFailedPrefix:"資料更新失敗：",
     queryFailedPrefix:"查詢失敗：",
-    paxHintPrefix:"此班次可預約：",
+    paxHintPrefix: "此班次可預約：",
+    paxHintSuffix: " 人；單筆最多 4 人",
+    dirOutLabel: "去程",
+    dirInLabel: "回程",
     paxHintSuffix:" 人；單筆最多 4 人",
     overPaxOrMissing: "班次已不存在或已超過可預訂人數，請重新查詢預約。",
 
@@ -127,8 +134,12 @@ const TEXTS = {
     updateFailedPrefix:"Update failed: ",
     refreshFailedPrefix:"Refresh failed: ",
     queryFailedPrefix:"Query failed: ",
-    paxHintPrefix:"Available: ",
-    paxHintSuffix:"; up to 4 per order",
+    paxHintPrefix: "Available: ",
+    paxHintSuffix: " seats; up to 4 per order",
+    dirOutLabel: "Outbound",
+    dirInLabel: "Return",
+    editBookingTitle: "Edit Booking",
+    phoneHint: "Please enter a valid phone number (including non‑Taiwan numbers)",
     overPaxOrMissing: "This trip no longer exists or is fully booked. Please search again.",
 
   },
@@ -192,8 +203,12 @@ const TEXTS = {
     updateFailedPrefix:"更新失敗：",
     refreshFailedPrefix:"更新失敗：",
     queryFailedPrefix:"検索失敗：",
-    paxHintPrefix:"空席数：",
-    paxHintSuffix:" 人（1回最大4名）",
+    paxHintPrefix: "空き：",
+    paxHintSuffix: " 人；1回の予約で最大4名",
+    dirOutLabel: "往路",
+    dirInLabel: "復路",
+    editBookingTitle: "予約を編集",
+    phoneHint: "正しい電話番号を入力してください（台湾以外の番号も可）",
     overPaxOrMissing: "便が存在しないか満席です。再度検索してください。",
 
   },
@@ -257,8 +272,12 @@ const TEXTS = {
     updateFailedPrefix:"업데이트 실패: ",
     refreshFailedPrefix:"새로고침 실패: ",
     queryFailedPrefix:"조회 실패: ",
-    paxHintPrefix:"예약 가능: ",
-    paxHintSuffix:"명 (최대 4명)",
+    paxHintPrefix: "예약 가능: ",
+    paxHintSuffix: "명; 주문당 최대 4명",
+    dirOutLabel: "편도",
+    dirInLabel: "왕복",
+    editBookingTitle: "예약 수정",
+    phoneHint: "정확한 휴대폰 번호를 입력하세요(대만 번호가 아니어도 입력 가능)",
     overPaxOrMissing: "해당 편은 존재하지 않거나 예약 가능 인원을 초과했습니다. 다시 조회해주세요.",
 
   }
@@ -281,6 +300,14 @@ const i18n = {
 let currentLang = "zh";
 function t(key){ return (TEXTS[currentLang]||TEXTS.zh)[key] || key; }
 function ts(key){ return (I18N_STATUS[currentLang]||I18N_STATUS.zh)[key] || key; }
+
+// 提供 t() 和 ts() 函數
+function t(key) {
+  return (TEXTS[currentLang] || TEXTS.zh)[key] || key;
+}
+function ts(key) {
+  return (I18N_STATUS[currentLang] || I18N_STATUS.zh)[key] || "";
+}
 
 function applyI18N(){
   document.title = t('title');
