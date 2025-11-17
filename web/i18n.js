@@ -59,6 +59,8 @@ const TEXTS = {
     queryFailedPrefix:"查詢失敗：",
     paxHintPrefix:"此班次可預約：",
     paxHintSuffix:" 人；單筆最多 4 人",
+    overPaxOrMissing: "班次已不存在或已超過可預訂人數，請重新查詢預約。",
+
   },
   en: {
     title:"Hotel Service - Free Shuttle Booking", brand:"Hotel Service",
@@ -120,6 +122,8 @@ const TEXTS = {
     queryFailedPrefix:"Query failed: ",
     paxHintPrefix:"Available: ",
     paxHintSuffix:"; up to 4 per order",
+    overPaxOrMissing: "This trip no longer exists or is fully booked. Please search again.",
+
   },
   ja: {
     title:"ホテルサービス-無料シャトル予約", brand:"ホテルサービス",
@@ -181,6 +185,8 @@ const TEXTS = {
     queryFailedPrefix:"検索失敗：",
     paxHintPrefix:"空席数：",
     paxHintSuffix:" 人（1回最大4名）",
+    overPaxOrMissing: "便が存在しないか満席です。再度検索してください。",
+
   },
   ko: {
     title:"호텔 서비스-무료 셔틀 예약", brand:"호텔 서비스",
@@ -242,6 +248,8 @@ const TEXTS = {
     queryFailedPrefix:"조회 실패: ",
     paxHintPrefix:"예약 가능: ",
     paxHintSuffix:"명 (최대 4명)",
+    overPaxOrMissing: "해당 편은 존재하지 않거나 예약 가능 인원을 초과했습니다. 다시 조회해주세요.",
+
   }
 };
 
