@@ -1484,5 +1484,3 @@ function isExpiredByCarDateTime(carDateTime) {
 }
 
 
-=======
-幫我檢查一下是不是有錯誤的括號之類的問題? 按鈕全部都失效了
