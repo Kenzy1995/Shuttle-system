@@ -252,6 +252,12 @@ const I18N_STATUS = {
   ja: { booked:"✔️ 予約済み", cancelled:"❌ キャンセル", rejected:"拒否", boarded:"乗車済み", expired:"期限切れ", download:"チケットをダウンロード", modify:"変更", remove:"削除", noRecords:"該当データがありません（直近30日）", includeSelf:"（本人含む）" },
   ko: { booked:"✔️ 예약됨", cancelled:"❌ 취소됨", rejected:"거절됨", boarded:"탑승완료", expired:"만료", download:"티켓 다운로드", modify:"수정", remove:"삭제", noRecords:"일치하는 기록 없음 (최근 30일)", includeSelf:"(본인 포함)" }
 };
+const i18n = {
+  zh: { dirOutLabel:"去程", dirInLabel:"回程" },
+  en: { dirOutLabel:"Outbound", dirInLabel:"Inbound" },
+  ja: { dirOutLabel:"往路", dirInLabel:"復路" },
+  ko: { dirOutLabel:"가는 편", dirInLabel:"오는 편" }
+};
 
 let currentLang = "zh";
 function t(key){ return (TEXTS[currentLang]||TEXTS.zh)[key] || key; }
