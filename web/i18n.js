@@ -31,12 +31,12 @@ const TEXTS = {
     dirOutLabel:"去程（飯店出發）",
     dirInLabel:"回程（前往飯店）",
     all:"全部",
-    realtimeTitle: "即時位置",
-
     // 停靠站點
     stopsInfoTitle:"接駁車資訊",
     stopsInfoText:`<p><strong>※房客、用餐客人可享免費預約接駁，非房客或用餐客人預約接駁須收費每位NT$200/單趟，每趟次可搭乘19名旅客，座位有限，約滿為止。</strong></p>
-                   <p><strong>※本飯店保有彈性調整發車時段，發車與否及車輛型式之權利。 車種介紹： 依預約人數安排白色20人中巴(車牌PAB-311)或鐵灰 色福斯九人座(車牌BLD-0361)</strong></p>`,
+                   <p><strong>※本飯店保有彈性調整發車時段，發車與否及車輛型式之權利。 車種介紹： 依預約人數安排白色20人中巴(車牌PAB-311)或鐵灰 色福斯九人座(車牌BLD-0361)</strong></p>
+                   <p>Depend on reservation status to arrange 20 seats-white shuttle bus (PAB-311) or 9 seats-grey Volkswagen (BLD-0361)</p>
+                   <p>予約人数に応じて、白い20人乗りミニバス（ナンバープレートPAB-311）または鉄灰色の9人乗りフォルクスワーゲン（ナンバープレートBLD-0361）を手配します。</p>`,
     stopHotelTitle:"福泰大飯店發車-側門出口 / Forte Hotel Xizhi Departure - Side Entrance",
     stopMRTTitle:"南港展覽館-捷運3號出口 / Nangang Exhibition Center - MRT Exit 3",
     stopTrainTitle:"南港火車站 / Nangang Train Station",
@@ -91,12 +91,13 @@ const TEXTS = {
     noSchedules:"No matching schedules",
     dirOutLabel:"Outbound (from hotel)",
     dirInLabel:"Inbound (to hotel)",
-    realtimeTitle: "Live location",
     all:"ALL",
     // Stops
     stopsInfoTitle:"Shuttle Info",
     stopsInfoText:`<p><strong>※ Hotel and dining guests ride free with reservation. Non-guests will be charged NT$200 per person per one-way ride. Max 19 passengers per trip; seats are limited.</strong></p>
-                   <p><strong>※ We may adjust departure times and vehicle type. Vehicles: 20-seat white minibus (PAB-311) or 9-seat grey Volkswagen (BLD-0361), depending on reservations.</strong></p>`,
+                   <p><strong>※ We may adjust departure times and vehicle type. Vehicles: 20-seat white minibus (PAB-311) or 9-seat grey Volkswagen (BLD-0361), depending on reservations.</strong></p>
+                   <p>Depend on reservation status to arrange 20 seats-white shuttle bus (PAB-311) or 9 seats-grey Volkswagen (BLD-0361).</p>
+                   <p>Japanese translation available below.</p>`,
     stopHotelTitle:"Forte Hotel Xizhi Departure - Side Entrance",
     stopMRTTitle:"Nangang Exhibition Center - MRT Exit 3",
     stopTrainTitle:"Nangang Train Station",
@@ -151,12 +152,12 @@ const TEXTS = {
     noSchedules:"条件に合う便がありません",
     dirOutLabel:"往路（ホテル発）",
     dirInLabel:"復路（ホテル行き）",
-    realtimeTitle: "リアルタイム位置",
     all:"すべて",
     // Stops
     stopsInfoTitle:"シャトル案内",
     stopsInfoText:`<p><strong>※ 宿泊客・レストラン客は予約により無料で乗車できます。非宿泊・非利用の場合は1名片道NT$200を頂戴します。1便最大19名、席数に限りがあります。</strong></p>
-                   <p><strong>※ 出発時刻や車両は変更となる場合があります。予約状況により、白い20人乗りミニバス(PAB-311)または鉄灰色の9人乗りフォルクスワーゲン(BLD-0361)を手配します。</strong></p>`,
+                   <p><strong>※ 出発時刻や車両は変更となる場合があります。予約状況により、白い20人乗りミニバス(PAB-311)または鉄灰色の9人乗りフォルクスワーゲン(BLD-0361)を手配します。</strong></p>
+                   <p>予約人数に応じて、白い20人乗りミニバス（PAB-311）または鉄灰色の9人乗りフォルクスワーゲン（BLD-0361）を手配します。</p>`,
     stopHotelTitle:"福泰大飯店発-側門出口 / Forte Hotel Xizhi Departure - Side Entrance",
     stopMRTTitle:"南港展示館-MRT3番出口 / Nangang Exhibition Center - MRT Exit 3",
     stopTrainTitle:"南港駅 / Nangang Train Station",
@@ -211,12 +212,12 @@ const TEXTS = {
     noSchedules:"조건에 맞는 일정이 없습니다",
     dirOutLabel:"가는편(호텔 출발)",
     dirInLabel:"오는편(호텔 도착)",
-    realtimeTitle: "실시간 위치",
     all:"전체",
     // Stops
     stopsInfoTitle:"셔틀 정보",
     stopsInfoText:`<p><strong>※ 숙박/식사 고객은 예약 시 무료 탑승. 비고객은 1인 편도 NT$200. 회당 최대 19명, 좌석 한정.</strong></p>
-                   <p><strong>※ 출발 시간과 차량은 변동될 수 있습니다. 예약 인원에 따라 20인승 백색 미니버스(PAB-311) 또는 9인승 회색 폭스바겐(BLD-0361)을 배차합니다.</strong></p>`,
+                   <p><strong>※ 출발 시간과 차량은 변동될 수 있습니다. 예약 인원에 따라 20인승 백색 미니버스(PAB-311) 또는 9인승 회색 폭스바겐(BLD-0361)을 배차합니다.</strong></p>
+                   <p>예약 상황에 따라 20인승 백색 버스(PAB-311) 또는 9인승 회색 폭스바겐(BLD-0361)을 배치합니다.</p>`,
     stopHotelTitle:"포르테 호텔 시즈 출발 - 측문",
     stopMRTTitle:"난강 전람관 - MRT 3번 출구",
     stopTrainTitle:"난강역",
