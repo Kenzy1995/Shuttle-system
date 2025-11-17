@@ -1029,7 +1029,6 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
     buildScheduleOptions();
   }
 
-  function buildScheduleOptions(){
   function buildScheduleOptions() {
     const list = holder.querySelector('#md_schedules');
     list.innerHTML = '';
