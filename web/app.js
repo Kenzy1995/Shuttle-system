@@ -600,7 +600,7 @@ function buildTicketCard(row, {mask=false}={}){
   const qr = document.createElement('div'); 
   qr.className='ticket-qr';
   if(statusCode==='cancelled'){
-    qr.innerHTML = `<img src="/images/qr-placeholder.png" alt="QR placeholder" />`;
+    qr.innerHTML = `<img src="/images/QR placeholder.png" alt="QR placeholder" />`;
   }else{
     qr.innerHTML = `<img src="${qrUrl}" alt="QR" />`;
   }
