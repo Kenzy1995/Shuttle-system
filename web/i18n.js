@@ -40,9 +40,14 @@ const TEXTS = {
     stopMRTTitle:"南港展覽館-捷運3號出口 / Nangang Exhibition Center - MRT Exit 3",
     stopTrainTitle:"南港火車站 / Nangang Train Station",
     stopLalaTitle:"南港 LaLaport Shopping Park",
-    stopMRTDesc:"捷運南港展覽館 3 號出口 - 汽機車臨停接送區。 停靠時間：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
-    stopTrainDesc:"南港火車站靠興中路一側上下客點(南港車站東側臨停接送區) 停靠時間:08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
-    stopLalaDesc:"南港展覽館1號出口大客車臨停區/小客車臨停區(視車種有不同停靠區) 停靠時間：12:15 / 14:45 / 17:20 / 18:50 / 21:15",
+    stopMRTDesc:"捷運南港展覽館 3 號出口 - 汽機車臨停接送區。" ,
+    stopMRTDesc2:"停靠時間：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+    
+    stopTrainDesc:"南港火車站靠興中路一側上下客點(南港車站東側臨停接送區)",
+    stopTrainDesc2:"停靠時間:08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+    
+    stopLalaDesc:"南港展覽館1號出口大客車臨停區/小客車臨停區(視車種有不同停靠區)",
+    stopLalaDesc2:"停靠時間：12:15 / 14:45 / 17:20 / 18:50 / 21:15",
 
     // 對話框
     errorTitle:"提交失敗",
