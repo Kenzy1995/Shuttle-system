@@ -111,6 +111,16 @@
 
     .page{display:none;padding:20px;max-width:980px;margin:0 auto;flex:1}
     .page.active{display:block}
+    
+    /* 即時位置 - 預留容器樣式 */
+    .realtime-box {
+      margin-top: 8px;
+      min-height: 320px;  /* 先給保留高度，未嵌入前也不突兀 */
+      border-radius: 12px;
+      background: #fafafa;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
 
     /* ★ 統一電腦版預約流程卡片寬度（33vw，固定） */
     .wizard-fixed{ width:100%; }
@@ -693,6 +703,12 @@
           </div>
         </div>
       </section>
+      <!-- 查詢班次 - 即時位置（保留區塊 @ 停靠站點頁） -->
+      <section id="realtimeSection" class="card wizard-fixed station-page" data-feature="liveLocation" style="display:none">
+        <h2 data-i18n="realtimeTitle">即時位置</h2>
+        <div id="realtimeMount" class="realtime-box" aria-live="polite"></div>
+      </section>
+
     </div>
   </main>
 
