@@ -98,7 +98,6 @@ const TEXTS = {
     dirOutLabel:"Outbound (from hotel)",
     dirInLabel:"Inbound (to hotel)",
     realtimeTitle: "Live location",
-
     all:"ALL",
     // Stops
     stopsInfoTitle:"Shuttle Info",
@@ -108,9 +107,12 @@ const TEXTS = {
     stopMRTTitle:"Nangang Exhibition Center - MRT Exit 3",
     stopTrainTitle:"Nangang Train Station",
     stopLalaTitle:"Nangang LaLaport Shopping Park",
-    stopMRTDesc:"MRT Nangang Exhibition Center Exit 3 — Temporary pick-up/drop-off zone. Times: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
-    stopTrainDesc:"Nangang Station, Xingzhong Rd. side (East-side temporary pick-up/drop-off). Times: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
-    stopLalaDesc:"Nangang Exhibition Hall Exit 1 (bus/van temporary stops vary by vehicle). Times: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
+    stopMRTDesc:"MRT Nangang Exhibition Center Exit 3 — Motor Vehicle Pick-up and Drop-off Area.",
+    stopMRTDesc2:"Stop Times: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+    stopTrainDesc:"Nangang Station, Xingzhong Rd. side (East-side temporary pick-up/drop-off area)",
+    stopTrainDesc2:"Stop Times: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+    stopLalaDesc:"Nangang Exhibition Hall Exit 1 (bus/van temporary stops vary by vehicle)",
+    stopLalaDesc2:"Stop Times: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
 
     // Dialogs
     errorTitle:"Submission failed",
@@ -161,7 +163,6 @@ const TEXTS = {
     dirOutLabel:"往路（ホテル発）",
     dirInLabel:"復路（ホテル行き）",
     realtimeTitle: "リアルタイム位置",
-
     all:"すべて",
     // Stops
     stopsInfoTitle:"シャトル案内",
@@ -171,9 +172,12 @@ const TEXTS = {
     stopMRTTitle:"南港展示館-MRT3番出口 / Nangang Exhibition Center - MRT Exit 3",
     stopTrainTitle:"南港駅 / Nangang Train Station",
     stopLalaTitle:"南港LaLaportショッピングパーク",
-    stopMRTDesc:"MRT南港展示館3番出口 - 車・バイク一時停車送迎エリア。 停車時刻：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
-    stopTrainDesc:"南港駅 興中路側の乗降場所（南港駅東側の一時停車送迎エリア） 停車時刻：08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
-    stopLalaDesc:"南港展示館1番出口 大型/小型車一時停車エリア（車種により停車位置が異なります） 停車時刻：12:15 / 14:45 / 17:20 / 18:50 / 21:15",
+    stopMRTDesc:"MRT南港展示館3番出口 - 車・バイク一時停車送迎エリア。",
+    stopMRTDesc2:"停車時刻：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+    stopTrainDesc:"南港駅 興中路側の乗降場所（南港駅東側の一時停車送迎エリア）",
+    stopTrainDesc2:"停車時刻：08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+    stopLalaDesc:"南港展示館1番出口 大型/小型車一時停車エリア（車種により停車位置が異なります）",
+    stopLalaDesc2:"停車時刻：12:15 / 14:45 / 17:20 / 18:50 / 21:15",
 
     // Dialogs
     errorTitle:"送信失敗",
@@ -224,7 +228,6 @@ const TEXTS = {
     dirOutLabel:"가는편(호텔 출발)",
     dirInLabel:"오는편(호텔 도착)",
     realtimeTitle: "실시간 위치",
-
     all:"전체",
     // Stops
     stopsInfoTitle:"셔틀 정보",
@@ -234,9 +237,12 @@ const TEXTS = {
     stopMRTTitle:"난강 전람관 - MRT 3번 출구",
     stopTrainTitle:"난강역",
     stopLalaTitle:"난강 라라포트 쇼핑파크",
-    stopMRTDesc:"MRT 난강 전람관 3번 출구 — 임시 승하차 구역. 시간: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
-    stopTrainDesc:"난강역 흥중로 측 승하차 (동측 임시 승하차 구역). 시간: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
-    stopLalaDesc:"난강 전람관 1번 출구 대형/소형차 임시 정차 구역(차종에 따라 다름). 시간: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
+    stopMRTDesc:"MRT 난강 전람관 3번 출구 — 차량 임시 승하차 구역.",
+    stopMRTDesc2:"시간: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+    stopTrainDesc:"난강역 흥중로 측 승하차 (동측 임시 승하차 구역)",
+    stopTrainDesc2:"시간: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+    stopLalaDesc:"난강 전람관 1번 출구 대형/소형차 임시 정차 구역(차종에 따라 다름)",
+    stopLalaDesc2:"시간: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
 
     // Dialogs
     errorTitle:"제출 실패",
