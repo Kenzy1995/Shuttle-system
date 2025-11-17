@@ -1004,26 +1004,42 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
     });
   }
 
-  function buildStationOptions(){
+  function buildStationOptions() {
     const stations = new Set(
       allRows
-        .filter(r => String(r["去程 / 回程"]).trim() === mdDirection && fmtDateLabel(r["日期"]) === mdDate)
+        .filter(r =>
+          String(r["去程 / 回程"]).trim() === mdDirection &&
+          fmtDateLabel(r["日期"]) === mdDate
+        )
         .map(r => String(r["站點"]).trim())
     );
-    const list = holder.querySelector('#md_stations'); 
+
+    const list = holder.querySelector('#md_stations');
     list.innerHTML = '';
+
     [...stations].forEach(st => {
-      const btn = document.createElement('button'); 
-      btn.type='button'; 
-      btn.className='opt-btn'; 
-      btn.textContent = st; 
-      if(st === mdStation) btn.classList.add('active');
-      btn.onclick = () => { 
-        mdStation = st; 
-        list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); 
-        btn.classList.add('active'); 
-        buildScheduleOptions(); 
-      }
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'opt-btn';
+      btn.textContent = st;
+      if (st === mdStation) btn.classList.add('active');
+
+      btn.onclick = () => {
+        mdStation = st;
+        list.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        buildScheduleOptions();
+      };
+
+      list.appendChild(btn);
+    });
+
+    // 如果目前選的站點不在列表裡，預設選第一個並重建班次
+    if (!stations.has(mdStation) && stations.size > 0) {
+      mdStation = [...stations][0];
+      buildScheduleOptions();
+    }
+  }
 
   function buildScheduleOptions() {
     const list = holder.querySelector('#md_schedules');
@@ -1053,7 +1069,6 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
         (mdStation === ((rb === '回程') ? pick : drop)) &&
         (fmtTimeLabel(time) === timeVal);
 
-      // 原邏輯：如果是同一筆原訂單，要把自己的人數加回來
       const availPlusSelf = baseAvail + (sameAsOriginal ? pax : 0);
 
       const btn = document.createElement('button');
@@ -1061,17 +1076,14 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
       btn.className = 'opt-btn';
       if (timeVal === mdTime) btn.classList.add('active');
 
-      // 這裡開始改成多語系顯示
-      const texts      = TEXTS[currentLang] || TEXTS.zh;
-      const prefix     = texts.paxHintPrefix || '';   // 例如：此班次可預約：
-      const suffixRaw  = texts.paxHintSuffix || '';   // 例如： 人；單筆最多 4 人
-      // 為了不要太長，只取到第一個分號前
-      const suffixShort = suffixRaw.split(/[；;]/)[0] || suffixRaw;
+      const texts        = TEXTS[currentLang] || TEXTS.zh;
+      const prefix       = texts.paxHintPrefix || '';
+      const suffixRaw    = texts.paxHintSuffix || '';
+      const suffixShort  = suffixRaw.split(/[；;]/)[0] || suffixRaw;
       const includeSelfText = sameAsOriginal
         ? (I18N_STATUS[currentLang] || I18N_STATUS.zh).includeSelf
         : '';
 
-      // 組出像 "(此班次可預約：8 人；含本人)" 這種多語句子
       const paxInfo = `(${prefix}${availPlusSelf}${suffixShort}${includeSelfText})`;
 
       btn.innerHTML = `
@@ -1094,6 +1106,8 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
 
     buildPax();
   }
+
+
 
 
   function buildPax(){
@@ -1348,36 +1362,25 @@ function renderFilterPills(containerId, items, selectedItem, onClick) {
     const pill = document.createElement('button');
     pill.type = 'button';
     pill.className = 'filter-pill' + (selectedItem === item ? ' active' : '');
-    pill.textContent = item;
+
+    // 方向要多語翻譯（去程/回程）
+    if (containerId === 'directionFilter') {
+      if (item === '去程') {
+        pill.textContent = t('dirOutLabel');
+      } else if (item === '回程') {
+        pill.textContent = t('dirInLabel');
+      } else {
+        pill.textContent = item;
+      }
+    } else {
+      pill.textContent = item;
+    }
+
     pill.onclick = () => onClick(item);
     container.appendChild(pill);
   });
 }
- function renderFilterPills(containerId, items) {
-   const container = document.getElementById(containerId);
-   container.innerHTML = '';
-   items.forEach(item => {
-     const pill = document.createElement('div');
-     pill.className = 'pill';
-     // 對方向篩選翻譯（去程/回程）
-     if (containerId === 'directionFilter') {
-       if (item === '去程') {
-         pill.textContent = t('dirOutLabel');
-       } else if (item === '回程') {
-         pill.textContent = t('dirInLabel');
-       } else {
-         pill.textContent = item;
-       }
-     } else {
-       pill.textContent = item;
-     }
-     pill.addEventListener('click', () => {
-       scheduleFilters[containerId] = item;
-       renderScheduleResults();
-     });
-     container.appendChild(pill);
-   });
- }
+
 
 function renderScheduleResults() {
   const container = document.getElementById('scheduleResults');
@@ -1420,46 +1423,19 @@ async function loadSystemConfig() {
     let marqueeText = "";
     for (let i = 1; i <= 5; i++) {
       const row = data[i] || [];
-      const text = row[3] || "";   // d 欄
+      const text = row[3] || "";   // D 欄
       const flag = row[4] || "";   // E 欄
 
       if (/^(是|Y|1|TRUE)$/i.test(String(flag).trim()) && String(text).trim()) {
         marqueeText += String(text).trim() + "　　";
       }
     }
-    
-// 專門顯示跑馬燈的函數
-function showMarquee() {
-  const marqueeContainer = document.getElementById("marqueeContainer");
-  const marqueeContent = document.getElementById("marqueeContent");
-  
-  if (marqueeContainer && marqueeContent && marqueeData.text) {
-    marqueeContent.textContent = marqueeData.text;
-    marqueeContainer.style.display = "";
-    
-    // 重新啟動動畫
-    restartMarqueeAnimation();
-    
-    console.log('✓ 跑馬燈已顯示:', marqueeData.text);
-  } else {
-    console.log('✗ 跑馬燈顯示失敗');
-  }
-}
 
-// 重新啟動動畫
-function restartMarqueeAnimation() {
-  const marqueeContent = document.getElementById("marqueeContent");
-  if (!marqueeContent) return;
-  
-  marqueeContent.style.animation = 'none';
-  void marqueeContent.offsetWidth; // 強制重排
-  marqueeContent.style.animation = '';
-}
     // 保存跑馬燈數據
     marqueeData.text = marqueeText.trim();
     marqueeData.isLoaded = true;
 
-    // 立即顯示跑馬燈
+    // 立即顯示跑馬燈（呼叫全域版本）
     showMarquee();
 
     // ========= 圖片牆處理 =========
@@ -1470,7 +1446,6 @@ function restartMarqueeAnimation() {
         const row = data[i] || [];
         const imgUrl = row[3] || "";
         const flag = row[4] || "";
-
         if (/^(是|Y|1|TRUE)$/i.test(String(flag).trim()) && String(imgUrl).trim()) {
           const img = document.createElement("img");
           img.className = "gallery-image";
@@ -1484,6 +1459,7 @@ function restartMarqueeAnimation() {
     console.error("loadSystemConfig 錯誤:", err);
   }
 }
+
 /* ====== 其他工具 ====== */
 function parseTripDateTime(dateStr, timeStr){
   const iso = fmtDateLabel(dateStr);
@@ -1572,30 +1548,6 @@ async function init() {
   handleScroll();
   await loadSystemConfig();
   renderLiveLocationPlaceholder();
-}
-
-/* ====== 解析/過期判斷 (查詢頁用) ====== */
-function getDateFromCarDateTime(carDateTime) {
-  if (!carDateTime) return "";
-  const parts = String(carDateTime).split(' ');
-  if (parts.length < 1) return "";
-  const datePart = parts[0];
-  return datePart.replace(/\//g, '-');
-}
-function getTimeFromCarDateTime(carDateTime) {
-  if (!carDateTime) return "00:00";
-  const parts = String(carDateTime).split(' ');
-  return parts.length > 1 ? parts[1] : "00:00";
-}
-function isExpiredByCarDateTime(carDateTime) {
-  if (!carDateTime) return true;
-  try {
-    const [datePart, timePart] = String(carDateTime).split(' ');
-    const [year, month, day] = datePart.split('/').map(Number);
-    const [hour, minute] = timePart.split(':').map(Number);
-    const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
-    return tripTime < Date.now();
-  } catch (e) { return true; }
 }
 
 
