@@ -403,6 +403,11 @@ function toStep6(){
   const errEl = document.getElementById('passengersErr'); if (errEl) errEl.style.display = 'none';
 }
 
+// === 友善錯誤提示（所有班次失效 / 調整額滿 / 不存在）===
+function showFriendlyCapacityError() {
+  showErrorCard(t("overPaxOrMissing"));
+}
+
 /* ====== 成功動畫 ====== */
 function showSuccessAnimation() {
   const el = document.getElementById('successAnimation');
@@ -451,7 +456,8 @@ async function submitBooking(){
   };
 
   bookingSubmitting = true;
-  document.getElementById('step6').style.display='none';
+  const step6 = document.getElementById('step6');
+  if (step6) step6.style.display = 'none';
   showVerifyLoading(true);
 
   try {
@@ -462,88 +468,109 @@ async function submitBooking(){
       body: JSON.stringify({ action: 'book', data: payload }),
     });
 
-    // 後端丟 409 ＝ 班次失效或人數超過
-    if (res.status === 409) {
-      showErrorCard("班次已不存在或已超過可預訂人數，請重新查詢預約。");
-      return;
+    // 嘗試解析後端回傳 JSON（成功或失敗都試著吃）
+    let result = null;
+    try {
+      result = await res.json();
+    } catch (e) {
+      result = null;
     }
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const backendMsg = result && (result.error || result.code || result.detail || result.message || '');
+    const isCapacityError =
+      res.status === 409 ||
+      backendMsg === 'capacity_not_found' ||
+      String(backendMsg || '').includes('capacity_not_found');
 
-    const result = await res.json();
-
-    // 後端自帶錯誤格式
-    if (result.error === "capacity_not_found") {
-      showErrorCard("班次已不存在或已超過可預訂人數，請重新查詢預約。");
-      return;
-    }
-
-    if (result.status === 'success') {
-      // 成功 → 顯示車票
-      const qrPath = result.qr_content 
-        ? (`${QR_ORIGIN}/api/qr/${encodeURIComponent(result.qr_content)}`) 
-        : (result.qr_url || '');
-
-      currentBookingData = {
-        bookingId: result.booking_id || '',
-        date: selectedDateRaw,
-        time: selectedScheduleTime,
-        direction: selectedDirection,
-        pickLocation: payload.pickLocation,
-        dropLocation: payload.dropLocation,
-        name: payload.name,
-        phone: payload.phone,
-        email: payload.email,
-        passengers: p,
-        qrUrl: qrPath
-      };
-
-      mountTicketAndShow(currentBookingData);
-
-      // 寄信（背景）
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 4000);
-        const dataUrl = await domtoimage.toPng(
-          document.getElementById('ticketCard'),
-          { bgcolor: '#fff', pixelRatio: 2 }
-        );
-        fetch(OPS_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'mail',
-            data: {
-              booking_id: currentBookingData.bookingId,
-              lang: currentLang,
-              kind: 'book',
-              ticket_png_base64: dataUrl
-            }
-          }),
-          signal: controller.signal
-        }).catch(()=>{}).finally(()=>clearTimeout(timer));
-      } catch (e) {
-        console.warn('寄信未完成或超時', e);
+    // HTTP 非 2xx：統一處理
+    if (!res.ok) {
+      if (isCapacityError) {
+        // 班次失效 / 人數超過 / 找不到班次 → 友善提示（多語系）
+        showErrorCard(t('overPaxOrMissing'));
+      } else {
+        // 其他 HTTP 錯誤
+        showErrorCard(t('submitFailedPrefix') + `HTTP ${res.status}`);
       }
+      if (step6) step6.style.display = '';
+      return;
+    }
 
-    } else {
-      showErrorCard(result.detail || result.message || t('errorGeneric'));
-      document.getElementById('step6').style.display='';
+    // res.ok 但結果不是 success
+    if (!result || result.status !== 'success') {
+      if (isCapacityError) {
+        showErrorCard(t('overPaxOrMissing'));
+      } else {
+        showErrorCard(
+          (result && (result.detail || result.message)) || t('errorGeneric')
+        );
+      }
+      if (step6) step6.style.display = '';
+      return;
+    }
+
+    // ✅ 成功 → 顯示車票
+    const qrPath = result.qr_content 
+      ? (`${QR_ORIGIN}/api/qr/${encodeURIComponent(result.qr_content)}`) 
+      : (result.qr_url || '');
+
+    currentBookingData = {
+      bookingId: result.booking_id || '',
+      date: selectedDateRaw,
+      time: selectedScheduleTime,
+      direction: selectedDirection,
+      pickLocation: payload.pickLocation,
+      dropLocation: payload.dropLocation,
+      name: payload.name,
+      phone: payload.phone,
+      email: payload.email,
+      passengers: p,
+      qrUrl: qrPath
+    };
+
+    mountTicketAndShow(currentBookingData);
+
+    // ✅ 寄信（背景）
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 4000);
+      const dataUrl = await domtoimage.toPng(
+        document.getElementById('ticketCard'),
+        { bgcolor: '#fff', pixelRatio: 2 }
+      );
+      fetch(OPS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'mail',
+          data: {
+            booking_id: currentBookingData.bookingId,
+            lang: currentLang,
+            kind: 'book',
+            ticket_png_base64: dataUrl
+          }
+        }),
+        signal: controller.signal
+      }).catch(()=>{}).finally(()=>clearTimeout(timer));
+    } catch (e) {
+      console.warn('寄信未完成或超時', e);
     }
 
   } catch(err){
-    // 捕捉 JSON 錯誤格式
-    if (err?.error === "capacity_not_found") {
-      showErrorDialog("班次已不存在或已超過可預訂人數，請重新查詢預約。");
-      return;
+    // fetch 本身錯誤（例如網路問題）
+    const maybeCapacity =
+      err && (err.error === 'capacity_not_found' || String(err.message || '').includes('capacity_not_found'));
+    if (maybeCapacity) {
+      showErrorCard(t('overPaxOrMissing'));
+    } else {
+      showErrorCard(t('submitFailedPrefix') + (err.message || ''));
     }
-    showErrorDialog(t('submitFailedPrefix') + (err.message || ''));
+    if (step6) step6.style.display = '';
   } finally {
-    document.getElementById('step6').style.display='';
     showVerifyLoading(false);
     bookingSubmitting = false;
   }
 }
+
 
 function mountTicketAndShow(ticket){
   document.getElementById('ticketQrImg').src = ticket.qrUrl;
@@ -865,6 +892,7 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
   showPage('check');
   document.getElementById('queryForm').style.display='none';
   document.getElementById('checkDateStep').style.display='none';
+
   const holderId = 'editHolder';
   let holder = document.getElementById(holderId);
   if(!holder){
@@ -873,6 +901,7 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
     holder.className = 'card wizard-fixed';
     document.getElementById('check').appendChild(holder);
   }
+
   holder.innerHTML = `
     <h2>${t('editBookingTitle') || '修改預約'} ${sanitize(bookingId)}</h2>
     <div class="field"><label class="label">${t('labelDirection')}</label>
@@ -892,6 +921,7 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
       <button class="button" id="md_save">${ts('modify')}</button>
     </div>
   `;
+
   document.getElementById('checkTicketStep').style.display='none';
   holder.style.display='block';
 
@@ -902,90 +932,226 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
   let mdAvail = 0;
 
   function buildDateOptions(){
-    const dateSet = new Set(allRows.filter(r=>String(r["去程 / 回程"]).trim()===mdDirection).map(r=>fmtDateLabel(r["日期"])));
-    const sorted=[...dateSet].sort((a,b)=>new Date(a)-new Date(b));
-    const list = holder.querySelector('#md_dates'); list.innerHTML='';
-    sorted.forEach(dateStr=>{ const btn=document.createElement('button'); btn.type='button'; btn.className='opt-btn'; btn.textContent=dateStr; if(dateStr===mdDate) btn.classList.add('active');
-      btn.onclick=()=>{ mdDate=dateStr; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); buildStationOptions(); }; list.appendChild(btn); });
+    const dateSet = new Set(
+      allRows
+        .filter(r => String(r["去程 / 回程"]).trim() === mdDirection)
+        .map(r => fmtDateLabel(r["日期"]))
+    );
+    const sorted = [...dateSet].sort((a,b)=>new Date(a)-new Date(b));
+    const list = holder.querySelector('#md_dates'); 
+    list.innerHTML = '';
+    sorted.forEach(dateStr => {
+      const btn = document.createElement('button'); 
+      btn.type='button'; 
+      btn.className='opt-btn'; 
+      btn.textContent = dateStr; 
+      if(dateStr === mdDate) btn.classList.add('active');
+      btn.onclick = () => { 
+        mdDate = dateStr; 
+        list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); 
+        btn.classList.add('active'); 
+        buildStationOptions(); 
+      }; 
+      list.appendChild(btn); 
+    });
   }
+
   function buildStationOptions(){
-    const stations = new Set(allRows.filter(r=>String(r["去程 / 回程"]).trim()===mdDirection && fmtDateLabel(r["日期"])===mdDate).map(r=>String(r["站點"]).trim()));
-    const list = holder.querySelector('#md_stations'); list.innerHTML='';
-    [...stations].forEach(st=>{ const btn=document.createElement('button'); btn.type='button'; btn.className='opt-btn'; btn.textContent=st; if(st===mdStation) btn.classList.add('active');
-      btn.onclick=()=>{ mdStation=st; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); buildScheduleOptions(); }; list.appendChild(btn); });
+    const stations = new Set(
+      allRows
+        .filter(r => String(r["去程 / 回程"]).trim() === mdDirection && fmtDateLabel(r["日期"]) === mdDate)
+        .map(r => String(r["站點"]).trim())
+    );
+    const list = holder.querySelector('#md_stations'); 
+    list.innerHTML = '';
+    [...stations].forEach(st => {
+      const btn = document.createElement('button'); 
+      btn.type='button'; 
+      btn.className='opt-btn'; 
+      btn.textContent = st; 
+      if(st === mdStation) btn.classList.add('active');
+      btn.onclick = () => { 
+        mdStation = st; 
+        list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); 
+        btn.classList.add('active'); 
+        buildScheduleOptions(); 
+      }; 
+      list.appendChild(btn); 
+    });
     buildScheduleOptions();
   }
+
   function buildScheduleOptions(){
-    const list=holder.querySelector('#md_schedules'); list.innerHTML='';
-    const entries = allRows.filter(r=>String(r["去程 / 回程"]).trim()===mdDirection && fmtDateLabel(r["日期"])===mdDate && String(r["站點"]).trim()===mdStation).sort((a,b)=>fmtTimeLabel(a["班次"]).localeCompare(fmtTimeLabel(b["班次"])));
-    entries.forEach(r=>{
-      const timeVal=fmtTimeLabel(r["班次"]||r["車次"]);
-      const availText=String(r["可預約人數"]||r["可約人數 / Available"]||'').trim();
-      const baseAvail=Number(onlyDigits(availText))||0;
-      const sameAsOriginal = (rb===mdDirection) && (fmtDateLabel(date)===mdDate) && (mdStation===((rb==='回程')?pick:drop)) && (fmtTimeLabel(time)===timeVal);
+    const list = holder.querySelector('#md_schedules'); 
+    list.innerHTML = '';
+    const entries = allRows
+      .filter(r =>
+        String(r["去程 / 回程"]).trim() === mdDirection &&
+        fmtDateLabel(r["日期"]) === mdDate &&
+        String(r["站點"]).trim() === mdStation
+      )
+      .sort((a,b)=>fmtTimeLabel(a["班次"]).localeCompare(fmtTimeLabel(b["班次"])));
+
+    entries.forEach(r => {
+      const timeVal = fmtTimeLabel(r["班次"] || r["車次"]);
+      const availText = String(r["可預約人數"] || r["可約人數 / Available"] || '').trim();
+      const baseAvail = Number(onlyDigits(availText)) || 0;
+      const sameAsOriginal =
+        (rb === mdDirection) &&
+        (fmtDateLabel(date) === mdDate) &&
+        (mdStation === ((rb === '回程') ? pick : drop)) &&
+        (fmtTimeLabel(time) === timeVal);
       const availPlusSelf = baseAvail + (sameAsOriginal ? pax : 0);
-      const btn=document.createElement('button'); btn.type='button'; btn.className='opt-btn'; if(timeVal===mdTime) btn.classList.add('active');
-      btn.innerHTML = `<span style="color:var(--primary);font-weight:700">${timeVal}</span> <span style="color:#777;font-size:13px">(可預約：${availPlusSelf} 人${sameAsOriginal ? (I18N_STATUS[currentLang]||I18N_STATUS.zh).includeSelf : ''})</span>`;
-      btn.onclick=()=>{ mdTime=timeVal; mdAvail=availPlusSelf; list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); buildPax(); };
+
+      const btn = document.createElement('button'); 
+      btn.type='button'; 
+      btn.className='opt-btn'; 
+      if(timeVal === mdTime) btn.classList.add('active');
+      btn.innerHTML = `
+        <span style="color:var(--primary);font-weight:700">${timeVal}</span>
+        <span style="color:#777;font-size:13px">
+          (可預約：${availPlusSelf} 人${sameAsOriginal ? (I18N_STATUS[currentLang]||I18N_STATUS.zh).includeSelf : ''})
+        </span>`;
+      btn.onclick = () => { 
+        mdTime = timeVal; 
+        mdAvail = availPlusSelf; 
+        list.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active')); 
+        btn.classList.add('active'); 
+        buildPax(); 
+      };
       list.appendChild(btn);
     });
     buildPax();
   }
+
   function buildPax(){
-    const sel=holder.querySelector('#md_pax'); sel.innerHTML='';
-    const maxPassengers = Math.min(4, Math.max(0, mdAvail||pax||4));
-    for(let i=1;i<=maxPassengers;i++){const opt=document.createElement('option');opt.value=String(i);opt.textContent=String(i);sel.appendChild(opt);} 
+    const sel = holder.querySelector('#md_pax'); 
+    sel.innerHTML = '';
+    const maxPassengers = Math.min(4, Math.max(0, mdAvail || pax || 4));
+    for(let i=1;i<=maxPassengers;i++){
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = String(i);
+      sel.appendChild(opt);
+    }
     sel.value = String(Math.min(pax, maxPassengers));
     const hint = holder.querySelector('#md_hint'); 
     hint.textContent = t('paxHintPrefix') + `${mdAvail || 0}` + t('paxHintSuffix');
   }
 
-  holder.querySelector('#md_dir').addEventListener('change', (e)=>{ mdDirection = e.target.value; mdStation = (mdDirection==='回程') ? pick : drop; buildDateOptions(); });
-  holder.querySelector('#md_cancel').onclick = ()=>{ holder.style.display='none'; showCheckDateStep(); };
-  holder.querySelector('#md_save').onclick = async ()=>{
-    const passengers = Number(holder.querySelector('#md_pax').value||'1');
-    const newPhone = (holder.querySelector('#md_phone').value||'').trim();
-    const newEmail = (holder.querySelector('#md_email').value||'').trim();
-    if(!phoneRegex.test(newPhone)){ showErrorCard(t('errPhone')); return; }
-    if(!emailRegex.test(newEmail)){ showErrorCard(t('errEmail')); return; }
+  holder.querySelector('#md_dir').addEventListener('change', (e)=>{
+    mdDirection = e.target.value; 
+    mdStation = (mdDirection === '回程') ? pick : drop; 
+    buildDateOptions(); 
+  });
 
-    // 送出前再驗證座位
+  holder.querySelector('#md_cancel').onclick = ()=>{
+    holder.style.display='none'; 
+    showCheckDateStep(); 
+  };
+
+  holder.querySelector('#md_save').onclick = async ()=>{
+    const passengers = Number(holder.querySelector('#md_pax').value || '1');
+    const newPhone = (holder.querySelector('#md_phone').value || '').trim();
+    const newEmail = (holder.querySelector('#md_email').value || '').trim();
+
+    if(!phoneRegex.test(newPhone)){ 
+      showErrorCard(t('errPhone')); 
+      return; 
+    }
+    if(!emailRegex.test(newEmail)){ 
+      showErrorCard(t('errEmail')); 
+      return; 
+    }
+
     try{
       showVerifyLoading(true);
       // 關閉編輯面板避免重複送出
       holder.style.display='none';
+
       const payload = {
-        booking_id: bookingId, direction: mdDirection, date: mdDate, time: mdTime, passengers,
-        pickLocation: mdDirection==='回程' ? mdStation : '福泰大飯店 Forte Hotel',
-        dropLocation: mdDirection==='回程' ? '福泰大飯店 Forte Hotel' : mdStation,
-        phone: newPhone, email: newEmail, station: mdStation
+        booking_id: bookingId,
+        direction: mdDirection,
+        date: mdDate,
+        time: mdTime,
+        passengers,
+        pickLocation: mdDirection === '回程' ? mdStation : '福泰大飯店 Forte Hotel',
+        dropLocation: mdDirection === '回程' ? '福泰大飯店 Forte Hotel' : mdStation,
+        phone: newPhone,
+        email: newEmail,
+        station: mdStation
       };
-      const r = await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'modify', data:payload})});
-      const j = await r.json();
-      if(j.status==='success'){
-        showSuccessAnimation();
-        setTimeout(async ()=>{
-          // 重新查詢
-          const id = document.getElementById('qBookId').value.trim();
-          const phone = document.getElementById('qPhone').value.trim();
-          const email = document.getElementById('qEmail').value.trim();
-          const queryRes = await fetch(OPS_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'query', data: { booking_id: id, phone, email } }) });
-          const queryData = await queryRes.json();
-          lastQueryResults = Array.isArray(queryData) ? queryData : (queryData.results || []);
-          buildDateListFromResults(lastQueryResults);
-          if (currentQueryDate) openTicketsForDate(currentQueryDate); else showCheckDateStep();
-        }, 3000);
-      } else {
-        showErrorCard(j.detail || t('errorGeneric'));
-        holder.style.display='block';
+
+      const r = await fetch(OPS_URL, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({action:'modify', data: payload})
+      });
+
+      let j = null;
+      try {
+        j = await r.json();
+      } catch (e) {
+        j = null;
       }
+
+      const backendMsg = j && (j.error || j.code || j.detail || j.message || '');
+      const isCapacityError =
+        r.status === 409 ||
+        backendMsg === 'capacity_not_found' ||
+        String(backendMsg || '').includes('capacity_not_found');
+
+      // HTTP 錯誤
+      if (!r.ok) {
+        if (isCapacityError) {
+          showErrorCard(t('overPaxOrMissing'));
+        } else {
+          showErrorCard(t('updateFailedPrefix') + `HTTP ${r.status}`);
+        }
+        holder.style.display='block';
+        return;
+      }
+
+      // 回傳內容錯誤
+      if (!j || j.status !== 'success') {
+        if (isCapacityError) {
+          showErrorCard(t('overPaxOrMissing'));
+        } else {
+          showErrorCard(
+            (j && (j.detail || j.message)) || t('errorGeneric')
+          );
+        }
+        holder.style.display='block';
+        return;
+      }
+
+      // ✅ 修改成功
+      showSuccessAnimation();
+      setTimeout(async ()=>{
+        // 重新查詢目前條件
+        const id = document.getElementById('qBookId').value.trim();
+        const phone = document.getElementById('qPhone').value.trim();
+        const email = document.getElementById('qEmail').value.trim();
+        const queryRes = await fetch(OPS_URL, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ action: 'query', data: { booking_id: id, phone, email } }) 
+        });
+        const queryData = await queryRes.json();
+        lastQueryResults = Array.isArray(queryData) ? queryData : (queryData.results || []);
+        buildDateListFromResults(lastQueryResults);
+        if (currentQueryDate) openTicketsForDate(currentQueryDate); 
+        else showCheckDateStep();
+      }, 3000);
+
     }catch(e){
-      showErrorCard(t('updateFailedPrefix') + (e?.message||''));
+      showErrorCard(t('updateFailedPrefix') + (e?.message || ''));
       holder.style.display='block';
     }finally{
       showVerifyLoading(false);
     }
   };
+
   buildDateOptions();
   window.scrollTo({top:0,behavior:'smooth'});
 }
