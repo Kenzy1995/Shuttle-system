@@ -18,7 +18,7 @@ let queryDateList = [];
 let currentQueryDate = "";
 let currentDateRows = [];
 
-/* ====== 事件/工具 ====== */
+/* ====== 小工具 ====== */
 function handleScroll(){
   const y = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
   const btn = document.getElementById('backToTop');
@@ -59,7 +59,67 @@ function toggleCollapse(id){
   const el = document.getElementById(id);
   if (!el) return;
   el.classList.toggle('open');
+  const icon = el.querySelector('.toggle-icon');
+  if (icon) icon.textContent = el.classList.contains('open') ? '▾' : '▸';
 }
+function hardResetOverlays(){
+  ['loading','loadingConfirm','expiredOverlay','dialogOverlay','successAnimation'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    if(id==='successAnimation'){ el.classList.remove('show'); el.style.display='none'; }
+    else{ el.classList.remove('show'); }
+  });
+}
+
+/* ====== 對話框（卡片） ====== */
+function showErrorCard(message){
+  const overlay = document.getElementById('dialogOverlay');
+  const title = document.getElementById('dialogTitle');
+  const content = document.getElementById('dialogContent');
+  const cancelBtn = document.getElementById('dialogCancelBtn');
+  const confirmBtn = document.getElementById('dialogConfirmBtn');
+  title.textContent = t('errorTitle');
+  content.innerHTML = `<p>${sanitize(message || t('errorGeneric'))}</p>`;
+  cancelBtn.style.display = 'none';
+  confirmBtn.disabled = false;
+  confirmBtn.textContent = t('ok');
+  confirmBtn.onclick = () => overlay.classList.remove('show');
+  overlay.classList.add('show');
+}
+function showConfirmDelete(bookingId, onConfirm){
+  const overlay = document.getElementById('dialogOverlay');
+  const title = document.getElementById('dialogTitle');
+  const content = document.getElementById('dialogContent');
+  const cancelBtn = document.getElementById('dialogCancelBtn');
+  const confirmBtn = document.getElementById('dialogConfirmBtn');
+
+  title.textContent = t('confirmDeleteTitle');
+  content.innerHTML = `<p>${t('confirmDeleteText')}</p><p style="color:#b00020;font-weight:700">${sanitize(bookingId)}</p>`;
+
+  cancelBtn.style.display = '';
+  cancelBtn.textContent = t('cancel');
+  cancelBtn.onclick = () => overlay.classList.remove('show');
+
+  let seconds = 5;
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = `${t('confirm')} (${seconds})`;
+  const timer = setInterval(()=>{
+    seconds -= 1;
+    confirmBtn.textContent = `${t('confirm')} (${seconds})`;
+    if(seconds<=0){
+      clearInterval(timer);
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = t('confirm');
+    }
+  },1000);
+
+  confirmBtn.onclick = () => {
+    overlay.classList.remove('show');
+    onConfirm && onConfirm();
+  };
+  overlay.classList.add('show');
+}
+function sanitize(s){ return String(s||'').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
 
 /* ====== 時間/格式化 ====== */
 function fmtDateLabel(v){
@@ -201,7 +261,7 @@ function buildStep1(){
   });
 }
 function toStep2(){
-  if(!selectedDirection){ alert(t('labelDirection')); return; }
+  if(!selectedDirection){ showErrorCard(t('labelDirection')); return; }
   const dateSet = new Set(allRows.filter(r=>String(r["去程 / 回程"]).trim()===selectedDirection).map(r=>fmtDateLabel(r["日期"])));
   const sorted=[...dateSet].sort((a,b)=>new Date(a)-new Date(b));
   const list = document.getElementById('dateList');
@@ -217,7 +277,7 @@ function toStep2(){
 
 /* ====== Step 3 ====== */
 function toStep3(){
-  if(!selectedDateRaw){ alert(t('labelDate')); return; }
+  if(!selectedDateRaw){ showErrorCard(t('labelDate')); return; }
   document.getElementById('fixedStation').value = '福泰大飯店 Forte Hotel';
   const stations = new Set(allRows.filter(r=>String(r["去程 / 回程"]).trim()===selectedDirection && fmtDateLabel(r["日期"])===selectedDateRaw).map(r=>String(r["站點"]).trim()));
   const list = document.getElementById('stationList');
@@ -233,7 +293,7 @@ function toStep3(){
 
 /* ====== Step 4 ====== */
 function toStep4(){
-  if(!selectedStationRaw){ alert(t('labelStation')); return; }
+  if(!selectedStationRaw){ showErrorCard(t('labelStation')); return; }
   const list=document.getElementById('scheduleList');
   list.innerHTML='';
   const entries = allRows.filter(r=>
@@ -280,7 +340,7 @@ function onIdentityChange(){
   }
 }
 function toStep5(){
-  if(!selectedScheduleTime){ alert(t('labelSchedule')); return; }
+  if(!selectedScheduleTime){ showErrorCard(t('labelSchedule')); return; }
   onIdentityChange();
   goStep(5);
 }
@@ -296,12 +356,12 @@ function validateStep5(){
   if(id==='hotel'){
     const cin=document.getElementById('checkInDate').value;
     const cout=document.getElementById('checkOutDate').value;
-    if(!cin||!cout){ alert(t('labelCheckIn')+'/'+t('labelCheckOut')); shake(document.getElementById('checkInDate')); shake(document.getElementById('checkOutDate')); return false; }
+    if(!cin||!cout){ showErrorCard(t('labelCheckIn')+'/'+t('labelCheckOut')); shake(document.getElementById('checkInDate')); shake(document.getElementById('checkOutDate')); return false; }
     const room=(document.getElementById('roomNumber').value||'').trim();
     if(!roomRegex.test(room)){document.getElementById('roomErr').style.display='block'; shake(document.getElementById('roomNumber')); return false}else document.getElementById('roomErr').style.display='none';
   }else{
     const din=document.getElementById('diningDate').value;
-    if(!din){ alert(t('labelDiningDate')); shake(document.getElementById('diningDate')); return false; }
+    if(!din){ showErrorCard(t('labelDiningDate')); shake(document.getElementById('diningDate')); return false; }
   }
   return true;
 }
@@ -333,8 +393,7 @@ function toStep6(){
     }
     sel.value = '1';
   }
-  document.getElementById('passengersHint').textContent =
-    `此班次可預約：${selectedAvailableSeats} 人；單筆最多 4 人`;
+  document.getElementById('passengersHint').textContent = `此班次可預約：${selectedAvailableSeats} 人；單筆最多 4 人`;
   ['step1','step2','step3','step4','step5'].forEach(id=>{ const el = document.getElementById(id); if (el) el.style.display = 'none'; });
   document.getElementById('step6').style.display = '';
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -365,7 +424,7 @@ async function submitBooking(){
   }
   const errEl = document.getElementById('passengersErr'); if (errEl) errEl.style.display = 'none';
 
-  // 依你要求：不再重拉資料；完全交由後端檢查
+  // 不再重拉資料；完全交由後端檢查
   const identity = document.getElementById('identitySelect').value;
   const payload = {
     direction: selectedDirection,
@@ -386,7 +445,7 @@ async function submitBooking(){
   };
 
   bookingSubmitting = true;
-  // 送出前先關閉 Step6，避免誤觸
+  // 送出前關閉 Step6，避免誤觸
   document.getElementById('step6').style.display='none';
   showVerifyLoading(true);
 
@@ -419,7 +478,7 @@ async function submitBooking(){
       // 先顯示車票，再播成功動畫
       mountTicketAndShow(currentBookingData);
 
-      // 背景寄信（4s 超時，不阻塞）
+      // 背景寄信
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 4000);
@@ -441,13 +500,13 @@ async function submitBooking(){
       } catch (e) { console.warn('寄信未完成或超時', e); }
 
     } else {
-      alert(result.detail || result.message || '預約失敗，請稍後再試');
+      showErrorCard(result.detail || result.message || t('errorGeneric'));
       // 回到 Step6 讓使用者修正
       document.getElementById('step6').style.display='';
     }
   } catch (e) {
     console.error('submitBooking error', e);
-    alert('提交失敗：' + (e?.message || e));
+    showErrorCard(t('submitFailedPrefix') + (e?.message || ''));
     document.getElementById('step6').style.display='';
   } finally {
     showVerifyLoading(false);
@@ -464,11 +523,10 @@ function mountTicketAndShow(ticket){
   document.getElementById('ticketName').textContent = ticket.name;
   document.getElementById('ticketPhone').textContent = ticket.phone;
   document.getElementById('ticketEmail').textContent = ticket.email;
-  document.getElementById('ticketPassengers').textContent = ticket.passengers + ' 人';
+  document.getElementById('ticketPassengers').textContent = ticket.passengers + ' ' + t('labelPassengersShort');
   const card = document.getElementById('successCard');
   if (card) card.style.display = '';
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  // 顯示成功動畫
   showSuccessAnimation();
 }
 function closeTicketToHome(){
@@ -482,7 +540,7 @@ function closeTicketToHome(){
 }
 async function downloadTicket() {
   const card = document.getElementById('ticketCard');
-  if (!card) { alert('找不到票卡'); return; }
+  if (!card) { showErrorCard('找不到票卡'); return; }
   try {
     const rect = card.getBoundingClientRect();
     const dpr = Math.max(window.devicePixelRatio || 1, 1);
@@ -495,7 +553,7 @@ async function downloadTicket() {
     const a = document.createElement('a');
     const bid = (document.getElementById('ticketBookingId')?.textContent || 'ticket').trim();
     a.href = dataUrl; a.download = `ticket_${bid}.png`; a.click();
-  } catch (e) { alert('下載失敗：' + (e?.message || e)); }
+  } catch (e) { showErrorCard('下載失敗：' + (e?.message || e)); }
 }
 
 /* ====== 查詢我的預約 ====== */
@@ -559,9 +617,10 @@ function maskEmail(email){
 }
 function buildTicketCard(row, {mask=false}={}){
   const carDateTime = String(row["車次-日期時間"] || "");
-  let dateIso = getDateFromCarDateTime(carDateTime);
-  let time = getTimeFromCarDateTime(carDateTime);
+  const dateIso = getDateFromCarDateTime(carDateTime);
+  const time = getTimeFromCarDateTime(carDateTime);
   const expired = isExpiredByCarDateTime(carDateTime);
+
   const statusCode = getStatusCode(row);
   const name = mask ? maskName(String(row["姓名"]||'')) : String(row["姓名"]||'');
   const phone = mask ? maskPhone(String(row["手機"]||'')) : String(row["手機"]||'');
@@ -586,35 +645,34 @@ function buildTicketCard(row, {mask=false}={}){
     tip.className='badge-alert';
     tip.title = t('rejectedTip');
     tip.textContent='!';
-    tip.onclick = ()=> alert(t('rejectedTip'));
+    tip.onclick = ()=> showErrorCard(t('rejectedTip'));
     card.appendChild(tip);
   }
 
   const header = document.createElement('div');
   header.className='ticket-header';
-  header.innerHTML=`<h2>${carDateTime}</h2>`;
+  header.innerHTML=`<h2>${sanitize(carDateTime)}</h2>`;
   card.appendChild(header);
 
   const content = document.createElement('div'); 
   content.className='ticket-content';
   const qr = document.createElement('div'); 
   qr.className='ticket-qr';
-  if(statusCode==='cancelled'){
-    qr.innerHTML = `<img src="/images/QR placeholder.png" alt="QR placeholder" />`;
-  }else{
-    qr.innerHTML = `<img src="${qrUrl}" alt="QR" />`;
-  }
+  qr.innerHTML = (statusCode==='cancelled')
+    ? `<img src="/images/qr-placeholder.png" alt="QR placeholder" />`
+    : `<img src="${qrUrl}" alt="QR" />`;
+
   const info = document.createElement('div'); 
   info.className='ticket-info';
   info.innerHTML = `
-    <div class="ticket-field"><span class="ticket-label">${t('labelBookingId')}</span><span class="ticket-value">${bookingId}</span></div>
-    <div class="ticket-field"><span class="ticket-label">${t('labelDirection')}</span><span class="ticket-value">${rb}</span></div>
-    <div class="ticket-field"><span class="ticket-label">${t('labelPick')}</span><span class="ticket-value">${pick}</span></div>
-    <div class="ticket-field"><span class="ticket-label">${t('labelDrop')}</span><span class="ticket-value">${drop}</span></div>
-    <div class="ticket-field"><span class="ticket-label">${t('labelName')}</span><span class="ticket-value">${name}</span></div>
-    <div class="ticket-field"><span class="ticket-label">${t('labelPhone')}</span><span class="ticket-value">${phone}</span></div>
-    <div class="ticket-field"><span class="ticket-label">${t('labelEmail')}</span><span class="ticket-value">${email}</span></div>
-    <div class="ticket-field"><span class="ticket-label">${t('labelPassengersShort')}</span><span class="ticket-value">${pax}</span></div>
+    <div class="ticket-field"><span class="ticket-label">${t('labelBookingId')}</span><span class="ticket-value">${sanitize(bookingId)}</span></div>
+    <div class="ticket-field"><span class="ticket-label">${t('labelDirection')}</span><span class="ticket-value">${sanitize(rb)}</span></div>
+    <div class="ticket-field"><span class="ticket-label">${t('labelPick')}</span><span class="ticket-value">${sanitize(pick)}</span></div>
+    <div class="ticket-field"><span class="ticket-label">${t('labelDrop')}</span><span class="ticket-value">${sanitize(drop)}</span></div>
+    <div class="ticket-field"><span class="ticket-label">${t('labelName')}</span><span class="ticket-value">${sanitize(name)}</span></div>
+    <div class="ticket-field"><span class="ticket-label">${t('labelPhone')}</span><span class="ticket-value">${sanitize(phone)}</span></div>
+    <div class="ticket-field"><span class="ticket-label">${t('labelEmail')}</span><span class="ticket-value">${sanitize(email)}</span></div>
+    <div class="ticket-field"><span class="ticket-label">${t('labelPassengersShort')}</span><span class="ticket-value">${sanitize(String(pax))}</span></div>
   `;
   content.appendChild(qr); 
   content.appendChild(info); 
@@ -630,7 +688,7 @@ function buildTicketCard(row, {mask=false}={}){
       domtoimage.toPng(card,{bgcolor:'#fff', pixelRatio:2}).then((dataUrl)=>{ 
         const a=document.createElement('a'); 
         a.href=dataUrl; 
-        a.download=`ticket_${bookingId}.png`; 
+        a.download=`ticket_${sanitize(bookingId)}.png`; 
         a.click(); 
       }); 
     };
@@ -642,6 +700,7 @@ function buildTicketCard(row, {mask=false}={}){
     mdBtn.textContent=ts('modify');
     mdBtn.onclick = ()=> openModifyPage({ row, bookingId, rb, date: dateIso, pick, drop, time, pax });
     actions.appendChild(mdBtn);
+    
     const delBtn = document.createElement('button'); 
     delBtn.className='button btn-ghost'; 
     delBtn.textContent=ts('remove');
@@ -652,30 +711,7 @@ function buildTicketCard(row, {mask=false}={}){
   return card;
 }
 
-function getDateFromCarDateTime(carDateTime) {
-  if (!carDateTime) return "";
-  const parts = carDateTime.split(' ');
-  if (parts.length < 1) return "";
-  const datePart = parts[0];
-  return datePart.replace(/\//g, '-');
-}
-function getTimeFromCarDateTime(carDateTime) {
-  if (!carDateTime) return "00:00";
-  const parts = carDateTime.split(' ');
-  return parts.length > 1 ? parts[1] : "00:00";
-}
-function isExpiredByCarDateTime(carDateTime) {
-  if (!carDateTime) return true;
-  try {
-    const [datePart, timePart] = carDateTime.split(' ');
-    const [year, month, day] = datePart.split('/').map(Number);
-    const [hour, minute] = timePart.split(':').map(Number);
-    const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
-    return tripTime < Date.now();
-  } catch (e) { return true; }
-}
-
-/* ====== 查詢 ====== */
+/* ====== 查詢/刪改 ====== */
 async function queryOrders(){
   const id=(document.getElementById('qBookId').value||'').trim();
   const phone=(document.getElementById('qPhone').value||'').trim();
@@ -684,21 +720,21 @@ async function queryOrders(){
   if(!id && !phone && !email){ shake(queryHint); return; }
   showLoading(true);
   try{
-    const res = await fetch(OPS_URL, {method:'POST', mode:'cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'query', data:{booking_id:id, phone, email}})});
+    const res = await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'query', data:{booking_id:id, phone, email}})});
     const data = await res.json();
     const arr = Array.isArray(data) ? data : (data.results || []);
     lastQueryResults = arr;
     buildDateListFromResults(arr);
     showCheckDateStep();
-  }catch(e){ alert('查詢失敗：' + (e?.message || e)); }
+  }catch(e){ showErrorCard(t('queryFailedPrefix') + (e?.message||'')); }
   finally{ showLoading(false); }
 }
 function buildDateListFromResults(rows){
   const dateMap = new Map();
   rows.forEach(r => {
     const carDateTime = String(r["車次-日期時間"] || "");
-    let dateIso = getDateFromCarDateTime(carDateTime);
-    if (withinOneMonth(dateIso)) { dateMap.set(dateIso, (dateMap.get(dateIso) || 0) + 1); }
+    const dateIso = getDateFromCarDateTime(carDateTime);
+    if (withinOneMonth(dateIso)) dateMap.set(dateIso, (dateMap.get(dateIso) || 0) + 1);
   });
   queryDateList = Array.from(dateMap.entries()).sort((a, b) => new Date(a[0]) - new Date(b[0]));
   const wrap = document.getElementById('dateChoices');
@@ -725,7 +761,7 @@ function openTicketsForDate(dateIso) {
   currentQueryDate = dateIso;
   const dateRows = lastQueryResults.filter(r => {
     const carDateTime = String(r["車次-日期時間"] || "");
-    let rowDateIso = getDateFromCarDateTime(carDateTime);
+    const rowDateIso = getDateFromCarDateTime(carDateTime);
     return rowDateIso === dateIso;
   });
   currentDateRows = dateRows.sort((a, b) => {
@@ -742,62 +778,56 @@ function openTicketsForDate(dateIso) {
       const timeB = getTimeFromCarDateTime(carDateTimeB);
       return timeA.localeCompare(timeB);
     }
-    const statusOrder = { 'cancelled': 1, 'rejected': 2, 'expired': 3, 'booked': 4, 'boarded': 5 };
-    return (statusOrder[statusA] || 6) - (statusOrder[statusB] || 6);
+    const order = { 'cancelled': 1, 'rejected': 2, 'expired': 3, 'booked': 4, 'boarded': 5 };
+    return (order[statusA] || 6) - (order[statusB] || 6);
   });
   const mount = document.getElementById('checkTicketMount');
   mount.innerHTML = '';
   currentDateRows.forEach(row => mount.appendChild(buildTicketCard(row, { mask: true })));
   showCheckTicketStep();
 }
-window.rerenderQueryPages = function rerenderQueryPages(){
-  if(document.getElementById('checkDateStep').style.display!=='none'){
-    buildDateListFromResults(lastQueryResults);
-  }
-  if(document.getElementById('checkTicketStep').style.display!=='none'){
-    openTicketsForDate(currentQueryDate);
-  }
+function rerenderQueryPages(){
+  if(document.getElementById('checkDateStep').style.display!=='none'){ buildDateListFromResults(lastQueryResults); }
+  if(document.getElementById('checkTicketStep').style.display!=='none'){ openTicketsForDate(currentQueryDate); }
 }
 
-/* ====== 刪除 ====== */
+/* 刪除（卡片確認 + 倒數5秒） */
 async function deleteOrder(bookingId){
-  if(!confirm(`刪除預約 ${bookingId} ？`)) return;
-  // 送出後先回到日期頁（避免誤點）
-  showCheckDateStep();
-  showLoading(true);
-  try{
-    const r = await fetch(OPS_URL, {
-      method: 'POST', mode:'cors',
-      headers: {'Content-Type':'application/json'}, 
-      body: JSON.stringify({action:'delete', data:{booking_id:bookingId}})
-    });
-    const j = await r.json();
-    if(j.status==='success'){
-      showSuccessAnimation();
-      // 重新查詢目前的條件
-      const id = document.getElementById('qBookId').value.trim();
-      const phone = document.getElementById('qPhone').value.trim();
-      const email = document.getElementById('qEmail').value.trim();
-      try{
-        const queryRes = await fetch(OPS_URL, {
-          method: 'POST', mode:'cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'query', data: { booking_id: id, phone, email } })
-        });
-        const queryData = await queryRes.json();
-        lastQueryResults = Array.isArray(queryData) ? queryData : (queryData.results || []);
-        buildDateListFromResults(lastQueryResults);
-        if (currentQueryDate) openTicketsForDate(currentQueryDate);
-      }catch{}
-    } else {
-      alert(j.detail || '刪除失敗');
-    }
-  } catch(e) { 
-    alert('刪除失敗：'+(e?.message||e)); 
-  } finally { showLoading(false); }
+  showConfirmDelete(bookingId, async ()=>{
+    showLoading(true);
+    try{
+      const r = await fetch(OPS_URL, {
+        method: 'POST', 
+        headers: {'Content-Type':'application/json'}, 
+        body: JSON.stringify({action:'delete', data:{booking_id:bookingId}})
+      });
+      const j = await r.json();
+      if(j.status==='success'){
+        showSuccessAnimation();
+        setTimeout(async () => {
+          // 重新查詢
+          const id = document.getElementById('qBookId').value.trim();
+          const phone = document.getElementById('qPhone').value.trim();
+          const email = document.getElementById('qEmail').value.trim();
+          const queryRes = await fetch(OPS_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'query', data: { booking_id: id, phone, email } })
+          });
+          const queryData = await queryRes.json();
+          lastQueryResults = Array.isArray(queryData) ? queryData : (queryData.results || []);
+          buildDateListFromResults(lastQueryResults);
+          if (currentQueryDate) openTicketsForDate(currentQueryDate); else showCheckDateStep();
+        }, 3000);
+      } else {
+        showErrorCard(j.detail || t('errorGeneric'));
+      }
+    } catch(e) { showErrorCard(t('deleteFailedPrefix') + (e?.message||'')); }
+    finally { showLoading(false); }
+  });
 }
 
-/* ====== 修改頁 ====== */
+/* ====== 修改：新頁面（人數動態受班次可預約限制，且<=4） ====== */
 async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax}){
   await refreshData();
   showPage('check');
@@ -812,7 +842,7 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
     document.getElementById('check').appendChild(holder);
   }
   holder.innerHTML = `
-    <h2>修改預約 ${bookingId}</h2>
+    <h2>${t('editBookingTitle') || '修改預約'} ${sanitize(bookingId)}</h2>
     <div class="field"><label class="label">${t('labelDirection')}</label>
       <select id="md_dir" class="select">
         <option value="去程" ${rb==='去程'?'selected':''}>${t('dirOutLabel')}</option>
@@ -823,8 +853,8 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
     <div class="field"><label class="label">${t('labelStation')}</label><div id="md_stations" class="options"></div></div>
     <div class="field"><label class="label">${t('labelSchedule')}</label><div id="md_schedules" class="options"></div></div>
     <div class="field"><label class="label">${t('labelPassengersShort')}</label><select id="md_pax" class="select"></select><div id="md_hint" class="hint"></div></div>
-    <div class="field"><label class="label">${t('labelPhone')}</label><input id="md_phone" class="input" value="${String(row["手機"]||'')}" /></div>
-    <div class="field"><label class="label">${t('labelEmail')}</label><input id="md_email" class="input" value="${String(row["信箱"]||'')}" /></div>
+    <div class="field"><label class="label">${t('labelPhone')}</label><input id="md_phone" class="input" value="${sanitize(String(row["手機"]||''))}" /></div>
+    <div class="field"><label class="label">${t('labelEmail')}</label><input id="md_email" class="input" value="${sanitize(String(row["信箱"]||''))}" /></div>
     <div class="actions row" style="justify-content:flex-end">
       <button class="button btn-ghost" id="md_cancel">${t('back')}</button>
       <button class="button" id="md_save">${ts('modify')}</button>
@@ -875,98 +905,86 @@ async function openModifyPage({row, bookingId, rb, date, pick, drop, time, pax})
     for(let i=1;i<=maxPassengers;i++){const opt=document.createElement('option');opt.value=String(i);opt.textContent=String(i);sel.appendChild(opt);} 
     sel.value = String(Math.min(pax, maxPassengers));
     const hint = holder.querySelector('#md_hint'); 
-    hint.textContent = `此班次可預約：${mdAvail || 0} 人；單筆最多 4 人`;
+    hint.textContent = t('paxHintPrefix') + `${mdAvail || 0}` + t('paxHintSuffix');
   }
+
   holder.querySelector('#md_dir').addEventListener('change', (e)=>{ mdDirection = e.target.value; mdStation = (mdDirection==='回程') ? pick : drop; buildDateOptions(); });
   holder.querySelector('#md_cancel').onclick = ()=>{ holder.style.display='none'; showCheckDateStep(); };
   holder.querySelector('#md_save').onclick = async ()=>{
-    // 送出前關閉修改視圖，避免重複點擊
-    holder.style.display='none';
-    showVerifyLoading(true);
     const passengers = Number(holder.querySelector('#md_pax').value||'1');
     const newPhone = (holder.querySelector('#md_phone').value||'').trim();
     const newEmail = (holder.querySelector('#md_email').value||'').trim();
-    if(!phoneRegex.test(newPhone)){ alert(t('errPhone')); showVerifyLoading(false); holder.style.display='block'; return; }
-    if(!emailRegex.test(newEmail)){ alert(t('errEmail')); showVerifyLoading(false); holder.style.display='block'; return; }
-    // 不再重拉資料；依後端檢查即可
-    const payload = {
-      booking_id: bookingId, direction: mdDirection, date: mdDate, time: mdTime, passengers,
-      pickLocation: mdDirection==='回程' ? mdStation : '福泰大飯店 Forte Hotel',
-      dropLocation: mdDirection==='回程' ? '福泰大飯店 Forte Hotel' : mdStation,
-      phone: newPhone, email: newEmail, station: mdStation
-    };
+    if(!phoneRegex.test(newPhone)){ showErrorCard(t('errPhone')); return; }
+    if(!emailRegex.test(newEmail)){ showErrorCard(t('errEmail')); return; }
+
+    // 送出前再驗證座位
     try{
-      const r = await fetch(OPS_URL, {method:'POST', mode:'cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'modify', data:payload})});
+      showVerifyLoading(true);
+      // 關閉編輯面板避免重複送出
+      holder.style.display='none';
+      const payload = {
+        booking_id: bookingId, direction: mdDirection, date: mdDate, time: mdTime, passengers,
+        pickLocation: mdDirection==='回程' ? mdStation : '福泰大飯店 Forte Hotel',
+        dropLocation: mdDirection==='回程' ? '福泰大飯店 Forte Hotel' : mdStation,
+        phone: newPhone, email: newEmail, station: mdStation
+      };
+      const r = await fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'modify', data:payload})});
       const j = await r.json();
       if(j.status==='success'){
-        try{
-          const temp = document.createElement('div');
-          temp.style.position='absolute'; temp.style.left='-99999px'; temp.style.top='-99999px';
-          temp.innerHTML = `
-            <div class="ticket-card">
-              <div class="status-pill status-booked">${ts('booked')}</div>
-              <div class="ticket-header"><h2>${t('ticketTitle')}</h2></div>
-              <div class="ticket-content">
-                <div class="ticket-qr"><img src="${await buildQrUrl(j.booking_id || bookingId, newEmail)}" alt="QR"/></div>
-                <div class="ticket-info">
-                  <div class="ticket-field"><span class="ticket-label">${t('labelBookingId')}</span><span class="ticket-value">${j.booking_id || bookingId}</span></div>
-                  <div class="ticket-field"><span class="ticket-label">${t('labelScheduleDate')}</span><span class="ticket-value">${mdTime}</span></div>
-                  <div class="ticket-field"><span class="ticket-label">${t('labelDirection')}</span><span class="ticket-value">${mdDirection}</span></div>
-                  <div class="ticket-field"><span class="ticket-label">${t('labelPick')}</span><span class="ticket-value">${payload.pickLocation}</span></div>
-                  <div class="ticket-field"><span class="ticket-label">${t('labelDrop')}</span><span class="ticket-value">${payload.dropLocation}</span></div>
-                  <div class="ticket-field"><span class="ticket-label">${t('labelName')}</span><span class="ticket-value">${(row['姓名']||'')}</span></div>
-                  <div class="ticket-field"><span class="ticket-label">${t('labelPhone')}</span><span class="ticket-value">${newPhone}</span></div>
-                  <div class="ticket-field"><span class="ticket-label">${t('labelEmail')}</span><span class="ticket-value">${newEmail}</span></div>
-                  <div class="ticket-field"><span class="ticket-label">${t('labelPassengersShort')}</span><span class="ticket-value">${passengers}</span></div>
-                </div>
-              </div>
-            </div>`;
-          document.body.appendChild(temp);
-          const png = await domtoimage.toPng(temp.querySelector('.ticket-card'), {bgcolor:'#fff', pixelRatio:2});
-          document.body.removeChild(temp);
-          fetch(OPS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'mail', data:{ booking_id: j.booking_id || bookingId, lang: currentLang, kind:'modify', ticket_png_base64: png }})}).catch(()=>{});
-        }catch(e){ console.warn('修改寄信失敗', e); }
-        // 成功動畫（在日期頁/票卡頁視圖上）
         showSuccessAnimation();
-        // 重新查
-        const id = document.getElementById('qBookId').value.trim();
-        const phone = document.getElementById('qPhone').value.trim();
-        const email = document.getElementById('qEmail').value.trim();
-        const queryRes = await fetch(OPS_URL, { method: 'POST', mode:'cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'query', data: { booking_id: id, phone, email } })});
-        const queryData = await queryRes.json();
-        lastQueryResults = Array.isArray(queryData) ? queryData : (queryData.results || []);
-        buildDateListFromResults(lastQueryResults);
-        if (currentQueryDate) openTicketsForDate(currentQueryDate); else showCheckDateStep();
+        setTimeout(async ()=>{
+          // 重新查詢
+          const id = document.getElementById('qBookId').value.trim();
+          const phone = document.getElementById('qPhone').value.trim();
+          const email = document.getElementById('qEmail').value.trim();
+          const queryRes = await fetch(OPS_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'query', data: { booking_id: id, phone, email } }) });
+          const queryData = await queryRes.json();
+          lastQueryResults = Array.isArray(queryData) ? queryData : (queryData.results || []);
+          buildDateListFromResults(lastQueryResults);
+          if (currentQueryDate) openTicketsForDate(currentQueryDate); else showCheckDateStep();
+        }, 3000);
       } else {
-        alert(j.detail || '更新失敗');
+        showErrorCard(j.detail || t('errorGeneric'));
         holder.style.display='block';
       }
-    }catch(e){ alert('更新失敗：'+(e?.message||e)); holder.style.display='block'; }
-    finally{ showVerifyLoading(false); }
+    }catch(e){
+      showErrorCard(t('updateFailedPrefix') + (e?.message||''));
+      holder.style.display='block';
+    }finally{
+      showVerifyLoading(false);
+    }
   };
   buildDateOptions();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-/* ====== 工具 ====== */
-async function sha256Hex(s){
-  const data = new TextEncoder().encode(String(s||''));
-  const hash = await crypto.subtle.digest('SHA-256', data);
-  const arr = Array.from(new Uint8Array(hash));
-  return arr.map(b => b.toString(16).padStart(2, '0')).join('');
+/* ====== 系統與資料 ====== */
+function getDateFromCarDateTime(carDateTime) {
+  if (!carDateTime) return "";
+  const parts = String(carDateTime).split(' ');
+  if (parts.length < 1) return "";
+  const datePart = parts[0];
+  return datePart.replace(/\//g, '-');
 }
-async function buildQrUrl(bookingId, email){
-  const hex = await sha256Hex(String(email||''));
-  const em6 = hex.slice(0,6);
-  const content = `FT:${bookingId}:${em6}`;
-  return `${QR_ORIGIN}/api/qr/${encodeURIComponent(content)}`;
+function getTimeFromCarDateTime(carDateTime) {
+  if (!carDateTime) return "00:00";
+  const parts = String(carDateTime).split(' ');
+  return parts.length > 1 ? parts[1] : "00:00";
 }
-
-/* ====== 資料處理 ====== */
+function isExpiredByCarDateTime(carDateTime) {
+  if (!carDateTime) return true;
+  try {
+    const [datePart, timePart] = String(carDateTime).split(' ');
+    const [year, month, day] = datePart.split('/').map(Number);
+    const [hour, minute] = timePart.split(':').map(Number);
+    const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
+    return tripTime < Date.now();
+  } catch (e) { return true; }
+}
 async function refreshData(){
   showLoading(true);
   try{
-    const res = await fetch(API_URL, {mode:'cors', cache:'no-store'});
+    const res = await fetch(API_URL);
     const raw = await res.json();
     const headers = raw[0];
     const rows = raw.slice(1);
@@ -974,14 +992,14 @@ async function refreshData(){
                   .filter(r=>r["去程 / 回程"]&&r["日期"]&&r["班次"]&&r["站點"]);
     return true;
   }catch(e){
-    alert("資料更新失敗，請稍後再試");
+    showErrorCard(t('refreshFailedPrefix') + (e?.message || ''));
     return false;
   }finally{
     showLoading(false);
   }
 }
 
-/* ====== 查詢班次功能（含 ALL 快速重置） ====== */
+/* ====== 查詢班次（單一 ALL 清除鈕） ====== */
 let scheduleData = {
   rows: [],
   directions: new Set(),
@@ -993,9 +1011,9 @@ let scheduleData = {
 };
 async function loadScheduleData() {
   const resultsEl = document.getElementById('scheduleResults');
-  resultsEl.innerHTML = '<div class="loading-text" data-i18n="loading">'+t('loading')+'</div>';
+  resultsEl.innerHTML = `<div class="loading-text">${t('loading')}</div>`;
   try {
-    const res = await fetch(API_URL + '?sheet=' + encodeURIComponent('可預約班次(web)'), {mode:'cors', cache:'no-store'});
+    const res = await fetch(API_URL + '?sheet=可預約班次(web)');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const headers = data[0];
@@ -1018,51 +1036,51 @@ async function loadScheduleData() {
     renderScheduleFilters();
     renderScheduleResults();
   } catch (error) {
-    resultsEl.innerHTML = `<div class="empty-state">查詢失敗: ${error.message}</div>`;
+    resultsEl.innerHTML = `<div class="empty-state">${t('queryFailedPrefix')}${sanitize(error.message)}</div>`;
   }
 }
 function renderScheduleFilters() {
-  // 綁定 ALL 快速清空
-  const allBtn = document.getElementById('filterAll');
-  if (allBtn) {
-    allBtn.onclick = () => {
-      scheduleData.selectedDirection = null;
-      scheduleData.selectedDate = null;
-      scheduleData.selectedStation = null;
-      renderScheduleFilters();
-      renderScheduleResults();
-    };
-  }
-  // Direction: 將 '去程/回程' 顯示為語系文字，但 value 仍使用中文原值
-  const dirContainer = document.getElementById('directionFilter');
-  dirContainer.innerHTML = '';
-  Array.from(scheduleData.directions).sort().forEach(dir => {
-    const pill = document.createElement('button');
-    pill.type='button'; pill.className='filter-pill' + (scheduleData.selectedDirection===dir ? ' active' : '');
-    const label = dir === '去程' ? t('dirOutLabel') : dir === '回程' ? t('dirInLabel') : dir;
-    pill.textContent = label;
-    pill.onclick = () => { scheduleData.selectedDirection = dir; renderScheduleFilters(); renderScheduleResults(); };
-    dirContainer.appendChild(pill);
+  // 單一 ALL 清除鈕
+  const allWrap = document.getElementById('allFilter');
+  allWrap.innerHTML = '';
+  const allBtn = document.createElement('button');
+  allBtn.type='button'; allBtn.className='filter-pill';
+  allBtn.textContent = t('all');
+  allBtn.onclick = () => {
+    scheduleData.selectedDirection = null;
+    scheduleData.selectedDate = null;
+    scheduleData.selectedStation = null;
+    renderScheduleFilters();
+    renderScheduleResults();
+  };
+  allWrap.appendChild(allBtn);
+
+  renderFilterPills('directionFilter', [...scheduleData.directions], scheduleData.selectedDirection, (dir) => {
+    scheduleData.selectedDirection = scheduleData.selectedDirection === dir ? null : dir;
+    renderScheduleFilters();
+    renderScheduleResults();
   });
-  // Dates
-  const dateContainer = document.getElementById('dateFilter');
-  dateContainer.innerHTML = '';
-  Array.from(scheduleData.dates).sort((a,b)=>new Date(a)-new Date(b)).forEach(date => {
-    const pill = document.createElement('button');
-    pill.type='button'; pill.className='filter-pill' + (scheduleData.selectedDate===date ? ' active' : '');
-    pill.textContent = date;
-    pill.onclick = () => { scheduleData.selectedDate = date; renderScheduleFilters(); renderScheduleResults(); };
-    dateContainer.appendChild(pill);
+  renderFilterPills('dateFilter', [...scheduleData.dates], scheduleData.selectedDate, (date) => {
+    scheduleData.selectedDate = scheduleData.selectedDate === date ? null : date;
+    renderScheduleFilters();
+    renderScheduleResults();
   });
-  // Stations
-  const stationContainer = document.getElementById('stationFilter');
-  stationContainer.innerHTML = '';
-  Array.from(scheduleData.stations).sort().forEach(st => {
+  renderFilterPills('stationFilter', [...scheduleData.stations], scheduleData.selectedStation, (station) => {
+    scheduleData.selectedStation = scheduleData.selectedStation === station ? null : station;
+    renderScheduleFilters();
+    renderScheduleResults();
+  });
+}
+function renderFilterPills(containerId, items, selectedItem, onClick) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  items.sort().forEach(item => {
     const pill = document.createElement('button');
-    pill.type='button'; pill.className='filter-pill' + (scheduleData.selectedStation===st ? ' active' : '');
-    pill.textContent = st;
-    pill.onclick = () => { scheduleData.selectedStation = st; renderScheduleFilters(); renderScheduleResults(); };
-    stationContainer.appendChild(pill);
+    pill.type = 'button';
+    pill.className = 'filter-pill' + (selectedItem === item ? ' active' : '');
+    pill.textContent = item;
+    pill.onclick = () => onClick(item);
+    container.appendChild(pill);
   });
 }
 function renderScheduleResults() {
@@ -1074,43 +1092,30 @@ function renderScheduleResults() {
     return true;
   });
   if (filtered.length === 0) {
-    container.innerHTML = `<div class="empty-state" data-i18n="noSchedules">${t('noSchedules')}</div>`;
+    container.innerHTML = `<div class="empty-state">${t('noSchedules')}</div>`;
     return;
   }
   container.innerHTML = filtered.map(row => `
     <div class="schedule-card">
       <div class="schedule-line">
-        <span class="schedule-direction">${row.direction === '去程' ? t('dirOutLabel') : t('dirInLabel')}</span>
-        <span class="schedule-date">${row.date}</span>
-        <span class="schedule-time">${row.time}</span>
+        <span class="schedule-direction">${sanitize(row.direction)}</span>
+        <span class="schedule-date">${sanitize(row.date)}</span>
+        <span class="schedule-time">${sanitize(row.time)}</span>
       </div>
       <div class="schedule-line">
-        <span class="schedule-station">${row.station}</span>
-        <span class="schedule-capacity">${row.capacity}</span>
+        <span class="schedule-station">${sanitize(row.station)}</span>
+        <span class="schedule-capacity">${sanitize(row.capacity)}</span>
       </div>
     </div>
   `).join('');
 }
 
-/* ====== 系統設定（跑馬燈與圖片） ====== */
+/* ====== 跑馬燈與圖片展示 ====== */
 async function loadSystemConfig() {
-  // 兼容不同後端參數名稱：?sheet=系統 / ?ws=系統 / ?name=系統
-  async function tryFetch(urls) {
-    for (const u of urls) {
-      try{
-        const r = await fetch(u, {mode:'cors', cache:'no-store'});
-        if (r.ok) return await r.json();
-      }catch(e){}
-    }
-    throw new Error('all variants failed');
-  }
   try {
-    const base = API_URL;
-    const data = await tryFetch([
-      `${base}?sheet=${encodeURIComponent('系統')}`,
-      `${base}?ws=${encodeURIComponent('系統')}`,
-      `${base}?name=${encodeURIComponent('系統')}`
-    ]);
+    const res = await fetch(API_URL + '?sheet=系統');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
     const marqueeTexts = [];
     for (let i = 1; i <= 5; i++) {
       const row = data[i] || [];
@@ -1121,7 +1126,7 @@ async function loadSystemConfig() {
     if (marqueeTexts.length > 0 && !localStorage.getItem('marqueeClosed')) {
       const marqueeContainer = document.getElementById('marqueeContainer');
       const marqueeContent = document.getElementById('marqueeContent');
-      marqueeContent.innerHTML = marqueeTexts.join(' | ');
+      marqueeContent.innerHTML = marqueeTexts.map(sanitize).join(' | ');
       marqueeContainer.style.display = 'block';
     }
     const galleryImages = [];
@@ -1133,22 +1138,14 @@ async function loadSystemConfig() {
     }
     if (galleryImages.length > 0) {
       const imageGallery = document.getElementById('imageGallery');
-      imageGallery.innerHTML = galleryImages.map(u => `<img src="${u}" class="gallery-image" alt="宣傳圖片" />`).join('');
+      imageGallery.innerHTML = galleryImages.map(u => `<img src="${sanitize(u)}" class="gallery-image" alt="宣傳圖片" />`).join('');
     }
   } catch (error) {
     console.warn('載入系統設定失敗:', error);
   }
 }
 
-/* ====== 其他 ====== */
-function hardResetOverlays(){
-  ['loading','loadingConfirm','expiredOverlay','successAnimation'].forEach(id=>{
-    const el = document.getElementById(id);
-    if(!el) return;
-    el.classList.remove('show');
-    el.style.display = (id==='successAnimation') ? 'none' : el.style.display;
-  });
-}
+/* ====== 其他工具 ====== */
 function parseTripDateTime(dateStr, timeStr){
   const iso = fmtDateLabel(dateStr);
   let y, m, d;
@@ -1177,10 +1174,29 @@ function parseTripDateTime(dateStr, timeStr){
   }
   return new Date(y, m - 1, d, H, M, 0);
 }
-window.__DISABLE_CLIENT_REFRESH__ = true;
 
 /* ====== 初始化 ====== */
-function init() {
+function resetQuery(){ document.getElementById('qBookId').value=''; document.getElementById('qPhone').value=''; document.getElementById('qEmail').value=''; }
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.actions').forEach(a => {
+    const btns = a.querySelectorAll('button');
+    if (btns.length === 3) a.classList.add('has-three');
+  });
+  document.querySelectorAll('.ticket-actions').forEach(a => {
+    const btns = a.querySelectorAll('button');
+    if (btns.length === 3) a.classList.add('has-three');
+  });
+  // 預設折疊站點區塊
+  ['stopHotel','stopMRT','stopTrain','stopLala'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('open');
+  });
+  init();
+});
+window.addEventListener('scroll', handleScroll, {passive:true});
+window.addEventListener('resize', handleScroll, {passive:true});
+
+async function init() {
   const tday = todayISO();
   const ci = document.getElementById('checkInDate');
   const co = document.getElementById('checkOutDate');
@@ -1192,26 +1208,29 @@ function init() {
   showPage('reservation');
   applyI18N();
   handleScroll();
-  loadSystemConfig();
-  // 預設將可收合區塊設為收合
-  ['blk-mrt','blk-train','blk-lala'].forEach(id=>{
-    const el = document.getElementById(id);
-    if (el) el.classList.remove('open');
-  });
+  await loadSystemConfig();
 }
-function resetQuery(){
-  document.getElementById('qBookId').value='';
-  document.getElementById('qPhone').value='';
-  document.getElementById('qEmail').value='';
+
+/* ====== 解析/過期判斷 (查詢頁用) ====== */
+function getDateFromCarDateTime(carDateTime) {
+  if (!carDateTime) return "";
+  const parts = String(carDateTime).split(' ');
+  if (parts.length < 1) return "";
+  const datePart = parts[0];
+  return datePart.replace(/\//g, '-');
 }
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.actions').forEach(a => {
-    const btns = a.querySelectorAll('button');
-    if (btns.length === 3) a.classList.add('has-three');
-  });
-  document.querySelectorAll('.ticket-actions').forEach(a => {
-    const btns = a.querySelectorAll('button');
-    if (btns.length === 3) a.classList.add('has-three');
-  });
-  init();
-});
+function getTimeFromCarDateTime(carDateTime) {
+  if (!carDateTime) return "00:00";
+  const parts = String(carDateTime).split(' ');
+  return parts.length > 1 ? parts[1] : "00:00";
+}
+function isExpiredByCarDateTime(carDateTime) {
+  if (!carDateTime) return true;
+  try {
+    const [datePart, timePart] = String(carDateTime).split(' ');
+    const [year, month, day] = datePart.split('/').map(Number);
+    const [hour, minute] = timePart.split(':').map(Number);
+    const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
+    return tripTime < Date.now();
+  } catch (e) { return true; }
+}
