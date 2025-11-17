@@ -179,16 +179,6 @@
     .query-form{display:flex;flex-direction:column;gap:14px}
 
     .footer{ background:#f5f5f5;color:#666;text-align:center;padding:20px;margin-top:auto;border-top:1px solid #e0e0e0;width:100%; }
-    
-    /* 即時位置 - 預留容器樣式 */
-    .realtime-box {
-      margin-top: 8px;
-      min-height: 320px;  /* 先給保留高度，未嵌入前也不突兀 */
-      border-radius: 12px;
-      background: #fafafa;
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
 
     /* 手機底部導覽（白字） */
     .mobile-tabbar{ position:fixed;left:0;right:0;bottom:0;display:none;z-index:40; background:var(--primary);border-top:1px solid #e9e9e9;box-shadow:0 -2px 12px rgba(0,0,0,.06) }
@@ -703,12 +693,6 @@
           </div>
         </div>
       </section>
-      <!-- 查詢班次 - 即時位置（保留區塊 @ 停靠站點頁） -->
-      <section id="realtimeSection" class="card wizard-fixed station-page" data-feature="liveLocation" style="display:none">
-        <h2 data-i18n="realtimeTitle">即時位置</h2>
-        <div id="realtimeMount" class="realtime-box" aria-live="polite"></div>
-      </section>
-    
     </div>
   </main>
 
