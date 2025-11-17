@@ -691,7 +691,7 @@ function buildTicketCard(row, {mask=false}={}){
   const pick = String(row["上車地點"]||'');
   const drop = String(row["下車地點"]||'');
   const bookingId = String(row["預約編號"]||'');
-  const pax = Number(row["預約人數"]||'1')||1;
+  const pax = Number(row["確認人數"] || row["預約人數"] || '1') || 1;
   const qrCodeContent = String(row["QRCode編碼"]||'');
   const qrUrl = qrCodeContent ? (QR_ORIGIN + '/api/qr/' + encodeURIComponent(qrCodeContent)) : '';
 
