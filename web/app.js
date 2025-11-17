@@ -81,13 +81,18 @@ function showPage(id){
   if(id==='station'){
     renderLiveLocationPlaceholder(); // ← 停靠站點頁顯示保留區塊
   }
-  // 在所有頁面都顯示跑馬燈
-  if (marqueeData.isLoaded) {
-    showMarquee();
+
+  if (marqueeData.isLoaded && typeof showMarquee === 'function') {
+    try {
+      showMarquee();
+    } catch (e) {
+      console.warn('showMarquee 發生錯誤，已略過：', e);
+    }
   }
 
   handleScroll();
 }
+
 function showLoading(s=true){document.getElementById('loading').classList.toggle('show',s)}
 function showVerifyLoading(s=true){document.getElementById('loadingConfirm').classList.toggle('show',s)}
 function showExpiredOverlay(s=true){document.getElementById('expiredOverlay').classList.toggle('show',s)}
