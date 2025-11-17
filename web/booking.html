@@ -42,11 +42,13 @@
       padding: 0 40px 0 16px;
       margin-bottom: 16px;
       border-radius: 8px;
-      overflow: hidden;
+      overflow: hidden; /* 必須保留：隱藏超出內容，創造視窗效果 */
       display: none;
-      height: 40px;
-      line-height: 40px;
+      height: 50px; /* 增加高度 */
+      line-height: 50px; /* 垂直居中 */
+      z-index: 1000; /* 確保在最上層 */
     }
+
     .marquee-close {
       position: absolute;
       right: 8px;
@@ -55,23 +57,38 @@
       background: none;
       border: none;
       color: white;
-      font-size: 18px;
+      font-size: 22px;
       cursor: pointer;
-      width: 24px;
-      height: 24px;
+      width: 30px;
+      height: 30px;
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 10;
+      z-index: 1001;
+      font-weight: bold;
     }
 
     .marquee-content {
       white-space: nowrap;
       display: inline-block;
-      padding-left: 100%; /* 從容器右側開始 */
+      padding-left: 100%;
       animation: marquee 30s linear infinite;
+  
+      /* 增大字體、加粗、使用黑體 */
+      font-size: 20px !important;
+      font-weight: 900 !important;
+      font-family: 
+        "Heiti TC", 
+        "Microsoft JhengHei", 
+        "PingFang TC", 
+        "Helvetica Neue", 
+        "Helvetica", 
+        "Arial", 
+        sans-serif !important;
+      letter-spacing: 0.5px;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
     }
-
+  
     @keyframes marquee {
       0% {
         transform: translateX(0);
@@ -83,6 +100,7 @@
     /* 懸停時暫停動畫 */
     .marquee-container:hover .marquee-content {
       animation-play-state: paused;
+      background: rgba(0,0,0,0.1);
     }
     /* 圖片展示區 */
     .image-gallery {
