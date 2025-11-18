@@ -169,14 +169,27 @@ function showMarquee() {
   if (!marqueeContainer || !marqueeContent) return;
 
   if (!marqueeData.text) {
+    // 沒有文案就隱藏
     marqueeContainer.style.display = "none";
     return;
   }
 
   marqueeContent.textContent = marqueeData.text;
+  // ★ 這裡強制改成 block，避免一直卡在 display:none
   marqueeContainer.style.display = "block";
+
   restartMarqueeAnimation();
 }
+
+function restartMarqueeAnimation() {
+  const marqueeContent = document.getElementById("marqueeContent");
+  if (!marqueeContent) return;
+
+  marqueeContent.style.animation = "none";
+  void marqueeContent.offsetHeight; // 強迫 reflow
+  marqueeContent.style.animation = null;
+}
+
 
 function restartMarqueeAnimation() {
   const marqueeContent = document.getElementById("marqueeContent");
@@ -2072,25 +2085,30 @@ function renderLiveLocationPlaceholder() {
 
 async function init() {
   const tday = todayISO();
-  const ci = document.getElementById("checkInDate");
-  const co = document.getElementById("checkOutDate");
-  const dining = document.getElementById("diningDate");
+  const ci = document.getElementById('checkInDate');
+  const co = document.getElementById('checkOutDate');
+  const dining = document.getElementById('diningDate');
+
   if (ci) ci.value = tday;
   if (co) co.value = tday;
   if (dining) dining.value = tday;
 
   hardResetOverlays();
-  applyI18N();
-  handleScroll();
 
-  // ✅ 先載入系統設定（跑馬燈 / 圖片牆）
+  // 1. 先套語系，避免一開始有文字還是舊語言
+  applyI18N();
+
+  // 2. 載入系統設定（會順便把跑馬燈文字載入 + showMarquee）
   await loadSystemConfig();
 
-  renderLiveLocationPlaceholder();
+  // 3. 顯示預約分頁（此時 marqueeData 已經有內容）
+  showPage('reservation');
 
-  // ✅ 最後才顯示預約主頁，此時 marqueeData 已經 ready
-  showPage("reservation");
+  // 4. 其他 UI 初始化
+  handleScroll();
+  renderLiveLocationPlaceholder();
 }
+
 
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".actions").forEach((a) => {
