@@ -1344,10 +1344,10 @@ function buildDateListFromResults(rows) {
     return;
   }
 
-  // ✅ 用多語系的文字組「(有：2 筆預約)」
-  const statusTexts = I18N_STATUS[currentLang] || I18N_STATUS.zh;
-  const prefix = statusTexts.dateCountPrefix || "";
-  const suffix = statusTexts.dateCountSuffix || "";
+  // ✅ 改這裡：從 TEXTS 拿字，而不是 I18N_STATUS
+  const texts = TEXTS[currentLang] || TEXTS.zh;
+  const prefix = texts.dateCountPrefix || "";
+  const suffix = texts.dateCountSuffix || "";
 
   queryDateList.forEach(([date, count]) => {
     const btn = document.createElement("button");
@@ -1365,6 +1365,7 @@ function buildDateListFromResults(rows) {
     wrap.appendChild(btn);
   });
 }
+
 
 function openTicketsForDate(dateIso) {
   currentQueryDate = dateIso;
