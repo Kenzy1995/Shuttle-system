@@ -37,17 +37,20 @@
     /* 跑馬燈 */
     .marquee-container {
       position: relative;
-      background: rgba(0,0,0,0.3);
-      background: rgba(0,0,0,0.2);
-      color: white;
-      padding: 0 40px 0 16px;
-      margin-bottom: 16px;
-      border-radius: 8px;
+      /* 使用主題色 A98570，20% 透明 */
+      background: rgba(169, 133, 112, 0.2);
+      color: #fff;
+      padding: 0 48px 0 18px; /* 右側多一點空間給關閉按鈕 */
+      margin: 8px 16px 16px;  /* 上下留一點距離，左右微縮，視覺更集中 */
+      border-radius: 10px;
       overflow: hidden;
       display: none;
-      height: 40px;
-      line-height: 40px;
+      height: 52px;           /* 高度加大 */
+      line-height: 52px;      /* 讓文字垂直置中 */
+      font-size: 15px;        /* 字體加大 */
     }
+    
+    /* 關閉按鈕 */
     .marquee-close {
       position: absolute;
       right: 8px;
@@ -55,11 +58,11 @@
       transform: translateY(-50%);
       background: none;
       border: none;
-      color: white;
+      color: #fff;
       font-size: 18px;
       cursor: pointer;
-      width: 24px;
-      height: 24px;
+      width: 28px;
+      height: 28px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -71,6 +74,8 @@
       display: inline-block;
       padding-left: 100%; /* 從容器右側開始 */
       animation: marquee 30s linear infinite;
+      font-size: 15px;      /* 跟容器字體一致 */
+      font-weight: 500;
     }
 
     @keyframes marquee {
@@ -342,7 +347,7 @@
 </head>
 <body>
   <!-- 跑馬燈 -->
-  <div id="marqueeContainer" class="marquee">
+  <div id="marqueeContainer" class="marquee-container">
     <div id="marqueeContent" class="marquee-content"></div>
     <button class="marquee-close" onclick="closeMarquee()">✕</button>
   </div>
