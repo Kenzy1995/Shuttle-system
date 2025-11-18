@@ -58,6 +58,16 @@
       overflow: hidden;
     }
     
+    /* 停靠站點圖片固定在卡片寬度內 */
+    .station-img,
+    .station-info-img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+
     /* 關閉按鈕（右上角的 ✕） */
     .marquee-close {
       position: absolute;
@@ -666,16 +676,18 @@
 
   <!-- 停靠站點 -->
   <main id="station" class="page station-page">
-    <div class="grid">
-      <!-- 第一區：接駁車資訊（不收合） -->
-      <section class="card">
-        <h2 class="station-title" style="text-align:center" data-i18n="stopsInfoTitle">
-          接駁車資訊
-        </h2>
-        <div class="station-info" data-i18n-html="stopsInfoText">
-          <p><strong>※房客、用餐客人可享免費預約接駁，非房客或用餐客人預約接駁須收費每位NT$200/單趟，每趟次可搭乘19名旅客，座位有限，約滿為止。</strong></p>
-          <p><strong>※本飯店保有彈性調整發車時段，發車與否及車輛型式之權利。車種介紹：依預約人數安排白色20人中巴(車牌PAB-311)或鐵灰色福斯九人座(車牌BLD-0361)</strong></p>
-        </div>
+    <!-- ✅ 外面包一層 wizard-fixed，統一寬度 -->
+    <div class="wizard-fixed">
+      <div class="grid">
+        <!-- 第一區：接駁車資訊（不收合） -->
+        <section class="card">
+          <h2 class="station-title" style="text-align:center" data-i18n="stopsInfoTitle">
+            接駁車資訊
+          </h2>
+          <div class="station-info" data-i18n-html="stopsInfoText">
+            <p><strong>※房客、用餐客人可享免費預約接駁，非房客或用餐客人預約接駁須收費每位NT$200/單趟，每趟次可搭乘19名旅客，座位有限，約滿為止。</strong></p>
+            <p><strong>※本飯店保有彈性調整發車時段，發車與否及車輛型式之權利。車種介紹：依預約人數安排白色20人中巴(車牌PAB-311)或鐵灰色福斯九人座(車牌BLD-0361)</strong></p>
+          </div>
 
           <!-- 這裡放一張橫向長方形圖片：檔名可自行替換 -->
           <div class="station-info-image-wrap">
@@ -683,133 +695,128 @@
                  alt="接駁車資訊示意圖"
                  class="station-info-img" />
           </div>
-      </section>
+        </section>
 
-      <!-- 第二區：福泰大飯店發車（可收合，預設收起） -->
-      <section class="card collapsible" id="stopHotel">
-        <div class="collapsible-header" onclick="toggleCollapse('stopHotel')">
-          <h2 data-i18n="stopHotelTitle">
-            福泰大飯店發車-側門出口 / Forte Hotel Xizhi Departure - Side Entrance
-          </h2>
-          <span class="toggle-icon">▸</span>
-        </div>
-        <div class="collapsible-content">
-          <!-- 若之後要加說明文字，可用跟其他站一樣的 pattern：
-          <div class="station-desc">
-            <div data-i18n="stopHotelDesc1">...</div>
-            <div data-i18n="stopHotelDesc2">...</div>
+        <!-- 第二區：福泰大飯店發車（可收合，預設收起） -->
+        <section class="card collapsible" id="stopHotel">
+          <div class="collapsible-header" onclick="toggleCollapse('stopHotel')">
+            <h2 data-i18n="stopHotelTitle">
+              福泰大飯店發車-側門出口 / Forte Hotel Xizhi Departure - Side Entrance
+            </h2>
+            <span class="toggle-icon">▸</span>
           </div>
-          -->
-          <img src="/images/飯店1.jpg" class="station-img" alt="飯店發車點"/>
-          <div style="margin-top:12px">
-            <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5965295503805!2d121.631097!3d25.054899!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzE3LjQiTiAxMjHCsDM3JzUyLjEiRQ!5e0!3m2!1szh-TW!2sus!4v1762533754549!5m2!1szh-TW!2us"
-                    width="100%" height="380"
-                    style="border:0;border-radius:12px"
-                    loading="lazy"
-                    referrerpolicy="no-referrer-when-downgrade"
-                    allowfullscreen></iframe>
-          </div>
-        </div>
-      </section>
-
-      <!-- 第三區：南港展覽館（可收合，預設收起） -->
-      <section class="card collapsible" id="stopMRT">
-        <div class="collapsible-header" onclick="toggleCollapse('stopMRT')">
-          <h2 data-i18n="stopMRTTitle">
-            南港展覽館捷運站 / Nangang Exhibition Center - MRT Exit 3
-          </h2>
-          <span class="toggle-icon">▸</span>
-        </div>
-        <div class="collapsible-content">
-          <div class="station-desc">
-            <div data-i18n="stopMRTDesc">
-              捷運南港展覽館 3 號出口 - 汽機車臨停接送區。
-            </div>
-            <div data-i18n="stopMRTDesc2">
-              停靠時間：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05
+          <div class="collapsible-content">
+            <img src="/images/飯店1.jpg" class="station-img" alt="飯店發車點"/>
+            <div style="margin-top:12px">
+              <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5965295503805!2d121.631097!3d25.054899!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzE3LjQiTiAxMjHCsDM3JzUyLjEiRQ!5e0!3m2!1szh-TW!2sus!4v1762533754549!5m2!1szh-TW!2us"
+                      width="100%" height="380"
+                      style="border:0;border-radius:12px"
+                      loading="lazy"
+                      referrerpolicy="no-referrer-when-downgrade"
+                      allowfullscreen></iframe>
             </div>
           </div>
-          <img src="/images/捷運1.png" class="station-img" alt="捷運3號出口"/>
-          <div style="margin-top:12px">
-            <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5957185825895!2d121.61843600000002!3d25.055009!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzE4LjEiTiAxMjHCsDM3JzA1LjUiRQ!5e0!3m2!1szh-TW!2us!4v1762600714030!5m2!1szh-TW!2us"
-                    width="100%" height="380"
-                    style="border:0;border-radius:12px"
-                    loading="lazy"
-                    referrerpolicy="no-referrer-when-downgrade"
-                    allowfullscreen></iframe>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- 第四區：南港火車站（可收合，預設收起） -->
-      <section class="card collapsible" id="stopTrain">
-        <div class="collapsible-header" onclick="toggleCollapse('stopTrain')">
-          <h2 data-i18n="stopTrainTitle">
-            南港火車站 / Nangang Train Station
-          </h2>
-          <span class="toggle-icon">▸</span>
-        </div>
-        <div class="collapsible-content">
-          <div class="station-desc">
-            <div data-i18n="stopTrainDesc">
-              南港火車站靠興中路一側上下客點（南港車站東側臨停接送區）。
-            </div>
-            <div data-i18n="stopTrainDesc2">
-              停靠時間：08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10
-            </div>
+        <!-- 第三區：南港展覽館（可收合，預設收起） -->
+        <section class="card collapsible" id="stopMRT">
+          <div class="collapsible-header" onclick="toggleCollapse('stopMRT')">
+            <h2 data-i18n="stopMRTTitle">
+              南港展覽館捷運站 / Nangang Exhibition Center - MRT Exit 3
+            </h2>
+            <span class="toggle-icon">▸</span>
           </div>
-          <img src="/images/火車站1.png" class="station-img" alt="南港火車站1"/>
-          <img src="/images/火車站2.png" class="station-img" alt="南港火車站2"/>
-          <div style="margin-top:12px">
-            <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.6109052447401!2d121.60801199999999!3d25.052949!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzEwLjMiTiAxMjHCsDM2JzI4LjAiRQ!5e0!3m2!1szh-TW!2us!4v1762600699115!5m2!1szh-TW!2us"
-                    width="100%" height="380"
-                    style="border:0;border-radius:12px"
-                    loading="lazy"
-                    referrerpolicy="no-referrer-when-downgrade"
-                    allowfullscreen></iframe>
-          </div>
-        </div>
-      </section>
-
-      <!-- 第五區：LaLaport（可收合，預設收起） -->
-      <section class="card collapsible" id="stopLala">
-        <div class="collapsible-header" onclick="toggleCollapse('stopLala')">
-          <h2 data-i18n="stopLalaTitle">
-            南港 LaLaport Shopping Park
-          </h2>
-          <span class="toggle-icon">▸</span>
-        </div>
-        <div class="collapsible-content">
-          <div class="station-desc">
-            <div data-i18n="stopLalaDesc">
-              南港展覽館 1 號出口大客車臨停區 / 小客車臨停區（視車種有不同停靠區）。
+          <div class="collapsible-content">
+            <div class="station-desc">
+              <div data-i18n="stopMRTDesc">
+                捷運南港展覽館 3 號出口 - 汽機車臨停接送區。
+              </div>
+              <div data-i18n="stopMRTDesc2">
+                停靠時間：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05
+              </div>
             </div>
-            <div data-i18n="stopLalaDesc2">
-              停靠時間：12:15 / 14:45 / 17:20 / 18:50 / 21:15
+            <img src="/images/捷運1.png" class="station-img" alt="捷運3號出口"/>
+            <div style="margin-top:12px">
+              <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5957185825895!2d121.61843600000002!3d25.055009!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzE4LjEiTiAxMjHCsDM3JzA1LjUiRQ!5e0!3m2!1szh-TW!2us!4v1762600714030!5m2!1szh-TW!2us"
+                      width="100%" height="380"
+                      style="border:0;border-radius:12px"
+                      loading="lazy"
+                      referrerpolicy="no-referrer-when-downgrade"
+                      allowfullscreen></iframe>
             </div>
           </div>
-          <img src="/images/lala1.png" class="station-img" alt="LaLaport1"/>
-          <img src="/images/lala2.png" class="station-img" alt="LaLaport2"/>
-          <div style="margin-top:12px">
-            <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5851167154738!2d121.617376!3d25.056447!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzIyLjciTiAxMjHCsDM3JzAxLjQiRQ!5e0!3m2!1szh-TW!2us!4v1762600680118!5m2!1szh-TW!2us"
-                    width="100%" height="380"
-                    style="border:0;border-radius:12px"
-                    loading="lazy"
-                    referrerpolicy="no-referrer-when-downgrade"
-                    allowfullscreen></iframe>
+        </section>
+
+        <!-- 第四區：南港火車站（可收合，預設收起） -->
+        <section class="card collapsible" id="stopTrain">
+          <div class="collapsible-header" onclick="toggleCollapse('stopTrain')">
+            <h2 data-i18n="stopTrainTitle">
+              南港火車站 / Nangang Train Station
+            </h2>
+            <span class="toggle-icon">▸</span>
           </div>
-        </div>
-      </section>
+          <div class="collapsible-content">
+            <div class="station-desc">
+              <div data-i18n="stopTrainDesc">
+                南港火車站靠興中路一側上下客點（南港車站東側臨停接送區）。
+              </div>
+              <div data-i18n="stopTrainDesc2">
+                停靠時間：08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10
+              </div>
+            </div>
+            <img src="/images/火車站1.png" class="station-img" alt="南港火車站1"/>
+            <img src="/images/火車站2.png" class="station-img" alt="南港火車站2"/>
+            <div style="margin-top:12px">
+              <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.6109052447401!2d121.60801199999999!3d25.052949!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzEwLjMiTiAxMjHCsDM2JzI4LjAiRQ!5e0!3m2!1szh-TW!2us!4v1762600699115!5m2!1szh-TW!2us"
+                      width="100%" height="380"
+                      style="border:0;border-radius:12px"
+                      loading="lazy"
+                      referrerpolicy="no-referrer-when-downgrade"
+                      allowfullscreen></iframe>
+            </div>
+          </div>
+        </section>
 
+        <!-- 第五區：LaLaport（可收合，預設收起） -->
+        <section class="card collapsible" id="stopLala">
+          <div class="collapsible-header" onclick="toggleCollapse('stopLala')">
+            <h2 data-i18n="stopLalaTitle">
+              南港 LaLaport Shopping Park
+            </h2>
+            <span class="toggle-icon">▸</span>
+          </div>
+          <div class="collapsible-content">
+            <div class="station-desc">
+              <div data-i18n="stopLalaDesc">
+                南港展覽館 1 號出口大客車臨停區 / 小客車臨停區（視車種有不同停靠區）。
+              </div>
+              <div data-i18n="stopLalaDesc2">
+                停靠時間：12:15 / 14:45 / 17:20 / 18:50 / 21:15
+              </div>
+            </div>
+            <img src="/images/lala1.png" class="station-img" alt="LaLaport1"/>
+            <img src="/images/lala2.png" class="station-img" alt="LaLaport2"/>
+            <div style="margin-top:12px">
+              <iframe src="https://www.google.com/maps/embed?pb=!1m13!1m8!1m3!1d903.5851167154738!2d121.617376!3d25.056447!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zMjXCsDAzJzIyLjciTiAxMjHCsDM3JzAxLjQiRQ!5e0!3m2!1szh-TW!2us!4v1762600680118!5m2!1szh-TW!2us"
+                      width="100%" height="380"
+                      style="border:0;border-radius:12px"
+                      loading="lazy"
+                      referrerpolicy="no-referrer-when-downgrade"
+                      allowfullscreen></iframe>
+            </div>
+          </div>
+        </section>
 
-      <!-- 查詢班次 - 即時位置（保留區塊 @ 停靠站點頁） -->
-      <section id="realtimeSection" class="card wizard-fixed station-page" data-feature="liveLocation" style="display:none">
-        <h2 data-i18n="realtimeTitle">即時位置</h2>
-        <div id="realtimeMount" class="realtime-box" aria-live="polite"></div>
-      </section>
-
+        <!-- 查詢班次 - 即時位置（保留區塊 @ 停靠站點頁） -->
+        <!-- ✅ 這裡就不要再 wizard-fixed 了，避免巢狀寬度怪怪的 -->
+        <section id="realtimeSection" class="card" data-feature="liveLocation" style="display:none">
+          <h2 data-i18n="realtimeTitle">即時位置</h2>
+          <div id="realtimeMount" class="realtime-box" aria-live="polite"></div>
+        </section>
+      </div>
     </div>
   </main>
+
 
   <!-- 底部 -->
   <footer class="footer">
