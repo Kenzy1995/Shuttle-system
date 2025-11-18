@@ -96,16 +96,6 @@ function showPage(id) {
   if (id === "station") {
     renderLiveLocationPlaceholder();
   }
-
-  // ✅ 跑馬燈（只要有載入過設定，就在每次切頁時重新顯示）
-  if (marqueeData.isLoaded && typeof showMarquee === "function") {
-    try {
-      showMarquee();
-    } catch (e) {
-      console.warn("showMarquee 發生錯誤，已略過：", e);
-    }
-  }
-
   handleScroll();
 }
 
@@ -134,11 +124,19 @@ function shake(el) {
 
 // 關閉跑馬燈：只在本次畫面隱藏（不寫入 storage）
 function closeMarquee() {
-  marqueeClosed = true;  // ✅ 標記為已關閉
-  const marqueeContainer = document.getElementById("marqueeContainer");
-  if (marqueeContainer) {
-    marqueeContainer.style.display = "none";
+  const bar = document.getElementById('marqueeContainer');
+  if (bar) {
+    bar.style.display = 'none';
   }
+
+  // 跑馬燈沒了，讓 navbar 貼到最上方
+  const nav = document.querySelector('.navbar');
+  if (nav) {
+    nav.style.top = '0';
+  }
+
+  // 也把 body 的 padding-top 拿掉，避免上面空一條
+  document.body.style.paddingTop = '0';
 }
 
 function toggleCollapse(id) {
