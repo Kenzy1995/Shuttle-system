@@ -1650,7 +1650,7 @@ async function openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax 
     showCheckDateStep();
   };
 
-  holder.querySelector("#md_save").onclick = async () => {
+
   holder.querySelector("#md_save").onclick = async () => {
     // 1️⃣ 讀取畫面上的修改值
     const passengers = Number(holder.querySelector("#md_pax").value || "1");
