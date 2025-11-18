@@ -17,17 +17,14 @@ import gspread
 import google.auth
 import hashlib
 import smtplib
-import ssl
 from email.mime.multipart import MIMEMultipart
-from email.mime_text import MIMEText
+from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 
-# SMTP 設定（從環境變數讀取，在 Cloud Run 由 --set-env-vars 設定）
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER = os.environ.get("SMTP_USER", EMAIL_FROM_ADDR)
-SMTP_PASS = os.environ.get("SMTP_PASS")
+# Email settings
+EMAIL_FROM_NAME = "汐止福泰大飯店"
+EMAIL_FROM_ADDR = "fortehotels.shuttle@gmail.com"
 
 # ========== 日誌設定 ==========
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -37,7 +34,6 @@ log = logging.getLogger("booking-manager")
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
-    "https://www.googleapis.com/auth/gmail.send",
 ]
 
 # Spreadsheet identifiers
@@ -47,10 +43,6 @@ SHEET_NAME_CAP  = "可預約班次(web)"     # 剩餘可預約名額（權威來
 
 # Base URL for generating QR code images
 BASE_URL = "https://booking-manager-995728097341.asia-east1.run.app"
-
-# Email settings
-EMAIL_FROM_NAME = "汐止福泰大飯店櫃檯"
-EMAIL_FROM_ADDR = "fortehotels.shuttle@gmail.com"
 
 # 表頭列開始索引（1-based indexing）
 HEADER_ROW_MAIN = 2
