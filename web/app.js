@@ -1651,10 +1651,13 @@ async function openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax 
   };
 
   holder.querySelector("#md_save").onclick = async () => {
+  holder.querySelector("#md_save").onclick = async () => {
+    // 1️⃣ 讀取畫面上的修改值
     const passengers = Number(holder.querySelector("#md_pax").value || "1");
     const newPhone = (holder.querySelector("#md_phone").value || "").trim();
     const newEmail = (holder.querySelector("#md_email").value || "").trim();
 
+    // 2️⃣ 前端格式驗證
     if (!phoneRegex.test(newPhone)) {
       showErrorCard(t("errPhone"));
       return;
@@ -1666,6 +1669,7 @@ async function openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax 
 
     try {
       showVerifyLoading(true);
+      // 避免重複送出，先把編輯面板收起來
       holder.style.display = "none";
 
       const payload = {
@@ -1683,6 +1687,7 @@ async function openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax 
         station: mdStation
       };
 
+      // 3️⃣ 呼叫後端做 modify
       const r = await fetch(OPS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1703,6 +1708,7 @@ async function openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax 
         backendMsg === "capacity_not_found" ||
         String(backendMsg || "").includes("capacity_not_found");
 
+      // 4️⃣ HTTP 錯誤
       if (!r.ok) {
         if (isCapacityError) {
           showErrorCard(t("overPaxOrMissing"));
@@ -1713,6 +1719,7 @@ async function openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax 
         return;
       }
 
+      // 5️⃣ 回傳內容錯誤
       if (!j || j.status !== "success") {
         if (isCapacityError) {
           showErrorCard(t("overPaxOrMissing"));
@@ -1725,7 +1732,7 @@ async function openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax 
         return;
       }
 
-      // ✅ 修改成功：先重新查詢並更新列表，再跑成功動畫
+      // 6️⃣ ✅ 修改成功：先重新查詢並更新列表
       const id = (document.getElementById("qBookId").value || "").trim();
       const phoneInput =
         (document.getElementById("qPhone").value || "").trim();
@@ -1751,7 +1758,7 @@ async function openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax 
         showCheckDateStep();
       }
 
-      // 列表更新後再顯示成功動畫
+      // 7️⃣ 列表更新後再顯示成功動畫 ✅（你要的流程）
       showSuccessAnimation();
     } catch (e) {
       showErrorCard(t("updateFailedPrefix") + (e?.message || ""));
@@ -1760,6 +1767,7 @@ async function openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax 
       showVerifyLoading(false);
     }
   };
+
 
   buildDateOptions();
   window.scrollTo({ top: 0, behavior: "smooth" });
