@@ -1,35 +1,4 @@
 from __future__ import annotations
-"""
-Booking management service for the hotel shuttle system.
-
-This module defines a FastAPI application that handles all booking operations
-including booking creation, querying existing bookings, modification, cancellation,
-check‑in and email notifications.  It persists data to a Google Sheet named
-``預約審核(櫃台)`` and uses another sheet ``可預約班次(web)`` to determine
-available capacity per trip.
-
-Key improvements over the upstream version:
-
-* When querying bookings, the service now always derives the ``日期`` (date)
-  and ``班次`` (time) fields from the unified ``車次‑日期時間`` column.  This
-  ensures that all downstream consumers interpret the trip schedule from a
-  single source of truth.  If for some reason ``車次‑日期時間`` is missing or
-  malformed, the service gracefully falls back to the original ``日期`` and
-  ``班次`` columns.
-
-* The modification workflow also uses the ``車次‑日期時間`` column to derive
-  the existing time component instead of relying on the legacy ``班次`` or
-  ``車次`` fields.  This unifies how times are stored and interpreted.
-
-* Extensive inline comments explain the purpose of each helper and critical
-  sections of the code.  Variable names have been harmonised to improve
-  readability and reduce accidental misuse of similar concepts (e.g. ``車次``
-  vs. ``車次‑日期時間``).
-
-The rest of the service behaviour remains compatible with the existing front‑end
-and spreadsheet structure.
-"""
-
 import io
 import os
 import re
@@ -47,16 +16,12 @@ from pydantic import BaseModel, Field, validator
 import gspread
 import google.auth
 import hashlib
-
+import smtplib
 from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+from email.mime_text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
-try:
-    from googleapiclient.discovery import build  # type: ignore
-    _GMAIL_AVAILABLE = True
-except Exception:
-    _GMAIL_AVAILABLE = False
+
 
 # ========== 日誌設定 ==========
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -397,30 +362,54 @@ class OpsRequest(BaseModel):
     action: str
     data: Dict[str, Any]
 
-# ========== Gmail ==========
-def _gmail_service():
-    if not _GMAIL_AVAILABLE:
-        raise RuntimeError("Gmail API 模組不可用（缺少 googleapiclient）")
-    credentials, _ = google.auth.default(scopes=SCOPES)
-    return build("gmail", "v1", credentials=credentials)
+# ========== Email (SMTP via Gmail App Password) ==========
+def _send_email_gmail(
+    to_email: str,
+    subject: str,
+    html_body: str,
+    attachment: Optional[bytes] = None,
+    attachment_filename: str = "ticket.png",
+):
+    """
+    使用 SMTP + Gmail App Password 寄信。
+    會讀取環境變數：
+      - SMTP_HOST（預設 smtp.gmail.com）
+      - SMTP_PORT（預設 587）
+      - SMTP_USER（登入帳號，通常就是寄件 Gmail）
+      - SMTP_PASS（App Password 16 碼）
+    """
+    host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    port = int(os.getenv("SMTP_PORT", "587"))
+    user = os.getenv("SMTP_USER") or EMAIL_FROM_ADDR
+    password = os.getenv("SMTP_PASS")
 
-def _send_email_gmail(to_email: str, subject: str, html_body: str, attachment: Optional[bytes] = None, attachment_filename: str = "ticket.png"):
-    if not _GMAIL_AVAILABLE:
-        raise RuntimeError("Gmail API 未安裝，無法寄信")
+    if not password:
+        raise RuntimeError("SMTP_PASS 未設定，無法寄信")
+
     msg = MIMEMultipart()
     msg["To"] = to_email
     msg["From"] = f"{EMAIL_FROM_NAME} <{EMAIL_FROM_ADDR}>"
     msg["Subject"] = subject
     msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    # 附件（例如票券 PNG）
     if attachment:
         part = MIMEBase("application", "octet-stream")
         part.set_payload(attachment)
         encoders.encode_base64(part)
-        part.add_header("Content-Disposition", f'attachment; filename="{attachment_filename}"')
+        part.add_header(
+            "Content-Disposition",
+            f'attachment; filename="{attachment_filename}"',
+        )
         msg.attach(part)
-    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
-    svc = _gmail_service()
-    svc.users().messages().send(userId="me", body={"raw": raw}).execute()
+
+    # 連線 SMTP 寄信
+    with smtplib.SMTP(host, port) as server:
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+        server.login(user, password)
+        server.sendmail(EMAIL_FROM_ADDR, [to_email], msg.as_string())
 
 def _compose_mail_html(info: Dict[str, str], lang: str, kind: str) -> Tuple[str, str]:
     subjects = {
