@@ -100,17 +100,22 @@
       animation-play-state: paused;
     }
     /* 圖片展示區 */
+
     .image-gallery {
       display: flex;
-      flex-direction: column; /* ✅ 垂直排列 */
+      flex-direction: column;   /* 垂直排列 */
       gap: 16px;
       margin-top: 20px;
     }
 
     .gallery-image {
       width: 100%;
-      height: auto;  /* 如果不想裁切，用 auto 就好 */
+      height: auto;             /* 不裁切圖片比例 */
+      border-radius: 12px;      /* ✅ 跟原本一樣導圓角 */
+      box-shadow: var(--shadow);/* ✅ 保留原本的陰影效果 */
+      display: block;           /* 保險一點，避免有奇怪空隙 */
     }
+
 
 
     .navbar{
