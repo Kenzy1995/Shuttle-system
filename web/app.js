@@ -1344,11 +1344,23 @@ function buildDateListFromResults(rows) {
     return;
   }
 
+  // ✅ 用多語系的文字組「(有：2 筆預約)」
+  const statusTexts = I18N_STATUS[currentLang] || I18N_STATUS.zh;
+  const prefix = statusTexts.dateCountPrefix || "";
+  const suffix = statusTexts.dateCountSuffix || "";
+
   queryDateList.forEach(([date, count]) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "opt-btn";
-    btn.innerHTML = `${date} <span style="color:#777;font-size:13px">(有：${count} 筆預約)</span>`;
+
+    btn.innerHTML = `
+      ${date}
+      <span style="color:#777;font-size:13px">
+        (${prefix}${count}${suffix})
+      </span>
+    `;
+
     btn.onclick = () => openTicketsForDate(date);
     wrap.appendChild(btn);
   });
