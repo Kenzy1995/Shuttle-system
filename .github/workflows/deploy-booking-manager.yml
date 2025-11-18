@@ -52,7 +52,7 @@ jobs:
           --memory=2Gi \
           --cpu=2 \
           --max-instances=10 \
-          --timeout=300s
+          --timeout=300s \
           --set-env-vars SMTP_HOST=smtp.gmail.com,SMTP_PORT=587 \
           --set-env-vars SMTP_USER=${{ secrets.SMTP_USER }},SMTP_PASS=${{ secrets.SMTP_PASS }}
 
