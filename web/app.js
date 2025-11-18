@@ -387,6 +387,16 @@ function validateRoom(input) {
   }
 }
 
+/* ======站點排序邏輯 ====== */
+function getStationPriority(name) {
+  const s = String(name || "");
+
+  if (s.includes("捷運") || s.includes("MRT")) return 1;          // 捷運站
+  if (s.includes("火車") || s.toLowerCase().includes("train")) return 2; // 火車站
+  if (s.toLowerCase().includes("lalaport")) return 3;             // LaLaport
+  return 99; // 
+}
+
 /* ====== 初始化/頁面 ====== */
 function startBooking() {
   const hero = document.getElementById("homeHero");
@@ -1928,7 +1938,22 @@ function renderFilterPills(containerId, items, selectedItem, onClick) {
   const container = document.getElementById(containerId);
   if (!container) return;
   container.innerHTML = "";
-  items.sort().forEach((item) => {
+
+  // ✅ 站點用自訂排序：捷運 > 火車 > LALA
+  if (containerId === "stationFilter") {
+    items.sort((a, b) => {
+      const pa = getStationPriority(a);
+      const pb = getStationPriority(b);
+      if (pa !== pb) return pa - pb;
+      // 同一類型時，用字典序當次排序（避免順序亂跳）
+      return String(a).localeCompare(String(b), "zh-Hant");
+    });
+  } else {
+    // 其他（方向、日期）維持原本字串排序
+    items.sort();
+  }
+
+  items.forEach((item) => {
     const pill = document.createElement("button");
     pill.type = "button";
     pill.className = "filter-pill" + (selectedItem === item ? " active" : "");
