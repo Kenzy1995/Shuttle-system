@@ -20,37 +20,45 @@
       --red:#b00020;
       --gray:#9e9e9e;
     }
+
     *{box-sizing:border-box}
-    html,body{height:100%}
-    html,body{
+    html, body { height:100%; }
+    html, body {
       margin:0;
       background:var(--bg);
       color:var(--text);
       font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",Segoe UI,Roboto,Arial,sans-serif;
       min-height:100vh;
       -webkit-text-size-adjust:100%;
-      display:flex;flex-direction:column;
     }
-    img, iframe{max-width:100%;}
-    a{color:inherit; text-decoration:none}
+
+    /* 只讓 body 做 flex 排版，並預留跑馬燈高度 52px */
+    body {
+      display:flex;
+      flex-direction:column;
+      padding-top:52px;  /* 跟 .marquee-container 的 height 一樣 */
+    }
 
     /* 跑馬燈 */
     .marquee-container {
-      position: relative;
-      /* 使用主題色 A98570，20% 透明 */
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 60;
+      /* 主題色 #A98570，20% 透明 */
       background: rgba(169, 133, 112, 0.2);
       color: #fff;
-      padding: 0 48px 0 18px; /* 右側多一點空間給關閉按鈕 */
-      margin: 8px 16px 16px;  /* 上下留一點距離，左右微縮，視覺更集中 */
-      border-radius: 10px;
+      display: flex;              /* 讓文字和 X 同一行 */
+      align-items: center;
+      padding: 0 48px 0 18px;     /* 右邊留空給關閉按鈕 */
+      height: 52px;               /* 高一點 */
+      font-size: 15px;            /* 字大一點 */
+      line-height: 1.4;
       overflow: hidden;
-      display: none;
-      height: 52px;           /* 高度加大 */
-      line-height: 52px;      /* 讓文字垂直置中 */
-      font-size: 15px;        /* 字體加大 */
     }
     
-    /* 關閉按鈕 */
+    /* 關閉按鈕（右上角的 ✕） */
     .marquee-close {
       position: absolute;
       right: 8px;
@@ -69,12 +77,13 @@
       z-index: 10;
     }
 
+    /* 跑馬文字本體 */
     .marquee-content {
       white-space: nowrap;
       display: inline-block;
-      padding-left: 100%; /* 從容器右側開始 */
+      padding-left: 100%; /* 從容器右側開始滾動 */
       animation: marquee 30s linear infinite;
-      font-size: 15px;      /* 跟容器字體一致 */
+      font-size: 15px;
       font-weight: 500;
     }
 
@@ -107,6 +116,7 @@
 
     .navbar{
       position:sticky;top:0;z-index:50;
+      top:52px;               /* 讓 navbar 永遠在跑馬燈下面 */
       display:flex;align-items:center;
       padding:12px 16px;background:var(--card);box-shadow:0 1px 4px rgba(0,0,0,.06)
     }
