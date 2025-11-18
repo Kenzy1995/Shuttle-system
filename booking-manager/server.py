@@ -17,11 +17,17 @@ import gspread
 import google.auth
 import hashlib
 import smtplib
+import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime_text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 
+# SMTP 設定（從環境變數讀取，在 Cloud Run 由 --set-env-vars 設定）
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", EMAIL_FROM_ADDR)
+SMTP_PASS = os.environ.get("SMTP_PASS")
 
 # ========== 日誌設定 ==========
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
