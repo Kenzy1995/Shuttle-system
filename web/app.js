@@ -1918,36 +1918,33 @@ function renderFilterPills(containerId, items, selectedItem, onClick) {
 }
 
 function renderScheduleResults() {
-  const container = document.getElementById("scheduleResults");
+  const container = document.getElementById('scheduleResults');
   if (!container) return;
 
-  const filtered = scheduleData.rows.filter((row) => {
-    if (
-      scheduleData.selectedDirection &&
-      row.direction !== scheduleData.selectedDirection
-    )
-      return false;
-    if (scheduleData.selectedDate && row.date !== scheduleData.selectedDate)
-      return false;
-    if (
-      scheduleData.selectedStation &&
-      row.station !== scheduleData.selectedStation
-    )
-      return false;
+  const filtered = scheduleData.rows.filter(row => {
+    if (scheduleData.selectedDirection && row.direction !== scheduleData.selectedDirection) return false;
+    if (scheduleData.selectedDate && row.date !== scheduleData.selectedDate) return false;
+    if (scheduleData.selectedStation && row.station !== scheduleData.selectedStation) return false;
     return true;
   });
 
   if (filtered.length === 0) {
-    container.innerHTML = `<div class="empty-state">${t("noSchedules")}</div>`;
+    container.innerHTML = `<div class="empty-state">${t('noSchedules')}</div>`;
     return;
   }
 
-  container.innerHTML = filtered
-    .map(
-      (row) => `
+  const texts = TEXTS[currentLang] || TEXTS.zh;
+
+  function translateDirection(direction) {
+    if (direction === '去程') return texts.dirOutLabel || direction;
+    if (direction === '回程') return texts.dirInLabel || direction;
+    return direction;
+  }
+
+  container.innerHTML = filtered.map(row => `
     <div class="schedule-card">
       <div class="schedule-line">
-        <span class="schedule-direction">${sanitize(row.direction)}</span>
+        <span class="schedule-direction">${sanitize(translateDirection(row.direction))}</span>
         <span class="schedule-date">${sanitize(row.date)}</span>
         <span class="schedule-time">${sanitize(row.time)}</span>
       </div>
@@ -1956,10 +1953,9 @@ function renderScheduleResults() {
         <span class="schedule-capacity">${sanitize(row.capacity)}</span>
       </div>
     </div>
-  `
-    )
-    .join("");
+  `).join('');
 }
+
 
 /* ====== 系統設定載入（跑馬燈 + 圖片牆） ====== */
 async function loadSystemConfig() {
