@@ -1963,6 +1963,7 @@ function renderScheduleResults() {
   }
 
   const texts = TEXTS[currentLang] || TEXTS.zh;
+  const capLabel = t("scheduleCapacityLabel");        // ✅ 這裡拿多語系字
 
   function translateDirection(direction) {
     if (direction === '去程') return texts.dirOutLabel || direction;
@@ -1970,20 +1971,27 @@ function renderScheduleResults() {
     return direction;
   }
 
-  container.innerHTML = filtered.map(row => `
-    <div class="schedule-card">
-      <div class="schedule-line">
-        <span class="schedule-direction">${sanitize(translateDirection(row.direction))}</span>
-        <span class="schedule-date">${sanitize(row.date)}</span>
-        <span class="schedule-time">${sanitize(row.time)}</span>
+  container.innerHTML = filtered.map(row => {
+    // 只抓數字，例如「可預約 / Available：7」→ "7"
+    const digits = onlyDigits(row.capacity);
+    const capNumber = digits || row.capacity; // 如果沒有數字就 fallback 原字串
+
+    return `
+      <div class="schedule-card">
+        <div class="schedule-line">
+          <span class="schedule-direction">${sanitize(translateDirection(row.direction))}</span>
+          <span class="schedule-date">${sanitize(row.date)}</span>
+          <span class="schedule-time">${sanitize(row.time)}</span>
+        </div>
+        <div class="schedule-line">
+          <span class="schedule-station">${sanitize(row.station)}</span>
+          <span class="schedule-capacity">${sanitize(capLabel)}：${sanitize(capNumber)}</span>
+        </div>
       </div>
-      <div class="schedule-line">
-        <span class="schedule-station">${sanitize(row.station)}</span>
-        <span class="schedule-capacity">${sanitize(row.capacity)}</span>
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
+
 
 
 /* ====== 系統設定載入（跑馬燈 + 圖片牆） ====== */
