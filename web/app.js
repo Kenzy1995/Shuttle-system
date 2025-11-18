@@ -20,6 +20,7 @@ let marqueeData = {
   text: "",
   isLoaded: false
 };
+let marqueeClosed = false;
 
 // 查詢分頁狀態
 let queryDateList = [];
@@ -133,6 +134,7 @@ function shake(el) {
 
 // 關閉跑馬燈：只在本次畫面隱藏（不寫入 storage）
 function closeMarquee() {
+  marqueeClosed = true;  // ✅ 標記為已關閉
   const marqueeContainer = document.getElementById("marqueeContainer");
   if (marqueeContainer) {
     marqueeContainer.style.display = "none";
@@ -164,20 +166,25 @@ function hardResetOverlays() {
 
 /* ====== 跑馬燈 ====== */
 function showMarquee() {
+  if (marqueeClosed) {
+    const marqueeContainer = document.getElementById("marqueeContainer");
+    if (marqueeContainer) {
+      marqueeContainer.style.display = "none";
+    }
+    return;
+  }
+
   const marqueeContainer = document.getElementById("marqueeContainer");
   const marqueeContent = document.getElementById("marqueeContent");
   if (!marqueeContainer || !marqueeContent) return;
 
   if (!marqueeData.text) {
-    // 沒有文案就隱藏
     marqueeContainer.style.display = "none";
     return;
   }
 
   marqueeContent.textContent = marqueeData.text;
-  // ★ 這裡強制改成 block，避免一直卡在 display:none
   marqueeContainer.style.display = "block";
-
   restartMarqueeAnimation();
 }
 
@@ -562,9 +569,24 @@ function toStep4() {
 
     if (avail <= 0) {
       btn.classList.add("disabled");
-      btn.innerHTML = `<span style="color:#999;font-weight:700">${time}</span> <span style="color:#999;font-size:13px">(已額滿)</span>`;
+      // 「已額滿」如果之後也要多語系，可以另外在 TEXTS 加一個 key
+      btn.innerHTML = `
+        <span style="color:#999;font-weight:700">${time}</span>
+        <span style="color:#999;font-size:13px">(已額滿)</span>
+      `;
     } else {
-      btn.innerHTML = `<span style="color:var(--primary);font-weight:700">${time}</span> <span style="color:#777;font-size:13px">(可預約：${avail} 人)</span>`;
+      const texts = TEXTS[currentLang] || TEXTS.zh;
+      const prefix = texts.paxHintPrefix || "";
+      const suffix = texts.paxHintSuffix || "";
+
+      // 這樣不同語系就會自動換字
+      const paxText = `${prefix}${avail}${suffix}`;
+
+      btn.innerHTML = `
+        <span style="color:var(--primary);font-weight:700">${time}</span>
+        <span style="color:#777;font-size:13px">(${paxText})</span>
+      `;
+
       btn.onclick = () => {
         selectedScheduleTime = time;
         selectedAvailableSeats = avail;
@@ -575,6 +597,7 @@ function toStep4() {
         toStep5();
       };
     }
+
     list.appendChild(btn);
   });
   goStep(4);
