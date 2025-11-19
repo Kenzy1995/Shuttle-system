@@ -302,6 +302,30 @@ function fmtTimeLabel(v) {
   return s.slice(0, 5);
 }
 
+function formatTicketHeader(dateStr, timeStr) {
+  // 先把日期轉成 ISO：2025-11-19
+  const iso = fmtDateLabel(dateStr);
+  if (!iso) {
+    // 萬一解析不到，就退回原始字串組合
+    return `${dateStr || ""} ${timeStr || ""}`.trim();
+  }
+
+  let y, m, d;
+  // iso 形態應該是 2025-11-19
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    [y, m, d] = iso.split("-");
+  } else if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(iso)) {
+    [y, m, d] = iso.split("/");
+  } else {
+    return `${dateStr || ""} ${timeStr || ""}`.trim();
+  }
+
+  const datePart = `${y}/${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}`;
+  const timePart = fmtTimeLabel(timeStr || "");
+  return `${datePart} ${timePart}`.trim();
+}
+
+
 function todayISO() {
   const now = new Date();
   const y = now.getFullYear();
