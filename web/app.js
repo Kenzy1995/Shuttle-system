@@ -948,8 +948,19 @@ function mountTicketAndShow(ticket) {
   const bookingIdEl = document.getElementById("ticketBookingId");
   if (bookingIdEl) bookingIdEl.textContent = ticket.bookingId || "";
 
-  const scheduleEl = document.getElementById("ticketSchedule");
-  if (scheduleEl) scheduleEl.textContent = ticket.time || "";
+  // 設定票卡標題：改成 「YYYY/MM/DD HH:MM」
+  const titleEl = document.getElementById("ticketTitleText");
+  if (titleEl) {
+    const dateStr = (ticket.date || "").replace(/-/g, "/"); // 2025-11-19 -> 2025/11/19
+    const timeStr = ticket.time || "";
+    if (dateStr && timeStr) {
+      titleEl.textContent = `${dateStr} ${timeStr}`;
+    } else {
+      // 萬一缺其中一個，就顯示現有的，不要空白
+      titleEl.textContent = dateStr || timeStr || titleEl.textContent;
+    }
+  }
+
 
   const directionEl = document.getElementById("ticketDirection");
   if (directionEl) directionEl.textContent = ticket.direction || "";
