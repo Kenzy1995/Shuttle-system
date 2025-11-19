@@ -573,12 +573,13 @@
       <div id="ticketCard" class="ticket-card">
         <div class="status-pill status-booked" id="successStatusPill">✔️ 已預約</div>
         <button class="ticket-close" onclick="closeTicketToHome()" aria-label="close">✕</button>
-        <div class="ticket-header"><h2 data-i18n="ticketTitle">接駁車票</h2></div>
+        <div class="ticket-header">
+          <h2 id="ticketTitleText" data-i18n="ticketTitle">接駁車票</h2>
+        </div>
         <div class="ticket-content">
           <div class="ticket-qr"><img id="ticketQrImg" src="" alt="QR Code"/></div>
           <div class="ticket-info">
             <div class="ticket-field"><span class="ticket-label" data-i18n="labelBookingId">預約編號</span><span class="ticket-value" id="ticketBookingId"></span></div>
-            <div class="ticket-field"><span class="ticket-label" data-i18n="labelScheduleDate">班次</span><span class="ticket-value" id="ticketSchedule"></span></div>
             <div class="ticket-field"><span class="ticket-label" data-i18n="labelDirection">方向</span><span class="ticket-value" id="ticketDirection"></span></div>
             <div class="ticket-field"><span class="ticket-label" data-i18n="labelPick">上車地點</span><span class="ticket-value" id="ticketPick"></span></div>
             <div class="ticket-field"><span class="ticket-label" data-i18n="labelDrop">下車地點</span><span class="ticket-value" id="ticketDrop"></span></div>
