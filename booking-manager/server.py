@@ -301,153 +301,261 @@ def lookup_capacity(direction: str, date_iso: str, time_hm: str, station: str) -
             return avail
     raise HTTPException(409, "capacity_not_found")
 
-# ========== 改良的車票生成功能 ==========
-def generate_ticket_image(booking_info: Dict[str, Any], qr_content: str, lang: str = "zh") -> str:
-    """生成符合前端樣式的車票圖片"""
-    try:
-        # 創建圖片 - 調整尺寸以符合設計
-        width, height = 400, 600
-        image = Image.new('RGB', (width, height), '#FFFFFF')
-        draw = ImageDraw.Draw(image)
-        
-        # 顏色定義
-        primary_color = '#2c5aa0'
-        secondary_color = '#666666'
-        background_color = '#f8f9fa'
-        
-        # 嘗試加載字體
+# ========== 簡化的 Email 功能 ==========
+def _send_email_gmail(
+    to_email: str,
+    subject: str,
+    text_body: str,
+    attachment: Optional[bytes] = None,
+    attachment_filename: str = "ticket.png",
+):
+    """使用 SMTP 寄信 - 簡化版"""
+    host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    port = int(os.getenv("SMTP_PORT", "587"))
+    user = os.getenv("SMTP_USER") or EMAIL_FROM_ADDR
+    password = os.getenv("SMTP_PASS")
+
+    if not password:
+        raise RuntimeError("SMTP_PASS 未設定，無法寄信")
+
+    msg = MIMEMultipart()
+    msg["To"] = to_email
+    msg["From"] = f"{EMAIL_FROM_NAME} <{EMAIL_FROM_ADDR}>"
+    msg["Subject"] = subject
+    
+    # 純文字內容
+    msg.attach(MIMEText(text_body, "plain", "utf-8"))
+
+    # 附件
+    if attachment:
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(attachment)
+        encoders.encode_base64(part)
+        part.add_header(
+            "Content-Disposition",
+            f'attachment; filename="{attachment_filename}"',
+        )
+        msg.attach(part)
+
+    # 連線 SMTP 寄信
+    with smtplib.SMTP(host, port) as server:
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+        server.login(user, password)
+        server.sendmail(EMAIL_FROM_ADDR, [to_email], msg.as_string())
+
+def _compose_mail_text(info: Dict[str, str], lang: str, kind: str) -> Tuple[str, str]:
+    """組合純文字郵件內容"""
+    
+    subjects = {
+        "book": {
+            "zh": "汐止福泰大飯店接駁車預約確認",
+            "en": "Forte Hotel Xizhi Shuttle Reservation Confirmation",
+        },
+        "modify": {
+            "zh": "汐止福泰大飯店接駁車預約變更確認",
+            "en": "Forte Hotel Xizhi Shuttle Reservation Updated",
+        },
+        "cancel": {
+            "zh": "汐止福泰大飯店接駁車預約已取消",
+            "en": "Forte Hotel Xizhi Shuttle Reservation Canceled",
+        },
+    }
+    
+    # 選擇標題
+    subject = subjects[kind].get(lang, subjects[kind]["zh"])
+    
+    # 根據語言生成內容
+    if lang == "en":
+        text_body = f"""
+Forte Hotel Xizhi Shuttle Reservation
+
+Dear {info.get('name','')},
+
+Your shuttle reservation details:
+
+**Reservation Number:** {info.get('booking_id','')}
+**Reservation Time:** {info.get('date','')} {info.get('time','')} (GMT+8)
+**Number of Guests:** {info.get('pax','')}
+**Direction:** {info.get('direction','')}
+**Pickup Location:** {info.get('pick','')}
+**Dropoff Location:** {info.get('drop','')}
+**Phone:** {info.get('phone','')}
+**Email:** {info.get('email','')}
+
+Please present the attached QR code ticket for boarding.
+
+If you have any questions, please call (02-2691-9222 #1)
+
+Best regards,
+Forte Hotel Xizhi
+"""
+    elif lang == "ja":
+        text_body = f"""
+汐止フルオンホテル シャトル予約
+
+{info.get('name','')} 様
+
+シャトル予約の詳細は以下の通りです。
+
+**予約番号：** {info.get('booking_id','')}
+**便：** {info.get('date','')} {info.get('time','')} (GMT+8)
+**人数：** {info.get('pax','')}
+**方向：** {info.get('direction','')}
+**乗車：** {info.get('pick','')}
+**降車：** {info.get('drop','')}
+**電話：** {info.get('phone','')}
+**メール：** {info.get('email','')}
+
+添付のQRコードチケットを提示して乗車してください。
+
+ご質問があれば、(02-2691-9222 #1) までお電話ください。
+
+汐止フルオンホテル
+"""
+    elif lang == "ko":
+        text_body = f"""
+포르테 호텔 시즈 셔틀 예약
+
+{info.get('name','')} 고객님,
+
+셔틀 예약 내역은 아래와 같습니다.
+
+**예약번호:** {info.get('booking_id','')}
+**시간:** {info.get('date','')} {info.get('time','')} (GMT+8)
+**인원:** {info.get('pax','')}
+**방향:** {info.get('direction','')}
+**승차:** {info.get('pick','')}
+**하차:** {info.get('drop','')}
+**전화:** {info.get('phone','')}
+**이메일:** {info.get('email','')}
+
+첨부된 QR 코드 티켓을 제시하고 탑승하세요.
+
+문의사항이 있으면 (02-2691-9222 #1) 로 전화주세요.
+
+포르테 호텔 시즈
+"""
+    else:  # 預設中文
+        text_body = f"""
+汐止福泰大飯店接駁車預約
+
+尊敬的 {info.get('name','')} 貴賓，您好！
+
+您的接駁車預約資訊：
+
+**預約編號：** {info.get('booking_id','')}
+**預約班次：** {info.get('date','')} {info.get('time','')} (GMT+8)
+**預約人數：** {info.get('pax','')}
+**往返方向：** {info.get('direction','')}
+**上車站點：** {info.get('pick','')}
+**下車站點：** {info.get('drop','')}
+**手機：** {info.get('phone','')}
+**信箱：** {info.get('email','')}
+
+請出示附件中的 QR Code 車票乘車。
+
+如有任何問題，請致電 (02-2691-9222 #1)
+
+汐止福泰大飯店 敬上
+"""
+    
+    return subject, text_body
+
+# ========== 改良的非同步處理 ==========
+def _async_process_mail(
+    kind: str,  # "book" / "modify" / "cancel"
+    booking_id: str,
+    booking_data: Dict[str, Any],
+    qr_content: Optional[str],
+    lang: str = "zh",
+):
+    """統一的背景寄信流程 - 簡化版"""
+    def _process():
         try:
-            title_font = ImageFont.truetype("arial.ttf", 20)
-            header_font = ImageFont.truetype("arial.ttf", 16)
-            normal_font = ImageFont.truetype("arial.ttf", 14)
-            small_font = ImageFont.truetype("arial.ttf", 12)
-        except:
-            title_font = ImageFont.load_default()
-            header_font = ImageFont.load_default()
-            normal_font = ImageFont.load_default()
-            small_font = ImageFont.load_default()
-        
-        # 標題區域
-        draw.rectangle([0, 0, width, 60], fill=primary_color)
-        
-        # 標題文字
-        title_text = "汐止福泰大飯店接駁車票"
-        if lang == "en":
-            title_text = "Forte Hotel Xizhi Shuttle Ticket"
-        elif lang == "ja":
-            title_text = "汐止フォルテホテル シャトルチケット"
-        elif lang == "ko":
-            title_text = "포르테 호텔 시즈 셔틀 티켓"
-            
-        draw.text((width//2, 30), title_text, fill='white', font=title_font, anchor="mm")
-        
-        # 基本信息區域
-        y_pos = 80
-        
-        # 預約時間
-        time_text = f"{booking_info.get('date', '')} {booking_info.get('time', '')}"
-        draw.text((20, y_pos), "預約時間", fill=secondary_color, font=small_font)
-        draw.text((20, y_pos + 20), time_text, fill='black', font=normal_font)
-        y_pos += 50
-        
-        # 預約編號
-        draw.text((20, y_pos), "預約編號", fill=secondary_color, font=small_font)
-        draw.text((20, y_pos + 20), booking_info.get('booking_id', ''), fill='black', font=header_font)
-        y_pos += 50
-        
-        # 方向
-        direction_display = "去程 → 飯店" if booking_info.get('direction') == "去程" else "回程 ← 飯店"
-        draw.text((20, y_pos), "方向", fill=secondary_color, font=small_font)
-        draw.text((20, y_pos + 20), direction_display, fill=primary_color, font=normal_font)
-        y_pos += 50
-        
-        # 站點信息
-        pick_text = booking_info.get('pick', '')
-        drop_text = booking_info.get('drop', '')
-        
-        # 上車地點
-        draw.text((20, y_pos), "上車地點", fill=secondary_color, font=small_font)
-        # 處理長文本換行
-        if len(pick_text) > 20:
-            pick_lines = [pick_text[i:i+20] for i in range(0, len(pick_text), 20)]
-            for i, line in enumerate(pick_lines):
-                draw.text((20, y_pos + 20 + i*20), line, fill='black', font=small_font)
-            y_pos += 20 + len(pick_lines)*20
-        else:
-            draw.text((20, y_pos + 20), pick_text, fill='black', font=small_font)
-            y_pos += 50
-        
-        # 下車地點
-        draw.text((20, y_pos), "下車地點", fill=secondary_color, font=small_font)
-        if len(drop_text) > 20:
-            drop_lines = [drop_text[i:i+20] for i in range(0, len(drop_text), 20)]
-            for i, line in enumerate(drop_lines):
-                draw.text((20, y_pos + 20 + i*20), line, fill='black', font=small_font)
-            y_pos += 20 + len(drop_lines)*20
-        else:
-            draw.text((20, y_pos + 20), drop_text, fill='black', font=small_font)
-            y_pos += 50
-        
-        # 乘客信息
-        draw.text((20, y_pos), "姓名", fill=secondary_color, font=small_font)
-        draw.text((20, y_pos + 20), booking_info.get('name', ''), fill='black', font=normal_font)
-        
-        draw.text((200, y_pos), "電話", fill=secondary_color, font=small_font)
-        draw.text((200, y_pos + 20), booking_info.get('phone', ''), fill='black', font=normal_font)
-        y_pos += 50
-        
-        draw.text((20, y_pos), "信箱", fill=secondary_color, font=small_font)
-        email_text = booking_info.get('email', '')
-        if len(email_text) > 25:
-            email_text = email_text[:25] + "..."
-        draw.text((20, y_pos + 20), email_text, fill='black', font=small_font)
-        
-        draw.text((200, y_pos), "人數", fill=secondary_color, font=small_font)
-        draw.text((200, y_pos + 20), f"{booking_info.get('pax', '')} 人", fill='black', font=normal_font)
-        y_pos += 50
-        
-        # 生成QR碼
-        qr_img = qrcode.make(qr_content)
-        qr_size = 120
-        qr_img = qr_img.resize((qr_size, qr_size))
-        
-        # 將QR碼放在右下角
-        qr_x = width - qr_size - 20
-        qr_y = height - qr_size - 20
-        image.paste(qr_img, (qr_x, qr_y))
-        
-        # 底部提示文字
-        footer_text = "請出示此車票乘車"
-        if lang == "en":
-            footer_text = "Please present this ticket for boarding"
-        elif lang == "ja":
-            footer_text = "このチケットを提示して乗車してください"
-        elif lang == "ko":
-            footer_text = "이 티켓을 제시하고 탑승하세요"
-            
-        draw.text((width//2, height - 60), footer_text, fill=primary_color, font=small_font, anchor="mm")
-        
-        # 邊框
-        draw.rectangle([5, 5, width-5, height-5], outline=primary_color, width=2)
-        
-        # 轉換為base64
-        buffer = io.BytesIO()
-        image.save(buffer, format='PNG', quality=95)
-        buffer.seek(0)
-        img_str = base64.b64encode(buffer.getvalue()).decode()
-        
-        return img_str
-        
-    except Exception as e:
-        log.error(f"生成車票圖片失敗: {str(e)}")
-        # 返回一個簡單的錯誤圖片
-        error_img = Image.new('RGB', (300, 100), 'white')
-        draw = ImageDraw.Draw(error_img)
-        draw.text((150, 50), "Ticket Generation Failed", fill='red', anchor="mm")
-        buffer = io.BytesIO()
-        error_img.save(buffer, format='PNG')
-        buffer.seek(0)
-        return base64.b64encode(buffer.getvalue()).decode()
+            ws_main = open_ws(SHEET_NAME_MAIN)
+            hmap = header_map_main(ws_main)
+            headers = _sheet_headers(ws_main, HEADER_ROW_MAIN)
+
+            # 找到對應的行
+            rownos = _find_rows_by_pred(
+                ws_main,
+                headers,
+                HEADER_ROW_MAIN,
+                lambda r: r.get("預約編號") == booking_id,
+            )
+            if not rownos:
+                log.error(f"[mail:{kind}] 找不到預約編號 {booking_id} 對應的行")
+                return
+
+            rowno = rownos[0]
+
+            # 只在 book / modify 生成 QR Code 附件
+            qr_attachment: Optional[bytes] = None
+            if kind in ("book", "modify") and qr_content:
+                try:
+                    # 生成 QR Code 圖片作為附件
+                    qr_img = qrcode.make(qr_content)
+                    buffer = io.BytesIO()
+                    qr_img.save(buffer, format="PNG")
+                    qr_attachment = buffer.getvalue()
+                    log.info(f"[mail:{kind}] 生成 QR Code 附件成功")
+                except Exception as e:
+                    log.error(f"[mail:{kind}] 生成 QR Code 附件失敗: {e}")
+
+            try:
+                # 使用純文字郵件內容
+                subject, text_body = _compose_mail_text(booking_data, lang, kind)
+                _send_email_gmail(
+                    booking_data["email"],
+                    subject,
+                    text_body,
+                    attachment=qr_attachment,
+                    attachment_filename=f"shuttle_ticket_{booking_id}.png" if qr_attachment else None,
+                )
+                mail_status = f"{_tz_now_str()} 寄信成功({kind})"
+                log.info(f"[mail:{kind}] 預約 {booking_id} 寄信成功")
+            except Exception as e:
+                mail_status = f"{_tz_now_str()} 寄信失敗({kind}): {str(e)}"
+                log.error(f"[mail:{kind}] 預約 {booking_id} 寄信失敗: {str(e)}")
+
+            # 更新寄信狀態
+            if "寄信狀態" in hmap:
+                ws_main.update_acell(
+                    gspread.utils.rowcol_to_a1(rowno, hmap["寄信狀態"]),
+                    mail_status,
+                )
+
+        except Exception as e:
+            log.error(f"[mail:{kind}] 非同步處理預約 {booking_id} 時發生錯誤: {str(e)}")
+
+    thread = threading.Thread(target=_process, daemon=True)
+    thread.start()
+
+def async_process_after_booking(
+    booking_id: str,
+    booking_data: Dict[str, Any],
+    qr_content: str,
+    lang: str = "zh",
+):
+    _async_process_mail("book", booking_id, booking_data, qr_content, lang)
+
+def async_process_after_modify(
+    booking_id: str,
+    booking_data: Dict[str, Any],
+    qr_content: Optional[str],
+    lang: str = "zh",
+):
+    _async_process_mail("modify", booking_id, booking_data, qr_content, lang)
+
+def async_process_after_cancel(
+    booking_id: str,
+    booking_data: Dict[str, Any],
+    lang: str = "zh",
+):
+    # cancel 不需要 QR code / 車票
+    _async_process_mail("cancel", booking_id, booking_data, qr_content=None, lang=lang)
 
 # ========== 改良的流程控制 ==========
 class BookingProcessor:
@@ -506,322 +614,6 @@ class BookingProcessor:
         return newrow
 
 booking_processor = BookingProcessor()
-
-# ========== 改良的非同步處理 ==========
-def _async_process_mail(
-    kind: str,  # "book" / "modify" / "cancel"
-    booking_id: str,
-    booking_data: Dict[str, Any],
-    qr_content: Optional[str],
-    lang: str = "zh",
-):
-    """統一的背景寄信流程"""
-    def _process():
-        try:
-            ws_main = open_ws(SHEET_NAME_MAIN)
-            hmap = header_map_main(ws_main)
-            headers = _sheet_headers(ws_main, HEADER_ROW_MAIN)
-
-            # 找到對應的行
-            rownos = _find_rows_by_pred(
-                ws_main,
-                headers,
-                HEADER_ROW_MAIN,
-                lambda r: r.get("預約編號") == booking_id,
-            )
-            if not rownos:
-                log.error(f"[mail:{kind}] 找不到預約編號 {booking_id} 對應的行")
-                return
-
-            rowno = rownos[0]
-
-            # 只在 book / modify 生成車票圖片
-            ticket_base64: Optional[str] = None
-            ticket_bytes: Optional[bytes] = None
-            if kind in ("book", "modify") and qr_content:
-                try:
-                    ticket_base64 = generate_ticket_image(booking_data, qr_content, lang)
-                    # 做成附件用的 bytes
-                    try:
-                        ticket_bytes = base64.b64decode(ticket_base64)
-                    except Exception as e:
-                        log.error(f"[mail:{kind}] 車票 base64 decode 失敗: {e}")
-                        ticket_bytes = None
-                except Exception as e:
-                    log.error(f"[mail:{kind}] 生成車票圖片失敗: {e}")
-
-            try:
-                # HTML 內仍然可以放 inline 圖片（大多數信箱會顯示）
-                subject, html_body = _compose_mail_html(
-                    booking_data, lang, kind, ticket_base64
-                )
-                _send_email_gmail(
-                    booking_data["email"],
-                    subject,
-                    html_body,
-                    attachment=ticket_bytes,
-                    attachment_filename=f"ticket_{booking_id}.png" if ticket_bytes else "ticket.png",
-                )
-                mail_status = f"{_tz_now_str()} 寄信成功({kind})"
-                log.info(f"[mail:{kind}] 預約 {booking_id} 寄信成功")
-            except Exception as e:
-                mail_status = f"{_tz_now_str()} 寄信失敗({kind}): {str(e)}"
-                log.error(f"[mail:{kind}] 預約 {booking_id} 寄信失敗: {str(e)}")
-
-            # 更新寄信狀態
-            if "寄信狀態" in hmap:
-                ws_main.update_acell(
-                    gspread.utils.rowcol_to_a1(rowno, hmap["寄信狀態"]),
-                    mail_status,
-                )
-
-        except Exception as e:
-            log.error(f"[mail:{kind}] 非同步處理預約 {booking_id} 時發生錯誤: {str(e)}")
-
-    thread = threading.Thread(target=_process, daemon=True)
-    thread.start()
-
-
-
-def async_process_after_booking(
-    booking_id: str,
-    booking_data: Dict[str, Any],
-    qr_content: str,
-    lang: str = "zh",
-):
-    _async_process_mail("book", booking_id, booking_data, qr_content, lang)
-
-
-def async_process_after_modify(
-    booking_id: str,
-    booking_data: Dict[str, Any],
-    qr_content: Optional[str],
-    lang: str = "zh",
-):
-    _async_process_mail("modify", booking_id, booking_data, qr_content, lang)
-
-
-def async_process_after_cancel(
-    booking_id: str,
-    booking_data: Dict[str, Any],
-    lang: str = "zh",
-):
-    # cancel 不需要 QR code / 車票
-    _async_process_mail("cancel", booking_id, booking_data, qr_content=None, lang=lang)
-
-
-# ========== Email 功能 ==========
-def _send_email_gmail(
-    to_email: str,
-    subject: str,
-    html_body: str,
-    attachment: Optional[bytes] = None,
-    attachment_filename: str = "ticket.png",
-):
-    """使用 SMTP 寄信"""
-    host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    port = int(os.getenv("SMTP_PORT", "587"))
-    user = os.getenv("SMTP_USER") or EMAIL_FROM_ADDR
-    password = os.getenv("SMTP_PASS")
-
-    if not password:
-        raise RuntimeError("SMTP_PASS 未設定，無法寄信")
-
-    msg = MIMEMultipart()
-    msg["To"] = to_email
-    msg["From"] = f"{EMAIL_FROM_NAME} <{EMAIL_FROM_ADDR}>"
-    msg["Subject"] = subject
-    
-    # HTML 內容
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
-
-    # 附件
-    if attachment:
-        part = MIMEBase("application", "octet-stream")
-        part.set_payload(attachment)
-        encoders.encode_base64(part)
-        part.add_header(
-            "Content-Disposition",
-            f'attachment; filename="{attachment_filename}"',
-        )
-        msg.attach(part)
-
-    # 連線 SMTP 寄信
-    with smtplib.SMTP(host, port) as server:
-        server.ehlo()
-        server.starttls()
-        server.ehlo()
-        server.login(user, password)
-        server.sendmail(EMAIL_FROM_ADDR, [to_email], msg.as_string())
-
-def _compose_mail_html(
-    info: Dict[str, str],
-    lang: str,
-    kind: str,
-    ticket_base64: Optional[str] = None
-) -> Tuple[str, str]:
-    """組合郵件內容"""
-
-    # 根據語言決定第二語言
-    second_lang = "en"  # 預設英文
-    if lang in ["ja", "ko"]:
-        second_lang = lang
-
-    subjects = {
-        "book": {
-            "zh": "汐止福泰大飯店接駁車預約確認",
-            "en": "Forte Hotel Xizhi Shuttle Reservation Confirmation",
-            "ja": "汐止フルオンホテル シャトル予約確認",
-            "ko": "포르테 호텔 시즈 셔틀 예약 확인",
-        },
-        "modify": {
-            "zh": "汐止福泰大飯店接駁車預約變更確認",
-            "en": "Forte Hotel Xizhi Shuttle Reservation Updated",
-            "ja": "汐止フルオンホテル シャトル予約変更完了",
-            "ko": "포르테 호텔 시즈 셔틀 예약 변경 완료",
-        },
-        "cancel": {
-            "zh": "汐止福泰大飯店接駁車預約已取消",
-            "en": "Forte Hotel Xizhi Shuttle Reservation Canceled",
-            "ja": "汐止フルオンホテル シャトル予約キャンセル",
-            "ko": "포르테 호텔 시즈 셔틀 예약 취소됨",
-        },
-    }
-
-    # 雙語標題
-    subject_zh = subjects[kind]["zh"]
-    subject_second = subjects[kind].get(second_lang, subjects[kind]["en"])
-    subject = f"{subject_zh} / {subject_second}"
-
-    # 中文內容
-    zh_content = f"""
-    <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
-        <h2 style="color: #2c5aa0;">{subject_zh}</h2>
-        <p>尊敬的 {info.get('name','')} 貴賓，您好！</p>
-        <p>以下為您的接駁車預約資訊：</p>
-        <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
-            <ul style="list-style: none; padding: 0;">
-                <li><strong>預約編號：</strong>{info.get('booking_id','')}</li>
-                <li><strong>預約班次：</strong>{info.get('date','')} {info.get('time','')} (GMT+8)</li>
-                <li><strong>預約人數：</strong>{info.get('pax','')}</li>
-                <li><strong>往返方向：</strong>{info.get('direction','')}</li>
-                <li><strong>上車站點：</strong>{info.get('pick','')}</li>
-                <li><strong>下車站點：</strong>{info.get('drop','')}</li>
-                <li><strong>手機：</strong>{info.get('phone','')}</li>
-                <li><strong>信箱：</strong>{info.get('email','')}</li>
-            </ul>
-        </div>
-    </div>
-    """
-
-    # 第二語言內容
-    second_content_map = {
-        "en": f"""
-        <div style="margin-top: 30px; border-top: 2px solid #2c5aa0; padding-top: 20px;">
-            <h2 style="color: #2c5aa0;">{subject_second}</h2>
-            <p>Dear {info.get('name','')},</p>
-            <p>Here are your shuttle reservation details:</p>
-            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                <ul style="list-style: none; padding: 0;">
-                    <li><strong>Reservation Number:</strong> {info.get('booking_id','')}</li>
-                    <li><strong>Reservation Time:</strong> {info.get('date','')} {info.get('time','')} (GMT+8)</li>
-                    <li><strong>Number of Guests:</strong> {info.get('pax','')}</li>
-                    <li><strong>Direction:</strong> {info.get('direction','')}</li>
-                    <li><strong>Pickup:</strong> {info.get('pick','')}</li>
-                    <li><strong>Dropoff:</strong> {info.get('drop','')}</li>
-                    <li><strong>Phone:</strong> {info.get('phone','')}</li>
-                    <li><strong>Email:</strong> {info.get('email','')}</li>
-                </ul>
-            </div>
-        </div>
-        """,
-        "ja": f"""
-        <div style="margin-top: 30px; border-top: 2px solid #2c5aa0; padding-top: 20px;">
-            <h2 style="color: #2c5aa0;">{subject_second}</h2>
-            <p>{info.get('name','')} 様</p>
-            <p>シャトル予約の詳細は以下の通りです。</p>
-            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                <ul style="list-style: none; padding: 0;">
-                    <li><strong>予約番号：</strong>{info.get('booking_id','')}</li>
-                    <li><strong>便：</strong>{info.get('date','')} {info.get('time','')} (GMT+8)</li>
-                    <li><strong>人数：</strong>{info.get('pax','')}</li>
-                    <li><strong>方向：</strong>{info.get('direction','')}</li>
-                    <li><strong>乗車：</strong>{info.get('pick','')}</li>
-                    <li><strong>降車：</strong>{info.get('drop','')}</li>
-                    <li><strong>電話：</strong>{info.get('phone','')}</li>
-                    <li><strong>メール：</strong>{info.get('email','')}</li>
-                </ul>
-            </div>
-        </div>
-        """,
-        "ko": f"""
-        <div style="margin-top: 30px; border-top: 2px solid #2c5aa0; padding-top: 20px;">
-            <h2 style="color: #2c5aa0;">{subject_second}</h2>
-            <p>{info.get('name','')} 고객님,</p>
-            <p>셔틀 예약 내역은 아래와 같습니다.</p>
-            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                <ul style="list-style: none; padding: 0;">
-                    <li><strong>예약번호:</strong> {info.get('booking_id','')}</li>
-                    <li><strong>시간:</strong> {info.get('date','')} {info.get('time','')} (GMT+8)</li>
-                    <li><strong>인원:</strong> {info.get('pax','')}</li>
-                    <li><strong>방향:</strong> {info.get('direction','')}</li>
-                    <li><strong>승차:</strong> {info.get('pick','')}</li>
-                    <li><strong>하차:</strong> {info.get('drop','')}</li>
-                    <li><strong>전화:</strong> {info.get('phone','')}</li>
-                    <li><strong>이메일:</strong> {info.get('email','')}</li>
-                </ul>
-            </div>
-        </div>
-        """,
-    }
-
-    second_content = second_content_map.get(second_lang, second_content_map["en"])
-
-    # 車票圖片（直接嵌入郵件內文，base64）
-    ticket_html = ""
-    if kind in ("book", "modify") and ticket_base64:
-        data_uri = f"data:image/png;base64,{ticket_base64}"
-        ticket_html = f"""
-        <div style="margin: 20px 0; text-align: center;">
-            <h3 style="color: #2c5aa0;">您的車票 / Your Ticket</h3>
-            <div style="display: inline-block; border: 2px solid #2c5aa0; border-radius: 10px; padding: 10px; background: white;">
-                <img src="{data_uri}" alt="Shuttle Ticket" style="max-width: 100%; height: auto;" />
-            </div>
-            <p style="color: #666; font-size: 14px; margin-top: 10px;">
-                請出示此車票乘車 / Please present this ticket for boarding
-            </p>
-        </div>
-        """
-
-
-    # 聯繫信息
-    contact_info = """
-        <div style="margin-top: 20px; padding: 15px; background: #e8f4ff; border-radius: 5px;">
-            <p><strong>聯繫資訊 / Contact Information:</strong></p>
-            <p>如有任何問題，請致電 (02-2691-9222 #1)</p>
-            <p>If you have questions, call (02-2691-9222 #1)</p>
-            <p>汐止福泰大飯店 敬上 / Forte Hotel Xizhi</p>
-        </div>
-    """
-
-    # 組合完整HTML
-    html_body = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    </head>
-    <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px;">
-        {zh_content}
-        {second_content}
-        {ticket_html}
-        {contact_info}
-    </body>
-    </html>
-    """
-
-    return subject, html_body
 
 # ========== Pydantic Models ==========
 class BookPayload(BaseModel):
@@ -907,6 +699,7 @@ def health():
 @app.options("/api/ops/")
 def ops_options():
     return Response(status_code=204)
+
 # ========== 主 API ==========
 @app.post("/api/ops")
 @app.post("/api/ops/")
@@ -1352,7 +1145,8 @@ def ops(req: OpsRequest):
                 "email": get("信箱"),
                 "pax": (get("確認人數") or get("預約人數") or "1"),
             }
-            subject, html = _compose_mail_html(info, p.lang, p.kind)
+            # 使用純文字郵件內容
+            subject, text_body = _compose_mail_text(info, p.lang, p.kind)
             attachment_bytes: Optional[bytes] = None
             if p.kind in ("book", "modify") and p.ticket_png_base64:
                 b64 = p.ticket_png_base64
@@ -1363,7 +1157,13 @@ def ops(req: OpsRequest):
                 except Exception:
                     attachment_bytes = None
             try:
-                _send_email_gmail(info["email"], subject, html, attachment=attachment_bytes, attachment_filename=f"ticket_{info['booking_id']}.png" if attachment_bytes else "ticket.png")
+                _send_email_gmail(
+                    info["email"], 
+                    subject, 
+                    text_body, 
+                    attachment=attachment_bytes, 
+                    attachment_filename=f"shuttle_ticket_{info['booking_id']}.png" if attachment_bytes else None
+                )
                 status_text = f"{_tz_now_str()} 寄信成功"
             except Exception as e:
                 status_text = f"{_tz_now_str()} 寄信失敗: {str(e)}"
