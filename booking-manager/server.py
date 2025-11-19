@@ -9,6 +9,7 @@ import threading
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 import urllib.parse
+import secrets  
 
 import qrcode
 from fastapi import FastAPI, HTTPException, Response
@@ -116,10 +117,6 @@ def _display_trip_str(date_iso: str, time_hm: str) -> str:
     y, m, d = date_iso.split("-")
     return f"{int(m)}/{int(d)} {time_hm}"
 
-def _mmdd_prefix(date_iso: str) -> str:
-    y, m, d = date_iso.split("-")
-    return f"{int(m):02d}{int(d):02d}"
-
 def _compute_indices_and_segments(pickup: str, dropoff: str):
     ps = (pickup or "").strip()
     ds = (dropoff or "").strip()
@@ -204,23 +201,45 @@ def _find_rows_by_pred(ws: gspread.Worksheet, headers: List[str], start_row: int
             result.append(i)
     return result
 
-def _get_max_seq_for_date(ws_main: gspread.Worksheet, date_iso: str) -> int:
+
+def _generate_booking_id_day_rand6(ws_main: gspread.Worksheet, today_iso: str) -> str:
+    """
+    產生 8 碼 booking_id：
+    前 2 碼 = 今日「日」(01–31)
+    後 6 碼 = 0–9 的亂數
+    並且在目前主表資料裡確認「不重複」。
+    不會額外多讀一次 Sheet（本來就會 get_all_values）。
+    """
     m = header_map_main(ws_main)
-    all_values = _read_all_rows(ws_main)
-    if not all_values or "預約編號" not in m:
-        return 0
-    c_id = m["預約編號"]
-    prefix = _mmdd_prefix(date_iso)
-    max_seq = 0
+    all_values = _read_all_rows(ws_main)  # 本來 _get_max_seq_for_date 就會做這行
+
+    # 沒有「預約編號」欄位的 fallback：直接給一個亂數（理論上不會發生）
+    if "預約編號" not in m:
+        day_str = today_iso.split("-")[2]  # "YYYY-MM-DD" → 取最後兩位日
+        rand_part = f"{secrets.randbelow(10**6):06d}"
+        return day_str + rand_part
+
+    c_id = m["預約編號"] - 1  # 0-based index
+    day_str = today_iso.split("-")[2]      # 取「日」，例如 "2025-11-14" → "14"
+
+    # 收集今天這一天前綴相同的既有 ID，避免撞號只需要跟「今天」比
+    existing_for_today = set()
     for row in all_values[HEADER_ROW_MAIN:]:
-        booking = row[c_id - 1] if c_id - 1 < len(row) else ""
-        if booking.startswith(prefix):
-            try:
-                seq = int(booking[len(prefix):])
-                max_seq = max(max_seq, seq)
-            except:
-                pass
-    return max_seq
+        if c_id < len(row):
+            bid = (row[c_id] or "").strip()
+            if bid.startswith(day_str) and len(bid) == 8 and bid.isdigit():
+                existing_for_today.add(bid)
+
+    # 最多重試 20 次，理論上一次就會成功
+    for _ in range(20):
+        rand_part = f"{secrets.randbelow(10**6):06d}"  # 000000–999999
+        booking_id = day_str + rand_part
+        if booking_id not in existing_for_today:
+            return booking_id
+
+    # 理論上到不了這裡，如果真的到了就噴 500
+    raise RuntimeError("booking_id_generation_failed")
+
 
 # ========== 容量檢查 ==========
 def _find_cap_header_row(values: List[List[str]]) -> int:
@@ -903,8 +922,7 @@ def ops(req: OpsRequest):
 
             # 產生預約編號：以「今日日期」為準
             today_iso = _today_iso_taipei()
-            last_seq = _get_max_seq_for_date(ws_main, today_iso)
-            booking_id = f"{_mmdd_prefix(today_iso)}{last_seq + 1:03d}"
+            booking_id = _generate_booking_id_day_rand6(ws_main, today_iso)
 
             # QR 內容
             em6 = _email_hash6(p.email)
