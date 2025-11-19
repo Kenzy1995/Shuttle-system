@@ -28,6 +28,20 @@ let currentQueryDate = "";
 let currentDateRows = [];
 
 /* ====== 小工具 ====== */
+
+// 取得目前語系，優先用 i18n.js 的 currentLang，全都不在預期範圍就 fallback zh
+function getCurrentLang() {
+  if (window.currentLang && ["zh", "en", "ja", "ko"].includes(window.currentLang)) {
+    return window.currentLang;
+  }
+  // 再保險一層：看 <html lang="...">
+  const htmlLang = (document.documentElement.getAttribute("lang") || "").toLowerCase();
+  if (["zh", "en", "ja", "ko"].includes(htmlLang)) {
+    return htmlLang;
+  }
+  return "zh";
+}
+
 function handleScroll() {
   const y =
     window.scrollY ||
@@ -843,7 +857,8 @@ async function submitBooking() {
     pickLocation:
       selectedDirection === "回程"
         ? selectedStationRaw
-        : "福泰大飯店 Forte Hotel"
+        : "福泰大飯店 Forte Hotel",
+    lang: getCurrentLang()
   };
 
   bookingSubmitting = true;
@@ -1447,7 +1462,8 @@ async function deleteOrder(bookingId) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               action: "query",
-              data: { booking_id: id, phone, email }
+              data: { booking_id: id, phone, email },
+              lang: getCurrentLang()
             })
           });
           const queryData = await queryRes.json();
@@ -1728,7 +1744,8 @@ async function openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax 
           mdDirection === "回程" ? "福泰大飯店 Forte Hotel" : mdStation,
         phone: newPhone,
         email: newEmail,
-        station: mdStation
+        station: mdStation,
+        lang: getCurrentLang()
       };
 
       // 3️⃣ 呼叫後端做 modify
