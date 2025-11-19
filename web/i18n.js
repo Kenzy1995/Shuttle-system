@@ -498,6 +498,7 @@ const I18N_STATUS = {
 };
 
 let currentLang = "zh";
+window.currentLang = currentLang; 
 function t(key) {
   return (TEXTS[currentLang] || TEXTS.zh)[key] || key;
 }
@@ -527,6 +528,7 @@ function applyI18N() {
 
 function onLanguageChange(lang) {
   currentLang = lang || "zh";
+  window.currentLang = currentLang;  
   applyI18N();
 
   // 查詢 / 票卡列表重繪（狀態文案）
