@@ -537,15 +537,31 @@ def _async_process_mail(
 
             # 只在 book / modify 生成車票圖片
             ticket_base64: Optional[str] = None
+            ticket_bytes: Optional[bytes] = None
             if kind in ("book", "modify") and qr_content:
                 try:
                     ticket_base64 = generate_ticket_image(booking_data, qr_content, lang)
+                    # 做成附件用的 bytes
+                    try:
+                        ticket_bytes = base64.b64decode(ticket_base64)
+                    except Exception as e:
+                        log.error(f"[mail:{kind}] 車票 base64 decode 失敗: {e}")
+                        ticket_bytes = None
                 except Exception as e:
                     log.error(f"[mail:{kind}] 生成車票圖片失敗: {e}")
 
             try:
-                subject, html_body = _compose_mail_html(booking_data, lang, kind, ticket_base64)
-                _send_email_gmail(booking_data["email"], subject, html_body)
+                # HTML 內仍然可以放 inline 圖片（大多數信箱會顯示）
+                subject, html_body = _compose_mail_html(
+                    booking_data, lang, kind, ticket_base64
+                )
+                _send_email_gmail(
+                    booking_data["email"],
+                    subject,
+                    html_body,
+                    attachment=ticket_bytes,
+                    attachment_filename=f"ticket_{booking_id}.png" if ticket_bytes else "ticket.png",
+                )
                 mail_status = f"{_tz_now_str()} 寄信成功({kind})"
                 log.info(f"[mail:{kind}] 預約 {booking_id} 寄信成功")
             except Exception as e:
@@ -564,6 +580,7 @@ def _async_process_mail(
 
     thread = threading.Thread(target=_process, daemon=True)
     thread.start()
+
 
 
 def async_process_after_booking(
@@ -771,10 +788,11 @@ def _compose_mail_html(
                 <img src="{data_uri}" alt="Shuttle Ticket" style="max-width: 100%; height: auto;" />
             </div>
             <p style="color: #666; font-size: 14px; margin-top: 10px;">
-                請出示此 QRCode 乘車 / Please present this QR code for boarding
+                請出示此車票乘車 / Please present this ticket for boarding
             </p>
         </div>
         """
+
 
     # 聯繫信息
     contact_info = """
