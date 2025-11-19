@@ -972,7 +972,7 @@ function mountTicketAndShow(ticket) {
   const bookingIdEl = document.getElementById("ticketBookingId");
   if (bookingIdEl) bookingIdEl.textContent = ticket.bookingId || "";
 
-  // ✅ 設定票卡標題：顯示「預約日期 + 班次時間」，例如 2025/11/19 21:00
+  // ✅ 修改這裡：將固定標題改為日期+班次
   const titleEl = document.getElementById("ticketHeaderTitle");
   if (titleEl) {
     titleEl.textContent = formatTicketHeader(ticket.date, ticket.time);
