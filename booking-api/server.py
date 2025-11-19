@@ -8,7 +8,7 @@ import os
 app = Flask(__name__)
 CORS(app, origins=[
     "https://hotel-web-3addcbkbgq-de.a.run.app",
-    "https://hotel-web-995728097341.asia-east1.run.app/",
+    "https://hotel-web-995728097341.asia-east1.run.app",
 ])
 
 # Scopes and spreadsheet ID for Google Sheets
