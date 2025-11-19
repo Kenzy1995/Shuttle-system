@@ -346,113 +346,48 @@ def _send_email_gmail(
         server.sendmail(EMAIL_FROM_ADDR, [to_email], msg.as_string())
 
 def _compose_mail_text(info: Dict[str, str], lang: str, kind: str) -> Tuple[str, str]:
-    """組合純文字郵件內容"""
+    """組合純文字郵件內容 - 雙語版本"""
     
     subjects = {
         "book": {
             "zh": "汐止福泰大飯店接駁車預約確認",
             "en": "Forte Hotel Xizhi Shuttle Reservation Confirmation",
+            "ja": "汐止フォルテホテル シャトル予約確認",
+            "ko": "포르테 호텔 시즈 셔틀 예약 확인",
         },
         "modify": {
             "zh": "汐止福泰大飯店接駁車預約變更確認",
             "en": "Forte Hotel Xizhi Shuttle Reservation Updated",
+            "ja": "汐止フォルテホテル シャトル予約変更完了",
+            "ko": "포르테 호텔 시즈 셔틀 예약 변경 완료",
         },
         "cancel": {
             "zh": "汐止福泰大飯店接駁車預約已取消",
             "en": "Forte Hotel Xizhi Shuttle Reservation Canceled",
+            "ja": "汐止フォルテホテル シャトル予約キャンセル",
+            "ko": "포르테 호텔 시즈 셔틀 예약 취소됨",
         },
     }
     
-    # 選擇標題
-    subject = subjects[kind].get(lang, subjects[kind]["zh"])
+    # 雙語標題
+    subject_zh = subjects[kind]["zh"]
+    subject_second = subjects[kind].get(lang, subjects[kind]["en"])
+    subject = f"{subject_zh} / {subject_second}"
     
-    # 根據語言生成內容
-    if lang == "en":
-        text_body = f"""
-Forte Hotel Xizhi Shuttle Reservation
-
-Dear {info.get('name','')},
-
-Your shuttle reservation details:
-
-**Reservation Number:** {info.get('booking_id','')}
-**Reservation Time:** {info.get('date','')} {info.get('time','')} (GMT+8)
-**Number of Guests:** {info.get('pax','')}
-**Direction:** {info.get('direction','')}
-**Pickup Location:** {info.get('pick','')}
-**Dropoff Location:** {info.get('drop','')}
-**Phone:** {info.get('phone','')}
-**Email:** {info.get('email','')}
-
-Please present the attached QR code ticket for boarding.
-
-If you have any questions, please call (02-2691-9222 #1)
-
-Best regards,
-Forte Hotel Xizhi
-"""
-    elif lang == "ja":
-        text_body = f"""
-汐止フルオンホテル シャトル予約
-
-{info.get('name','')} 様
-
-シャトル予約の詳細は以下の通りです。
-
-**予約番号：** {info.get('booking_id','')}
-**便：** {info.get('date','')} {info.get('time','')} (GMT+8)
-**人数：** {info.get('pax','')}
-**方向：** {info.get('direction','')}
-**乗車：** {info.get('pick','')}
-**降車：** {info.get('drop','')}
-**電話：** {info.get('phone','')}
-**メール：** {info.get('email','')}
-
-添付のQRコードチケットを提示して乗車してください。
-
-ご質問があれば、(02-2691-9222 #1) までお電話ください。
-
-汐止フルオンホテル
-"""
-    elif lang == "ko":
-        text_body = f"""
-포르테 호텔 시즈 셔틀 예약
-
-{info.get('name','')} 고객님,
-
-셔틀 예약 내역은 아래와 같습니다.
-
-**예약번호:** {info.get('booking_id','')}
-**시간:** {info.get('date','')} {info.get('time','')} (GMT+8)
-**인원:** {info.get('pax','')}
-**방향:** {info.get('direction','')}
-**승차:** {info.get('pick','')}
-**하차:** {info.get('drop','')}
-**전화:** {info.get('phone','')}
-**이메일:** {info.get('email','')}
-
-첨부된 QR 코드 티켓을 제시하고 탑승하세요.
-
-문의사항이 있으면 (02-2691-9222 #1) 로 전화주세요.
-
-포르테 호텔 시즈
-"""
-    else:  # 預設中文
-        text_body = f"""
-汐止福泰大飯店接駁車預約
-
+    # 中文內容
+    chinese_content = f"""
 尊敬的 {info.get('name','')} 貴賓，您好！
 
 您的接駁車預約資訊：
 
-**預約編號：** {info.get('booking_id','')}
-**預約班次：** {info.get('date','')} {info.get('time','')} (GMT+8)
-**預約人數：** {info.get('pax','')}
-**往返方向：** {info.get('direction','')}
-**上車站點：** {info.get('pick','')}
-**下車站點：** {info.get('drop','')}
-**手機：** {info.get('phone','')}
-**信箱：** {info.get('email','')}
+預約編號：{info.get('booking_id','')}
+預約班次：{info.get('date','')} {info.get('time','')} (GMT+8)
+預約人數：{info.get('pax','')}
+往返方向：{info.get('direction','')}
+上車站點：{info.get('pick','')}
+下車站點：{info.get('drop','')}
+手機：{info.get('phone','')}
+信箱：{info.get('email','')}
 
 請出示附件中的 QR Code 車票乘車。
 
@@ -460,6 +395,79 @@ Forte Hotel Xizhi
 
 汐止福泰大飯店 敬上
 """
+    
+    # 第二語言內容
+    second_content_map = {
+        "en": f"""
+Dear {info.get('name','')},
+
+Your shuttle reservation details:
+
+Reservation Number: {info.get('booking_id','')}
+Reservation Time: {info.get('date','')} {info.get('time','')} (GMT+8)
+Number of Guests: {info.get('pax','')}
+Direction: {info.get('direction','')}
+Pickup Location: {info.get('pick','')}
+Dropoff Location: {info.get('drop','')}
+Phone: {info.get('phone','')}
+Email: {info.get('email','')}
+
+Please present the attached QR code ticket for boarding.
+
+If you have any questions, please call (02-2691-9222 #1)
+
+Best regards,
+Forte Hotel Xizhi
+""",
+        "ja": f"""
+{info.get('name','')} 様
+
+シャトル予約の詳細：
+
+予約番号：{info.get('booking_id','')}
+便：{info.get('date','')} {info.get('time','')} (GMT+8)
+人数：{info.get('pax','')}
+方向：{info.get('direction','')}
+乗車：{info.get('pick','')}
+降車：{info.get('drop','')}
+電話：{info.get('phone','')}
+メール：{info.get('email','')}
+
+添付のQRコードチケットを提示して乗車してください。
+
+ご質問があれば、(02-2691-9222 #1) までお電話ください。
+
+汐止フルオンホテル
+""",
+        "ko": f"""
+{info.get('name','')} 고객님,
+
+셔틀 예약 내역：
+
+예약번호: {info.get('booking_id','')}
+시간: {info.get('date','')} {info.get('time','')} (GMT+8)
+인원: {info.get('pax','')}
+방향: {info.get('direction','')}
+승차: {info.get('pick','')}
+하차: {info.get('drop','')}
+전화: {info.get('phone','')}
+이메일: {info.get('email','')}
+
+첨부된 QR 코드 티켓을 제시하고 탑승하세요.
+
+문의사항이 있으면 (02-2691-9222 #1) 로 전화주세요.
+
+포르테 호텔 시즈
+"""
+    }
+    
+    # 選擇第二語言內容（如果語言是中文，則使用英文作為第二語言）
+    second_lang = lang if lang in ["en", "ja", "ko"] else "en"
+    second_content = second_content_map.get(second_lang, second_content_map["en"])
+    
+    # 組合雙語內容，中間用分隔線隔開
+    separator = "\n" + "="*50 + "\n"
+    text_body = chinese_content + separator + second_content
     
     return subject, text_body
 
