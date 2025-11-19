@@ -755,15 +755,25 @@ def _compose_mail_html(info: Dict[str, str], lang: str, kind: str, ticket_base64
     ticket_html = ""
     if kind in ["book", "modify"] and ticket_base64:
         ticket_html = f"""
-        <div style="margin: 20px 0; text-align: center;">
-            <h3 style="color: #2c5aa0;">您的車票 / Your Ticket</h3>
-            <div style="display: inline-block; border: 2px solid #2c5aa0; border-radius: 10px; padding: 10px; background: white;">
-                <img src="data:image/png;base64,{ticket_base64}" alt="Shuttle Ticket" style="max-width: 100%; height: auto;" />
-            </div>
-            <p style="color: #666; font-size: 14px; margin-top: 10px;">
-                請出示此車票乘車 / Please present this ticket for boarding
-            </p>
-        </div>
+        ticket_html = ""
+        if kind in ["book", "modify"]:
+            # 優先用 info 裡的 qr_url，沒有就用 qr_content 拼一個
+            qr_url = info.get("qr_url")
+            qr_content = info.get("qr_content")
+            if not qr_url and qr_content:
+                qr_url = f"{BASE_URL}/api/qr/{quote(qr_content)}"
+
+            if qr_url:
+                ticket_html = f"""
+                <div style="margin: 20px 0; text-align: center;">
+                    <h3 style="color: #2c5aa0;">您的車票 / Your Ticket</h3>
+                    <div style="display: inline-block; border: 2px solid #2c5aa0; border-radius: 10px; padding: 10px; background: white;">
+                        <img src="{qr_url}" alt="Shuttle Ticket" style="max-width: 100%; height: auto;" />
+                    </div>
+                    <p style="color: #666; font-size: 14px; margin-top: 10px;">
+                        請出示此 QRCode 乘車 / Please present this QR code for boarding
+                    </p>
+                </div>
         """
     
     # 聯繫信息
@@ -963,6 +973,9 @@ def ops(req: OpsRequest):
                 "phone": p.phone,
                 "email": p.email,
                 "pax": str(p.passengers),
+                "qr_content": qr_content,
+                "qr_url": qr_url,
+                
             }
             async_process_after_booking(booking_id, booking_info, qr_content, p.lang)
 
@@ -1209,6 +1222,8 @@ def ops(req: OpsRequest):
                 "phone": p.phone or get_by_rowno(rowno, "手機"),
                 "email": final_email,
                 "pax": str(new_pax),
+                "qr_content": qr_content,
+                "qr_url": f"{BASE_URL}/api/qr/{urllib.parse.quote(qr_content)}" if qr_content else "",
             }
             async_process_after_modify(p.booking_id, booking_info, qr_content, p.lang)
 
