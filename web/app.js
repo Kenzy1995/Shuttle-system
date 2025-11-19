@@ -1448,7 +1448,13 @@ async function deleteOrder(bookingId) {
       const r = await fetch(OPS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "delete", data: { booking_id: bookingId } })
+        body: JSON.stringify({
+          action: "delete",
+          data: {
+            booking_id: bookingId,
+            lang: getCurrentLang()      
+          }
+        })
       });
       const j = await r.json();
       if (j.status === "success") {
