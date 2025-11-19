@@ -637,14 +637,19 @@ def _send_email_gmail(
         server.login(user, password)
         server.sendmail(EMAIL_FROM_ADDR, [to_email], msg.as_string())
 
-def _compose_mail_html(info: Dict[str, str], lang: str, kind: str, ticket_base64: Optional[str] = None) -> Tuple[str, str]:
+def _compose_mail_html(
+    info: Dict[str, str],
+    lang: str,
+    kind: str,
+    ticket_base64: Optional[str] = None
+) -> Tuple[str, str]:
     """組合郵件內容"""
-    
+
     # 根據語言決定第二語言
     second_lang = "en"  # 預設英文
     if lang in ["ja", "ko"]:
         second_lang = lang
-    
+
     subjects = {
         "book": {
             "zh": "汐止福泰大飯店接駁車預約確認",
@@ -665,12 +670,12 @@ def _compose_mail_html(info: Dict[str, str], lang: str, kind: str, ticket_base64
             "ko": "포르테 호텔 시즈 셔틀 예약 취소됨",
         },
     }
-    
+
     # 雙語標題
     subject_zh = subjects[kind]["zh"]
     subject_second = subjects[kind].get(second_lang, subjects[kind]["en"])
     subject = f"{subject_zh} / {subject_second}"
-    
+
     # 中文內容
     zh_content = f"""
     <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
@@ -689,8 +694,9 @@ def _compose_mail_html(info: Dict[str, str], lang: str, kind: str, ticket_base64
                 <li><strong>信箱：</strong>{info.get('email','')}</li>
             </ul>
         </div>
+    </div>
     """
-    
+
     # 第二語言內容
     second_content_map = {
         "en": f"""
@@ -710,6 +716,7 @@ def _compose_mail_html(info: Dict[str, str], lang: str, kind: str, ticket_base64
                     <li><strong>Email:</strong> {info.get('email','')}</li>
                 </ul>
             </div>
+        </div>
         """,
         "ja": f"""
         <div style="margin-top: 30px; border-top: 2px solid #2c5aa0; padding-top: 20px;">
@@ -728,6 +735,7 @@ def _compose_mail_html(info: Dict[str, str], lang: str, kind: str, ticket_base64
                     <li><strong>メール：</strong>{info.get('email','')}</li>
                 </ul>
             </div>
+        </div>
         """,
         "ko": f"""
         <div style="margin-top: 30px; border-top: 2px solid #2c5aa0; padding-top: 20px;">
@@ -746,36 +754,28 @@ def _compose_mail_html(info: Dict[str, str], lang: str, kind: str, ticket_base64
                     <li><strong>이메일:</strong> {info.get('email','')}</li>
                 </ul>
             </div>
-        """
+        </div>
+        """,
     }
-    
-    second_content = second_content_map.get(second_lang, second_content_map["en"])
-    
-    # 車票圖片（直接嵌入郵件內文）
-    ticket_html = ""
-    if kind in ["book", "modify"] and ticket_base64:
-        ticket_html = f"""
-        ticket_html = ""
-        if kind in ["book", "modify"]:
-            # 優先用 info 裡的 qr_url，沒有就用 qr_content 拼一個
-            qr_url = info.get("qr_url")
-            qr_content = info.get("qr_content")
-            if not qr_url and qr_content:
-                qr_url = f"{BASE_URL}/api/qr/{quote(qr_content)}"
 
-            if qr_url:
-                ticket_html = f"""
-                <div style="margin: 20px 0; text-align: center;">
-                    <h3 style="color: #2c5aa0;">您的車票 / Your Ticket</h3>
-                    <div style="display: inline-block; border: 2px solid #2c5aa0; border-radius: 10px; padding: 10px; background: white;">
-                        <img src="{qr_url}" alt="Shuttle Ticket" style="max-width: 100%; height: auto;" />
-                    </div>
-                    <p style="color: #666; font-size: 14px; margin-top: 10px;">
-                        請出示此 QRCode 乘車 / Please present this QR code for boarding
-                    </p>
-                </div>
+    second_content = second_content_map.get(second_lang, second_content_map["en"])
+
+    # 車票圖片（直接嵌入郵件內文，base64）
+    ticket_html = ""
+    if kind in ("book", "modify") and ticket_base64:
+        data_uri = f"data:image/png;base64,{ticket_base64}"
+        ticket_html = f"""
+        <div style="margin: 20px 0; text-align: center;">
+            <h3 style="color: #2c5aa0;">您的車票 / Your Ticket</h3>
+            <div style="display: inline-block; border: 2px solid #2c5aa0; border-radius: 10px; padding: 10px; background: white;">
+                <img src="{data_uri}" alt="Shuttle Ticket" style="max-width: 100%; height: auto;" />
+            </div>
+            <p style="color: #666; font-size: 14px; margin-top: 10px;">
+                請出示此 QRCode 乘車 / Please present this QR code for boarding
+            </p>
+        </div>
         """
-    
+
     # 聯繫信息
     contact_info = """
         <div style="margin-top: 20px; padding: 15px; background: #e8f4ff; border-radius: 5px;">
@@ -785,7 +785,7 @@ def _compose_mail_html(info: Dict[str, str], lang: str, kind: str, ticket_base64
             <p>汐止福泰大飯店 敬上 / Forte Hotel Xizhi</p>
         </div>
     """
-    
+
     # 組合完整HTML
     html_body = f"""
     <!DOCTYPE html>
@@ -802,7 +802,7 @@ def _compose_mail_html(info: Dict[str, str], lang: str, kind: str, ticket_base64
     </body>
     </html>
     """
-    
+
     return subject, html_body
 
 # ========== Pydantic Models ==========
