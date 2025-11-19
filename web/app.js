@@ -972,19 +972,11 @@ function mountTicketAndShow(ticket) {
   const bookingIdEl = document.getElementById("ticketBookingId");
   if (bookingIdEl) bookingIdEl.textContent = ticket.bookingId || "";
 
-  // 設定票卡標題：改成 「YYYY/MM/DD HH:MM」
-  const titleEl = document.getElementById("ticketTitleText");
+  // ✅ 設定票卡標題：顯示「預約日期 + 班次時間」，例如 2025/11/19 21:00
+  const titleEl = document.getElementById("ticketHeaderTitle");
   if (titleEl) {
-    const dateStr = (ticket.date || "").replace(/-/g, "/"); // 2025-11-19 -> 2025/11/19
-    const timeStr = ticket.time || "";
-    if (dateStr && timeStr) {
-      titleEl.textContent = `${dateStr} ${timeStr}`;
-    } else {
-      // 萬一缺其中一個，就顯示現有的，不要空白
-      titleEl.textContent = dateStr || timeStr || titleEl.textContent;
-    }
+    titleEl.textContent = formatTicketHeader(ticket.date, ticket.time);
   }
-
 
   const directionEl = document.getElementById("ticketDirection");
   if (directionEl) directionEl.textContent = ticket.direction || "";
@@ -1014,6 +1006,7 @@ function mountTicketAndShow(ticket) {
   // ✅ 先顯示票卡，再跑成功動畫
   showSuccessAnimation();
 }
+
 
 function closeTicketToHome() {
   const card = document.getElementById("successCard");
