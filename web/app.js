@@ -902,6 +902,8 @@ async function submitBooking() {
       ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(result.qr_content)}`
       : result.qr_url || "";
 
+    // 後端已經確認成功、寫進 Sheet，也在後端開始寄信
+    // 前端這裡只負責顯示票卡
     currentBookingData = {
       bookingId: result.booking_id || "",
       date: selectedDateRaw,
@@ -917,37 +919,6 @@ async function submitBooking() {
     };
 
     mountTicketAndShow(currentBookingData);
-
-    // 寄信（背景）
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 4000);
-      const cardEl = document.getElementById("ticketCard");
-      if (cardEl && window.domtoimage) {
-        const dataUrl = await domtoimage.toPng(cardEl, {
-          bgcolor: "#fff",
-          pixelRatio: 2
-        });
-        fetch(OPS_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "mail",
-            data: {
-              booking_id: currentBookingData.bookingId,
-              lang: currentLang,
-              kind: "book",
-              ticket_png_base64: dataUrl
-            }
-          }),
-          signal: controller.signal
-        })
-          .catch(() => {})
-          .finally(() => clearTimeout(timer));
-      }
-    } catch (e) {
-      console.warn("寄信未完成或超時", e);
-    }
   } catch (err) {
     const maybeCapacity =
       err &&
@@ -965,8 +936,8 @@ async function submitBooking() {
   }
 }
 
+
 function mountTicketAndShow(ticket) {
-  console.log("★ mountTicketAndShow ticket =", ticket);
   const qrImg = document.getElementById("ticketQrImg");
   if (qrImg) qrImg.src = ticket.qrUrl || "";
 
