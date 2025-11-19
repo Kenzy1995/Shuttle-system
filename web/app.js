@@ -966,6 +966,7 @@ async function submitBooking() {
 }
 
 function mountTicketAndShow(ticket) {
+  console.log("★ mountTicketAndShow ticket =", ticket);
   const qrImg = document.getElementById("ticketQrImg");
   if (qrImg) qrImg.src = ticket.qrUrl || "";
 
