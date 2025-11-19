@@ -528,7 +528,11 @@ function applyI18N() {
 
 function onLanguageChange(lang) {
   currentLang = lang || "zh";
-  window.currentLang = currentLang;  
+  // 🔹 同步到 window，給 app.js 的 getCurrentLang() 用
+  window.currentLang = currentLang;
+
+  // 🔹 順便把 <html lang> 改成當前語系（讓 getCurrentLang 第二層保險也正確）
+  document.documentElement.setAttribute("lang", currentLang);
   applyI18N();
 
   // 查詢 / 票卡列表重繪（狀態文案）
