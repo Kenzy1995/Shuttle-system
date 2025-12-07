@@ -2,7 +2,7 @@ from __future__ import annotations
 import os
 import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import google.auth
 import gspread
@@ -19,46 +19,33 @@ SCOPES = [
 
 SPREADSHEET_ID = "1xp54tKOczklmT8uacW-HMxwV8r0VOR2ui33jYcE2pUQ"
 SHEET_NAME_MAIN = "預約審核(櫃台)"
-HEADER_ROW_MAIN = 2  # 第二列是表頭
+HEADER_ROW_MAIN = 2  # 第 2 列為表頭，資料從第 3 列起
 
+# 預約狀態文字（與 booking-manager 保持一致）
 BOOKED_TEXT = "✔️ 已預約 Booked"
 CANCELLED_TEXT = "❌ 已取消 Cancelled"
 
-# 站點（必須和主表內容一致）
-HOTEL = "福泰大飯店 Forte Hotel"
-MRT = "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3"
-TRAIN = "南港火車站 Nangang Train Station"
-MALL = "LaLaport Shopping Park"
 
+# ========= 共用工具 =========
 
-# ========= 工具函數 =========
+def _tz_now() -> datetime:
+    """台北時間 now（作為時間比較用）"""
+    os.environ.setdefault("TZ", "Asia/Taipei")
+    try:
+        time.tzset()
+    except Exception:
+        pass
+    return datetime.now()
+
 
 def _tz_now_str() -> str:
-    """台北時間現在的文字（yyyy-MM-dd HH:mm:ss）"""
-    os.environ.setdefault("TZ", "Asia/Taipei")
-    try:
-        time.tzset()
-    except Exception:
-        pass
-    t = time.localtime()
-    return f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
-
-
-def _tz_now_dt() -> datetime:
-    """台北時間現在的 datetime（naive，但已是台北時區的本地時間）"""
-    os.environ.setdefault("TZ", "Asia/Taipei")
-    try:
-        time.tzset()
-    except Exception:
-        pass
-    t = time.localtime()
-    return datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
+    """台北時間 now 的字串（寫回表格用）"""
+    t = _tz_now()
+    return t.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _time_hm_from_any(s: str) -> str:
-    """
-    把 '18:30', '2025/12/08 18:30', '18：30' 等整理成 'HH:MM'
-    """
+    """把 '18:30', '2025/12/08 18:30', '18：30' 等轉成 'HH:MM'。"""
     s = (s or "").strip().replace("：", ":")
     if " " in s and ":" in s:
         return s.split()[-1][:5]
@@ -67,46 +54,27 @@ def _time_hm_from_any(s: str) -> str:
     return s
 
 
-def _parse_main_dt(s: str) -> Tuple[str, str, Optional[datetime]]:
-    """
-    將主班次時間字串拆成 (日期yyyy-MM-dd, 時間HH:MM, datetime物件或None)
-    支援 'YYYY/MM/DD HH:MM' 或 'YYYY-MM-DD HH:MM'
-    """
-    raw = (s or "").strip()
+def _parse_main_dt(raw: str) -> Optional[datetime]:
+    """解析主班次時間：可能是 '2025/12/08 18:30' 或 '2025-12-08 18:30' 等。"""
     if not raw:
-        return "", "", None
-
-    txt = raw.replace("年", "-").replace("月", "-").replace("日", " ").replace("/", "-")
-    parts = txt.split()
-    if not parts:
-        return "", "", None
-    if len(parts) == 1:
-        date_part = parts[0]
-        time_part = "00:00"
-    else:
-        date_part = parts[0]
-        time_part = _time_hm_from_any(parts[1])
-
-    date_norm = date_part
-    # 盡量補零 (yyyy-m-d → yyyy-mm-dd)
-    try:
-        y, m, d = date_norm.split("-")
-        date_norm = f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
-    except Exception:
-        pass
-
-    dt = None
-    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        return None
+    raw = raw.strip()
+    for fmt in ("%Y/%m/%d %H:%M", "%Y-%m-%d %H:%M",
+                "%Y/%m/%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
         try:
-            dt = datetime.strptime(f"{date_norm} {time_part}", "%Y-%m-%d %H:%M")
-            break
-        except Exception:
-            dt = None
-    return date_norm, time_part, dt
+            return datetime.strptime(raw, fmt)
+        except ValueError:
+            continue
+    # 有些可能只存日期
+    for fmt in ("%Y/%m/%d", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(raw, fmt)
+        except ValueError:
+            continue
+    return None
 
 
 def open_ws(name: str) -> gspread.Worksheet:
-    """開啟指定名稱的工作表"""
     credentials, _ = google.auth.default(scopes=SCOPES)
     gc = gspread.authorize(credentials)
     sh = gc.open_by_key(SPREADSHEET_ID)
@@ -115,98 +83,97 @@ def open_ws(name: str) -> gspread.Worksheet:
 
 def _sheet_headers(ws: gspread.Worksheet, header_row: int) -> List[str]:
     headers = ws.row_values(header_row)
-    return [h.strip() for h in headers]
+    return [(h or "").strip() for h in headers]
 
 
 def header_map_main(ws: gspread.Worksheet) -> Dict[str, int]:
     """
-    把表頭欄位名稱 → 欄位位置（1-based index）
-    例：{"主班次時間": 19, "預約編號": 3, ...}
+    依表頭名稱建立 map：欄名 -> 欄 index (1-based)。
+    e.g. {"主班次時間": 19, "預約編號": 3, ...}
     """
     row = _sheet_headers(ws, HEADER_ROW_MAIN)
     m: Dict[str, int] = {}
     for idx, name in enumerate(row, start=1):
-        name = (name or "").strip()
         if name and name not in m:
             m[name] = idx
     return m
 
 
 def _read_all_rows(ws: gspread.Worksheet) -> List[List[str]]:
+    """整張表一次抓回 List[List[str]]。"""
     return ws.get_all_values()
 
 
-def _find_booking_row(values: List[List[str]], hmap: Dict[str, int], booking_id: str) -> Optional[int]:
-    """在全表裡找到指定 booking_id 的列號（Sheet 的 1-based row）"""
+def _find_booking_row(values: List[List[str]],
+                      hmap: Dict[str, int],
+                      booking_id: str) -> Optional[int]:
+    """
+    找到指定預約編號所在的「工作表列號」（1-based）。
+    """
     col = hmap.get("預約編號")
     if not col:
         return None
-    col_idx = col - 1
+    ci = col - 1
+    # values[0] -> row1, values[HEADER_ROW_MAIN] -> row3
     for i, row in enumerate(values[HEADER_ROW_MAIN:], start=HEADER_ROW_MAIN + 1):
-        if col_idx < len(row) and (row[col_idx] or "").strip() == booking_id:
+        if ci < len(row) and (row[ci] or "").strip() == booking_id:
             return i
     return None
 
 
-def _get_cell_from_row(row: List[str], hmap: Dict[str, int], col_name: str) -> str:
-    """從單一 row（list）用欄位名稱取得欄位值"""
-    idx = hmap.get(col_name)
-    if not idx:
-        return ""
-    i = idx - 1
-    if i >= len(row):
-        return ""
-    return row[i] or ""
+def _safe_int(v: Any, default: int = 0) -> int:
+    try:
+        s = str(v).strip()
+        if not s:
+            return default
+        # 有些會是 1.0 之類
+        return int(float(s))
+    except Exception:
+        return default
 
 
 # ========= Pydantic Models =========
 
 class DriverTrip(BaseModel):
-    trip_id: str   # 使用「主班次時間」欄位原字串，例如 "2025/12/08 18:30"
-    date: str      # "2025-12-08"
-    time: str      # "18:30"
+    trip_id: str   # 主班次時間原始字串（當 key）
+    date: str      # YYYY-MM-DD
+    time: str      # HH:MM
     total_pax: int
 
 
 class DriverPassenger(BaseModel):
     trip_id: str
-    main_departure: str   # 主班次時間原字串
-    station: str          # 站點名稱
+    station: str          # 站點名稱（1️⃣ 福泰大飯店..）
     updown: str           # "上車" / "下車"
     booking_id: str
     name: str
     phone: str
     room: str
     pax: int
-    status: str           # "已上車" 或 ""
+    status: str           # "已上車" or ""
+    direction: Optional[str] = None  # 去程 / 回程
     qrcode: str
-    direction: str = ""   # 往返（去程/回程）
-    station_order: int = 99  # 站點排序用（1~5）
 
 
-class PassengerListRow(BaseModel):
-    main_departure: str   # 主班次時間原字串，如 "2025/12/08 17:00"
-    main_date: str        # "2025-12-08"
-    main_time: str        # "17:00"
-    car: str              # 車次（原表「車次」欄）
+class DriverAllPassenger(BaseModel):
     booking_id: str
-    ride_status: str      # 乘車狀態
-    direction: str        # 往返：去程/回程
+    main_datetime: str    # 主班次時間原始字串
+    depart_time: str      # HH:mm
     name: str
     phone: str
     room: str
     pax: int
-    hotel_go: str         # 飯店(去) 欄：上/下/空
-    mrt: str              # 捷運站 欄：上/下/空
-    train: str            # 火車站 欄：上/下/空
-    mall: str             # LaLaport 欄：上/下/空
-    hotel_back: str       # 飯店(回) 欄：上/下/空
-    station_order: int    # 用於排序（同一方向內站點順序）
-    dropoff_order: int    # 用於排序（下車順序）
+    ride_status: str
+    direction: str
+    hotel_go: str
+    mrt: str
+    train: str
+    mall: str
+    hotel_back: str
 
 
 class DriverCheckinRequest(BaseModel):
-    qrcode: str  # 掃到的整段字串：FT:{booking_id}:{hash}
+    qrcode: str  # FT:{booking_id}:{hash}
 
 
 class DriverCheckinResponse(BaseModel):
@@ -222,10 +189,13 @@ class DriverCheckinResponse(BaseModel):
 
 app = FastAPI(title="Shuttle Driver API", version="2.0.0")
 
-# CORS - 給正式前端用，先全部放行，之後你可改成指定網域
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        # 未來可加上正式前端網域
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -237,172 +207,134 @@ def health():
     return {"status": "ok", "time": _tz_now_str()}
 
 
-# ========= 1. 取得「預計出車」班次列表（主班次時間） =========
+# ========= 1. 班次列表（主班次時間） =========
 
 @app.get("/api/driver/trips", response_model=List[DriverTrip])
 def driver_get_trips():
     """
-    司機用：取得未來班次清單（依「主班次時間」去重）。
-    對應你原本的 ARRAYFORMULA（用主班次時間 S 欄、過濾 >= NOW()-1/24）。
+    司機用：取得未來「主班次時間」的班次列表。
+    等價於你原本 Sheet 裡的：
+      FILTER( 主班次時間 >= NOW()-1/24 ) 再 UNIQUE + 拆成日期/時間。
     """
-    ws_main = open_ws(SHEET_NAME_MAIN)
-    hmap = header_map_main(ws_main)
-    values = _read_all_rows(ws_main)
+    ws = open_ws(SHEET_NAME_MAIN)
+    hmap = header_map_main(ws)
+    values = _read_all_rows(ws)
 
-    col_main = hmap.get("主班次時間")
-    if not values or not col_main:
+    if "主班次時間" not in hmap:
+        # 主班次時間一定要存在
         return []
 
-    idx_main = col_main - 1
-    col_pax = hmap.get("確認人數") or hmap.get("預約人數")
-    idx_pax = col_pax - 1 if col_pax else None
-    col_status = hmap.get("預約狀態")
-    idx_status = col_status - 1 if col_status else None
+    idx_main_dt = hmap["主班次時間"] - 1
+    idx_pax_col = hmap.get("確認人數", hmap.get("預約人數", 0))
+    idx_pax = idx_pax_col - 1 if idx_pax_col else None
+    idx_status_col = hmap.get("預約狀態")
+    idx_status = idx_status_col - 1 if idx_status_col else None
 
-    trips: Dict[str, DriverTrip] = {}
+    now = _tz_now()
+    cutoff = now - timedelta(hours=1)  # NOW() - 1/24
 
-    now_dt = _tz_now_dt()
-    # 對齊你原本公式：主班次時間 >= NOW() - 1/24
-    min_dt = now_dt - timedelta(hours=1)
+    trips_by_dt: Dict[str, DriverTrip] = {}
 
     for row in values[HEADER_ROW_MAIN:]:
         if not any(row):
             continue
-        if idx_main >= len(row):
+        if idx_main_dt >= len(row):
             continue
 
-        main_dt_raw = (row[idx_main] or "").strip()
-        if not main_dt_raw:
+        main_raw = (row[idx_main_dt] or "").strip()
+        if not main_raw:
             continue
 
-        # 跳過已取消
+        # 排除已取消（包含 ❌ 的都跳過）
         if idx_status is not None and idx_status < len(row):
             st = (row[idx_status] or "").strip()
-            if st == CANCELLED_TEXT or st.startswith("❌"):
+            if "❌" in st or st == CANCELLED_TEXT:
                 continue
 
-        # 解析主班次時間
-        date_str, time_str, dt = _parse_main_dt(main_dt_raw)
-        if not date_str or not time_str or dt is None:
+        dt = _parse_main_dt(main_raw)
+        if not dt or dt < cutoff:
             continue
 
-        if dt < min_dt:
-            continue
+        date_str = dt.strftime("%Y-%m-%d")
+        time_str = dt.strftime("%H:%M")
 
-        key = main_dt_raw  # 原始主班次時間字串當 trip_id
-
-        if key not in trips:
-            trips[key] = DriverTrip(
-                trip_id=key,
+        if main_raw not in trips_by_dt:
+            trips_by_dt[main_raw] = DriverTrip(
+                trip_id=main_raw,
                 date=date_str,
                 time=time_str,
                 total_pax=0,
             )
 
-        # 累計人數
-        pax = 0
-        if idx_pax is not None and 0 <= idx_pax < len(row):
-            try:
-                pax = int((row[idx_pax] or "0").strip() or "0")
-            except Exception:
-                pax = 0
-        trips[key].total_pax += pax
+        if idx_pax is not None and idx_pax < len(row):
+            trips_by_dt[main_raw].total_pax += _safe_int(row[idx_pax], 0)
 
-    # 依主班次時間排序
-    def sort_key(t: DriverTrip):
-        try:
-            dt = datetime.strptime(f"{t.date} {t.time}", "%Y-%m-%d %H:%M")
-        except Exception:
-            dt = datetime.max
-        return dt
-
-    return sorted(trips.values(), key=sort_key)
+    return sorted(trips_by_dt.values(), key=lambda t: (t.date, t.time))
 
 
-# ========= 2. 單一班次 → 依站點/上下車的乘客列表 =========
+# ========= 2. 指定班次乘客列表（依站點） =========
 
 @app.get("/api/driver/trip_passengers", response_model=List[DriverPassenger])
 def driver_get_trip_passengers(
-    trip_id: str = Query(..., description="主班次時間原字串，例如 2025/12/08 17:00"),
+    trip_id: str = Query(..., description="主班次時間原始字串，例如 2025/12/08 18:30")
 ):
     """
-    司機用：取得指定「主班次時間」的乘客清單。
-    每位乘客會拆成「上車」與「下車」兩筆（供班次畫面依站點分組用）。
+    司機用：取得指定「主班次時間」班次的乘客清單。
+    一位乘客拆成「上車」與「下車」兩筆（用於 App 站點分組畫面）。
     """
-    ws_main = open_ws(SHEET_NAME_MAIN)
-    hmap = header_map_main(ws_main)
-    values = _read_all_rows(ws_main)
+    ws = open_ws(SHEET_NAME_MAIN)
+    hmap = header_map_main(ws)
+    values = _read_all_rows(ws)
 
-    col_main = hmap.get("主班次時間")
-    if not values or not col_main:
+    if "主班次時間" not in hmap:
         return []
-    idx_main = col_main - 1
+
+    idx_main_dt = hmap["主班次時間"] - 1
 
     idx_booking = hmap.get("預約編號", 0) - 1
     idx_name = hmap.get("姓名", 0) - 1
     idx_phone = hmap.get("手機", 0) - 1
     idx_room = hmap.get("房號", 0) - 1
-    col_pax = hmap.get("確認人數") or hmap.get("預約人數")
-    idx_pax = col_pax - 1 if col_pax else None
+    idx_pax_col = hmap.get("確認人數", hmap.get("預約人數", 0))
+    idx_pax = idx_pax_col - 1 if idx_pax_col else None
     idx_pick = hmap.get("上車地點", 0) - 1
     idx_drop = hmap.get("下車地點", 0) - 1
-    idx_ride_status = hmap.get("乘車狀態", 0) - 1
-    idx_qr = hmap.get("QRCode編碼", 0) - 1
+    idx_status = hmap.get("乘車狀態", 0) - 1
     idx_dir = hmap.get("往返", 0) - 1
-    idx_pick_idx = hmap.get("上車索引", 0) - 1
-    idx_drop_idx = hmap.get("下車索引", 0) - 1
+    idx_qr = hmap.get("QRCode編碼", 0) - 1
 
     result: List[DriverPassenger] = []
 
     for row in values[HEADER_ROW_MAIN:]:
         if not any(row):
             continue
-        if idx_main >= len(row):
+        if idx_main_dt >= len(row):
             continue
 
-        main_dt_raw = (row[idx_main] or "").strip()
-        if main_dt_raw != trip_id:
+        main_raw = (row[idx_main_dt] or "").strip()
+        if main_raw != trip_id:
             continue
 
         booking_id = (row[idx_booking] if 0 <= idx_booking < len(row) else "").strip()
         name = (row[idx_name] if 0 <= idx_name < len(row) else "").strip()
         phone = (row[idx_phone] if 0 <= idx_phone < len(row) else "").strip()
         room = (row[idx_room] if 0 <= idx_room < len(row) else "").strip()
-        ride_status = (row[idx_ride_status] if 0 <= idx_ride_status < len(row) else "").strip()
+        ride_status = (row[idx_status] if 0 <= idx_status < len(row) else "").strip()
         qrcode = (row[idx_qr] if 0 <= idx_qr < len(row) else "").strip()
         direction = (row[idx_dir] if 0 <= idx_dir < len(row) else "").strip()
 
+        pax = 1
         if idx_pax is not None and 0 <= idx_pax < len(row):
-            try:
-                pax = int((row[idx_pax] or "1").strip() or "1")
-            except Exception:
-                pax = 1
-        else:
-            pax = 1
+            pax = _safe_int(row[idx_pax], 1)
 
         pick = (row[idx_pick] if 0 <= idx_pick < len(row) else "").strip()
         drop = (row[idx_drop] if 0 <= idx_drop < len(row) else "").strip()
-
-        # 站點排序：優先用 上車索引 / 下車索引
-        pick_order = 99
-        drop_order = 99
-        if 0 <= idx_pick_idx < len(row):
-            try:
-                pick_order = int((row[idx_pick_idx] or "99").strip() or "99")
-            except Exception:
-                pick_order = 99
-        if 0 <= idx_drop_idx < len(row):
-            try:
-                drop_order = int((row[idx_drop_idx] or "99").strip() or "99")
-            except Exception:
-                drop_order = 99
 
         # 上車
         if pick:
             result.append(
                 DriverPassenger(
                     trip_id=trip_id,
-                    main_departure=main_dt_raw,
                     station=pick,
                     updown="上車",
                     booking_id=booking_id,
@@ -411,9 +343,8 @@ def driver_get_trip_passengers(
                     room=room,
                     pax=pax,
                     status=ride_status,
-                    qrcode=qrcode,
                     direction=direction,
-                    station_order=pick_order,
+                    qrcode=qrcode,
                 )
             )
         # 下車
@@ -421,7 +352,6 @@ def driver_get_trip_passengers(
             result.append(
                 DriverPassenger(
                     trip_id=trip_id,
-                    main_departure=main_dt_raw,
                     station=drop,
                     updown="下車",
                     booking_id=booking_id,
@@ -430,190 +360,226 @@ def driver_get_trip_passengers(
                     room=room,
                     pax=pax,
                     status=ride_status,
-                    qrcode=qrcode,
                     direction=direction,
-                    station_order=drop_order,
+                    qrcode=qrcode,
                 )
             )
 
-    # 排序：先按站點順序，再上/下車，再預約編號
     def sort_key(p: DriverPassenger):
-        return (p.station_order, 0 if p.updown == "上車" else 1, p.booking_id)
+        # 站點字串前面有 1️⃣ 2️⃣...，字面排序就會是正確順序
+        return (p.station, 0 if p.updown == "上車" else 1, p.booking_id)
 
     return sorted(result, key=sort_key)
 
 
-# ========= 3. 全部乘客清單（右邊「乘客清單」大分頁） =========
+# ========= 3. 乘客清單（全部班次、照出車總覽公式） =========
 
-@app.get("/api/driver/passenger_list", response_model=List[PassengerListRow])
-def driver_passenger_list():
+@app.get("/api/driver/passenger_list", response_model=List[DriverAllPassenger])
+def driver_get_passenger_list():
     """
-    司機/主管用：全部未來乘客清單。
-    結構對應你原本的 ARRAYFORMULA（出車總覽），每位乘客一列，
-    5 個站別欄位：飯店(去)、捷運站、火車站、LaLaport、飯店(回)。
+    司機 / 主管用：乘客總清單。
+    完整模擬你在 Sheet 中那條「出車總覽」 ARRAYFORMULA + QUERY 的邏輯：
+      - data 來源：預約審核(櫃台)
+      - 用 主班次時間 >= NOW() 做篩選
+      - 排除含「❌」的預約狀態
+      - 依 主班次時間、往返、stationSort、dropoff_order 排序
+      - 輸出欄位：車次、主班次時間、預約編號、乘車狀態、往返、
+                  姓名、手機、房號、確認人數、
+                  飯店(去)、捷運站、火車站、LaLaport、飯店(回)
     """
-    ws_main = open_ws(SHEET_NAME_MAIN)
-    hmap = header_map_main(ws_main)
-    values = _read_all_rows(ws_main)
+    ws = open_ws(SHEET_NAME_MAIN)
+    hmap = header_map_main(ws)
+    values = _read_all_rows(ws)
 
-    col_main = hmap.get("主班次時間")
-    if not values or not col_main:
-        return []
+    # 需要用到的欄位索引
+    def col_idx(name: str) -> int:
+        return hmap.get(name, 0) - 1
 
-    idx_main = col_main - 1
+    idx_rid = col_idx("預約編號")
+    idx_car_raw = col_idx("車次")
+    idx_main_dt = col_idx("主班次時間")
+    idx_dir = col_idx("往返")
+    idx_up = col_idx("上車地點")
+    idx_down = col_idx("下車地點")
+    idx_name = col_idx("姓名")
+    idx_phone = col_idx("手機")
+    idx_room = col_idx("房號")
+    idx_qty = col_idx("確認人數")
+    idx_status = col_idx("預約狀態")
+    idx_ride = col_idx("乘車狀態")
 
-    idx_car = hmap.get("車次", 0) - 1
-    idx_booking = hmap.get("預約編號", 0) - 1
-    idx_ride = hmap.get("乘車狀態", 0) - 1
-    idx_dir = hmap.get("往返", 0) - 1
-    idx_up = hmap.get("上車地點", 0) - 1
-    idx_down = hmap.get("下車地點", 0) - 1
-    idx_name = hmap.get("姓名", 0) - 1
-    idx_phone = hmap.get("手機", 0) - 1
-    idx_room = hmap.get("房號", 0) - 1
-    col_pax = hmap.get("確認人數") or hmap.get("預約人數")
-    idx_pax = col_pax - 1 if col_pax else None
-    idx_status = hmap.get("預約狀態", 0) - 1
+    # 站點文字（照你公式中使用的）
+    hotel = "福泰大飯店 Forte Hotel"
+    mrt = "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3"
+    train = "南港火車站 Nangang Train Station"
+    mall = "LaLaport Shopping Park"
 
-    now_dt = _tz_now_dt()
-    # 這裡依公式：主班次時間 >= NOW()
-    min_dt = now_dt - timedelta(minutes=1)
+    now = _tz_now()
 
-    rows: List[Tuple[Tuple, PassengerListRow]] = []
+    base_rows: List[Dict[str, Any]] = []
 
     for row in values[HEADER_ROW_MAIN:]:
         if not any(row):
             continue
-        if idx_main >= len(row):
+        if idx_main_dt < 0 or idx_main_dt >= len(row):
             continue
 
-        main_raw = (row[idx_main] or "").strip()
+        main_raw = (row[idx_main_dt] or "").strip()
         if not main_raw:
             continue
 
-        # 解析主班次時間，並做時間過濾
-        main_date, main_time, main_dt = _parse_main_dt(main_raw)
-        if not main_date or not main_time or main_dt is None:
-            continue
-        if main_dt < min_dt:
+        dt = _parse_main_dt(main_raw)
+        if not dt or dt < now:
+            # 只有主班次時間 >= NOW 的才保留
             continue
 
-        # 過濾已取消
         status_val = (row[idx_status] if 0 <= idx_status < len(row) else "").strip()
-        if status_val == CANCELLED_TEXT or status_val.startswith("❌"):
+        if "❌" in status_val:
+            # 排除已取消
             continue
 
-        car = (row[idx_car] if 0 <= idx_car < len(row) else "").strip()
-        booking_id = (row[idx_booking] if 0 <= idx_booking < len(row) else "").strip()
-        ride_status = (row[idx_ride] if 0 <= idx_ride < len(row) else "").strip()
+        rid = (row[idx_rid] if 0 <= idx_rid < len(row) else "").strip()
+        car_raw = (row[idx_car_raw] if 0 <= idx_car_raw < len(row) else "").strip()
         direction = (row[idx_dir] if 0 <= idx_dir < len(row) else "").strip()
         up = (row[idx_up] if 0 <= idx_up < len(row) else "").strip()
         down = (row[idx_down] if 0 <= idx_down < len(row) else "").strip()
         name = (row[idx_name] if 0 <= idx_name < len(row) else "").strip()
-        phone = (row[idx_phone] if 0 <= idx_phone < len(row) else "").strip()
-        room = (row[idx_room] if 0 <= idx_room < len(row) else "").strip()
+        phone_raw = (row[idx_phone] if 0 <= idx_phone < len(row) else "").strip()
+        room_raw = (row[idx_room] if 0 <= idx_room < len(row) else "").strip()
+        qty_raw = (row[idx_qty] if 0 <= idx_qty < len(row) else "").strip()
+        ride_status = (row[idx_ride] if 0 <= idx_ride < len(row) else "").strip()
 
-        if idx_pax is not None and 0 <= idx_pax < len(row):
-            try:
-                pax = int((row[idx_pax] or "1").strip() or "1")
-            except Exception:
-                pax = 1
+        phone_text = phone_raw if phone_raw else ""
+        room_text = room_raw if room_raw else ""
+        qty = _safe_int(qty_raw, 1)
+
+        # sort_go
+        if up == hotel:
+            sort_go = 1
+        elif up == mrt:
+            sort_go = 2
+        elif up == train:
+            sort_go = 3
+        elif up == mall:
+            sort_go = 4
         else:
-            pax = 1
+            sort_go = 99
 
-        up_n = up.strip()
-        down_n = down.strip()
-
-        # ===== stationSort（站點順序） =====
-        if direction == "去程":
-            if up_n == HOTEL:
-                station_sort = 1
-            elif up_n == MRT:
-                station_sort = 2
-            elif up_n == TRAIN:
-                station_sort = 3
-            elif up_n == MALL:
-                station_sort = 4
-            else:
-                station_sort = 99
-        elif direction == "回程":
-            if up_n == MRT:
-                station_sort = 1
-            elif up_n == TRAIN:
-                station_sort = 2
-            elif up_n == MALL:
-                station_sort = 3
-            elif down_n == HOTEL:
-                station_sort = 4
-            else:
-                station_sort = 99
+        # sort_back
+        if up == mrt:
+            sort_back = 1
+        elif up == train:
+            sort_back = 2
+        elif up == mall:
+            sort_back = 3
+        elif down == hotel:
+            sort_back = 4
         else:
-            station_sort = 99
+            sort_back = 99
 
-        # ===== dropoff_order（下車順序） =====
+        station_sort = sort_go if direction == "去程" else sort_back
+
+        # hotel_go
+        hotel_go = "上" if (direction == "去程" and up == hotel) else ""
+
+        # mrt_col
+        if up == mrt or down == mrt:
+            mrt_col = "上" if up == mrt else "下"
+        else:
+            mrt_col = ""
+
+        # train_col
+        if up == train or down == train:
+            train_col = "上" if up == train else "下"
+        else:
+            train_col = ""
+
+        # mall_col
+        if up == mall or down == mall:
+            mall_col = "上" if up == mall else "下"
+        else:
+            mall_col = ""
+
+        # hotel_back
+        hotel_back = "下" if (direction == "回程" and down == hotel) else ""
+
+        # dropoff_order
         if direction == "去程":
-            if down_n == MRT:
+            if down == mrt:
                 dropoff_order = 1
-            elif down_n == TRAIN:
+            elif down == train:
                 dropoff_order = 2
-            elif down_n == MALL:
+            elif down == mall:
                 dropoff_order = 3
             else:
                 dropoff_order = 4
         elif direction == "回程":
-            if up_n == MALL:
+            if up == mall:
                 dropoff_order = 1
-            elif up_n == TRAIN:
+            elif up == train:
                 dropoff_order = 2
-            elif up_n == MRT:
+            elif up == mrt:
                 dropoff_order = 3
             else:
-                dropoff_order = 99
+                dropoff_order = 4
         else:
             dropoff_order = 99
 
-        # ===== 各站欄位：上/下/空 =====
-        hotel_go = "上" if (direction == "去程" and up_n == HOTEL) else ""
-        hotel_back = "下" if (direction == "回程" and down_n == HOTEL) else ""
-
-        mrt_col = ""
-        if up_n == MRT or down_n == MRT:
-            mrt_col = "上" if up_n == MRT else "下"
-
-        train_col = ""
-        if up_n == TRAIN or down_n == TRAIN:
-            train_col = "上" if up_n == TRAIN else "下"
-
-        mall_col = ""
-        if up_n == MALL or down_n == MALL:
-            mall_col = "上" if up_n == MALL else "下"
-
-        row_model = PassengerListRow(
-            main_departure=main_raw,
-            main_date=main_date,
-            main_time=main_time,
-            car=car,
-            booking_id=booking_id,
-            ride_status=ride_status,
-            direction=direction,
-            name=name,
-            phone=phone,
-            room=room,
-            pax=pax,
-            hotel_go=hotel_go,
-            mrt=mrt_col,
-            train=train_col,
-            mall=mall_col,
-            hotel_back=hotel_back,
-            station_order=station_sort,
-            dropoff_order=dropoff_order,
+        base_rows.append(
+            dict(
+                car_raw=car_raw,
+                main_dt_raw=main_raw,
+                main_dt=dt,
+                booking_id=rid,
+                ride_status=ride_status,
+                direction=direction,
+                station_sort=station_sort,
+                dropoff_order=dropoff_order,
+                name=name,
+                phone=phone_text,
+                room=room_text,
+                qty=qty,
+                hotel_go=hotel_go,
+                mrt=mrt_col,
+                train=train_col,
+                mall=mall_col,
+                hotel_back=hotel_back,
+            )
         )
 
-        sort_key = (main_dt, direction, station_sort, dropoff_order, booking_id)
-        rows.append((sort_key, row_model))
+    # 排序：主班次時間、往返、stationSort、dropoff_order
+    def sort_key(row: Dict[str, Any]):
+        dir_val = row["direction"] or ""
+        # 去程先、回程後
+        dir_rank = 0 if dir_val == "去程" else 1
+        return (row["main_dt"], dir_rank, row["station_sort"], row["dropoff_order"])
 
-    rows.sort(key=lambda x: x[0])
-    return [r for _, r in rows]
+    base_rows.sort(key=sort_key)
+
+    result: List[DriverAllPassenger] = []
+    for row in base_rows:
+        dt = row["main_dt"]
+        depart_time = dt.strftime("%H:%M") if dt else ""
+        result.append(
+            DriverAllPassenger(
+                booking_id=row["booking_id"],
+                main_datetime=row["main_dt_raw"],
+                depart_time=depart_time,
+                name=row["name"],
+                phone=row["phone"],
+                room=row["room"],
+                pax=row["qty"],
+                ride_status=row["ride_status"],
+                direction=row["direction"],
+                hotel_go=row["hotel_go"],
+                mrt=row["mrt"],
+                train=row["train"],
+                mall=row["mall"],
+                hotel_back=row["hotel_back"],
+            )
+        )
+
+    return result
 
 
 # ========= 4. 掃描 QRCode → 更新乘車狀態 =========
@@ -634,11 +600,16 @@ def driver_checkin(req: DriverCheckinRequest):
             status="error",
             message="QRCode 格式錯誤",
         )
-    booking_id = parts[1]
+    booking_id = parts[1].strip()
+    if not booking_id:
+        return DriverCheckinResponse(
+            status="error",
+            message="QRCode 內容缺少預約編號",
+        )
 
-    ws_main = open_ws(SHEET_NAME_MAIN)
-    hmap = header_map_main(ws_main)
-    values = _read_all_rows(ws_main)
+    ws = open_ws(SHEET_NAME_MAIN)
+    hmap = header_map_main(ws)
+    values = _read_all_rows(ws)
 
     if "預約編號" not in hmap:
         raise HTTPException(500, "主表缺少『預約編號』欄位")
@@ -650,35 +621,40 @@ def driver_checkin(req: DriverCheckinRequest):
             message=f"找不到預約編號 {booking_id}",
         )
 
-    from gspread.utils import rowcol_to_a1
+    # 直接從 values 取值，避免多次 cell() 呼叫
+    row_idx = rowno - 1  # values 的 index
+    row = values[row_idx] if 0 <= row_idx < len(values) else []
 
-    # 更新「乘車狀態」與「最後操作時間」
+    def getv(col_name: str) -> str:
+        ci = hmap.get(col_name, 0) - 1
+        if ci < 0 or ci >= len(row):
+            return ""
+        return row[ci] or ""
+
+    # 更新乘車狀態 / 最後操作時間
     updates: Dict[str, str] = {}
     if "乘車狀態" in hmap:
         updates["乘車狀態"] = "已上車"
     if "最後操作時間" in hmap:
         updates["最後操作時間"] = _tz_now_str() + " 已上車(司機)"
 
-    batch_updates = []
-    for col_name, value in updates.items():
-        if col_name in hmap:
-            batch_updates.append(
+    from gspread.utils import rowcol_to_a1
+
+    if updates:
+        data = []
+        for col_name, val in updates.items():
+            ci = hmap[col_name]
+            data.append(
                 {
-                    "range": rowcol_to_a1(rowno, hmap[col_name]),
-                    "values": [[value]],
+                    "range": rowcol_to_a1(rowno, ci),
+                    "values": [[val]],
                 }
             )
-    if batch_updates:
-        ws_main.batch_update(batch_updates, value_input_option="USER_ENTERED")
+        ws.batch_update(data, value_input_option="USER_ENTERED")
 
     # 回傳給前端顯示
-    def getv(col: str) -> str:
-        return _get_cell_from_row(values[rowno - 1], hmap, col)
-
-    try:
-        pax = int((getv("確認人數") or getv("預約人數") or "1"))
-    except Exception:
-        pax = 1
+    pax_str = getv("確認人數") or getv("預約人數") or "1"
+    pax = _safe_int(pax_str, 1)
 
     return DriverCheckinResponse(
         status="success",
