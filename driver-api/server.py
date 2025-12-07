@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 import google.auth
 import gspread
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # ========= Google Sheets 設定 =========
@@ -16,12 +17,12 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
-# 和你 booking-manager 一樣的 Spreadsheet
+# ✅ 用你現在 booking-manager 相同的 Spreadsheet
 SPREADSHEET_ID = "1xp54tKOczklmT8uacW-HMxwV8r0VOR2ui33jYcE2pUQ"
 SHEET_NAME_MAIN = "預約審核(櫃台)"
-HEADER_ROW_MAIN = 2
+HEADER_ROW_MAIN = 2  # 第二列是表頭，資料從第三列起
 
-# 狀態文字（和原本保持一致）
+# 狀態文字（要跟 booking-manager 一致）
 BOOKED_TEXT = "✔️ 已預約 Booked"
 CANCELLED_TEXT = "❌ 已取消 Cancelled"
 
@@ -40,7 +41,7 @@ def _tz_now_str() -> str:
 
 
 def _time_hm_from_any(s: str) -> str:
-    """把 '18:30', '2025/12/08 18:30', '18：30' 之類的文字整理成 'HH:MM'。"""
+    """把 '18:30', '2025/12/08 18:30', '18：30' 之類整理成 'HH:MM'。"""
     s = (s or "").strip().replace("：", ":")
     if " " in s and ":" in s:
         return s.split()[-1][:5]
@@ -50,6 +51,7 @@ def _time_hm_from_any(s: str) -> str:
 
 
 def open_ws(name: str) -> gspread.Worksheet:
+    """開啟指定名稱的工作表。"""
     credentials, _ = google.auth.default(scopes=SCOPES)
     gc = gspread.authorize(credentials)
     sh = gc.open_by_key(SPREADSHEET_ID)
@@ -63,7 +65,8 @@ def _sheet_headers(ws: gspread.Worksheet, header_row: int) -> List[str]:
 
 def header_map_main(ws: gspread.Worksheet) -> Dict[str, int]:
     """
-    把表頭欄位名稱 -> 欄位位置（1-based index）
+    把表頭欄位名稱 -> 欄位位置（1-based index）。
+    例：{"車次-日期時間": 23, "預約編號": 3, ...}
     """
     row = _sheet_headers(ws, HEADER_ROW_MAIN)
     m: Dict[str, int] = {}
@@ -75,7 +78,23 @@ def header_map_main(ws: gspread.Worksheet) -> Dict[str, int]:
 
 
 def _read_all_rows(ws: gspread.Worksheet) -> List[List[str]]:
+    """把整張表抓成 List[List[str]]。"""
     return ws.get_all_values()
+
+
+def _find_booking_row(values: List[List[str]], hmap: Dict[str, int], booking_id: str) -> Optional[int]:
+    """
+    在全表裡找到指定 booking_id 的列號（Sheet 上的 1-based row number）。
+    """
+    col = hmap.get("預約編號")
+    if not col:
+        return None
+    col_idx = col - 1
+    # values[0] 是第一列，values[HEADER_ROW_MAIN] 是第三列
+    for i, row in enumerate(values[HEADER_ROW_MAIN:], start=HEADER_ROW_MAIN + 1):
+        if col_idx < len(row) and (row[col_idx] or "").strip() == booking_id:
+            return i
+    return None
 
 
 # ========= Pydantic Models =========
@@ -101,11 +120,11 @@ class DriverPassenger(BaseModel):
 
 
 class DriverCheckinRequest(BaseModel):
-    qrcode: str
+    qrcode: str        # 掃到的整段字串：FT:{booking_id}:{hash}
 
 
 class DriverCheckinResponse(BaseModel):
-    status: str
+    status: str        # "success" / "not_found" / "error"
     message: str
     booking_id: Optional[str] = None
     name: Optional[str] = None
@@ -116,6 +135,19 @@ class DriverCheckinResponse(BaseModel):
 # ========= FastAPI App =========
 
 app = FastAPI(title="Shuttle Driver API", version="1.0.0")
+
+# CORS：先允許本機的前端，之後再加上正式網域
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        # 之後可加 "https://your-driver-front-end.domain"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health")
@@ -325,16 +357,7 @@ def driver_checkin(req: DriverCheckinRequest):
     if "預約編號" not in hmap:
         raise HTTPException(500, "主表缺少『預約編號』欄位")
 
-    col_booking = hmap["預約編號"]
-    rowno: Optional[int] = None
-
-    # 從主表找到該 booking 的列號（1-based）
-    for i, row in enumerate(values[HEADER_ROW_MAIN:], start=HEADER_ROW_MAIN + 1):
-        if col_booking - 1 < len(row):
-            if (row[col_booking - 1] or "").strip() == booking_id:
-                rowno = i
-                break
-
+    rowno = _find_booking_row(values, hmap, booking_id)
     if rowno is None:
         return DriverCheckinResponse(
             status="not_found",
@@ -354,11 +377,12 @@ def driver_checkin(req: DriverCheckinRequest):
         updates["最後操作時間"] = _tz_now_str() + " 已上車(司機)"
 
     batch_updates = []
+    from gspread.utils import rowcol_to_a1
     for col_name, value in updates.items():
         if col_name in hmap:
             batch_updates.append(
                 {
-                    "range": gspread.utils.rowcol_to_a1(rowno, hmap[col_name]),
+                    "range": rowcol_to_a1(rowno, hmap[col_name]),
                     "values": [[value]],
                 }
             )
