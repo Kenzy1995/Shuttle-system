@@ -104,11 +104,14 @@ def _read_all_rows(ws: gspread.Worksheet) -> List[List[str]]:
     return ws.get_all_values()
 
 
-def _find_booking_row(values: List[List[str]],
-                      hmap: Dict[str, int],
-                      booking_id: str) -> Optional[int]:
+def _find_booking_row(
+    values: List[List[str]],
+    hmap: Dict[str, int],
+    booking_id: str
+) -> Optional[int]:
     """
     找到指定預約編號所在的「工作表列號」（1-based）。
+    （目前 checkin 已改用 QRCode編碼 查找，這個 function 只保留備用）
     """
     col = hmap.get("預約編號")
     if not col:
@@ -117,6 +120,27 @@ def _find_booking_row(values: List[List[str]],
     # values[0] -> row1, values[HEADER_ROW_MAIN] -> row3
     for i, row in enumerate(values[HEADER_ROW_MAIN:], start=HEADER_ROW_MAIN + 1):
         if ci < len(row) and (row[ci] or "").strip() == booking_id:
+            return i
+    return None
+
+
+def _find_qrcode_row(
+    values: List[List[str]],
+    hmap: Dict[str, int],
+    qrcode_value: str
+) -> Optional[int]:
+    """
+    在『QRCode編碼』欄位裡，用「完整 qrcode 字串」找列。
+    回傳工作表列號（1-based），找不到回傳 None。
+    """
+    col = hmap.get("QRCode編碼")
+    if not col:
+        return None
+    ci = col - 1
+
+    # values[0] 是第 1 列，values[HEADER_ROW_MAIN] 才是第 3 列資料
+    for i, row in enumerate(values[HEADER_ROW_MAIN:], start=HEADER_ROW_MAIN + 1):
+        if ci < len(row) and (row[ci] or "").strip() == qrcode_value:
             return i
     return None
 
@@ -582,13 +606,23 @@ def driver_get_passenger_list():
     return result
 
 
-# ========= 4. 掃描 QRCode → 更新乘車狀態 =========
+# ========= 4. 掃描 QRCode → 更新乘車狀態（用 QRCode編碼，比對 ±30 分鐘，避免重複核銷） =========
 
 @app.post("/api/driver/checkin", response_model=DriverCheckinResponse)
 def driver_checkin(req: DriverCheckinRequest):
     """
     司機用：掃描 QRCode 後，將該訂單標記為「已上車」。
-    QR 格式：FT:{booking_id}:{hash}
+
+    QR 格式（例）：FT:20146958:2043d6
+
+    規則：
+    1. **只用『QRCode編碼』欄位** 比對整條 qrcode 字串，找出對應列
+    2. 若「乘車狀態」已含「已上車」→ status = "already_checked_in"
+       message = "此乘客已上車，不重複核銷"
+    3. 取該列「主班次時間」，只有在『主班次時間 ± 30 分鐘』內才允許核銷
+       - now > 主班次時間 + 30 分鐘 → status = "expired"（逾期）
+       - now < 主班次時間 - 30 分鐘 → status = "not_started"（尚未發車）
+       - 其餘 → 更新「乘車狀態」為「已上車」並寫入「最後操作時間」
     """
     code = (req.qrcode or "").strip()
     if not code:
@@ -600,28 +634,28 @@ def driver_checkin(req: DriverCheckinRequest):
             status="error",
             message="QRCode 格式錯誤",
         )
-    booking_id = parts[1].strip()
-    if not booking_id:
-        return DriverCheckinResponse(
-            status="error",
-            message="QRCode 內容缺少預約編號",
-        )
+
+    # 從 QRCode 中抓出 booking_id（純顯示用，不拿來找列）
+    booking_id = parts[1].strip() if len(parts) >= 2 else ""
 
     ws = open_ws(SHEET_NAME_MAIN)
     hmap = header_map_main(ws)
     values = _read_all_rows(ws)
 
-    if "預約編號" not in hmap:
-        raise HTTPException(500, "主表缺少『預約編號』欄位")
+    # 一定要有 QRCode編碼 欄位
+    if "QRCode編碼" not in hmap:
+        raise HTTPException(500, "主表缺少『QRCode編碼』欄位")
 
-    rowno = _find_booking_row(values, hmap, booking_id)
+    # ✅ 用「QRCode編碼」來找列（完整比對整條字串）
+    rowno: Optional[int] = _find_qrcode_row(values, hmap, code)
+
     if rowno is None:
         return DriverCheckinResponse(
             status="not_found",
-            message=f"找不到預約編號 {booking_id}",
+            message="找不到對應的預約（QRCode編碼）",
         )
 
-    # 直接從 values 取值，避免多次 cell() 呼叫
+    # 直接從 values 取值
     row_idx = rowno - 1  # values 的 index
     row = values[row_idx] if 0 <= row_idx < len(values) else []
 
@@ -631,7 +665,74 @@ def driver_checkin(req: DriverCheckinRequest):
             return ""
         return row[ci] or ""
 
-    # 更新乘車狀態 / 最後操作時間
+    # 以表格內容為準更新 booking_id（避免將來格式調整）
+    sheet_booking_id = getv("預約編號").strip()
+    if sheet_booking_id:
+        booking_id = sheet_booking_id
+
+    # ✨ 先檢查是否已經「已上車」→ 不重複核銷
+    ride_status_current = getv("乘車狀態").strip()
+    if ride_status_current and ("已上車" in ride_status_current):
+        pax_str = getv("確認人數") or getv("預約人數") or "1"
+        pax = _safe_int(pax_str, 1)
+        return DriverCheckinResponse(
+            status="already_checked_in",
+            message="此乘客已上車，不重複核銷",
+            booking_id=booking_id or None,
+            name=getv("姓名") or None,
+            pax=pax,
+            station=getv("上車地點") or None,
+        )
+
+    # 取得主班次時間，並做 ±30 分鐘判斷
+    main_raw = getv("主班次時間").strip()
+    if not main_raw:
+        return DriverCheckinResponse(
+            status="error",
+            message="此預約缺少『主班次時間』，無法核銷上車",
+            booking_id=booking_id or None,
+        )
+
+    main_dt = _parse_main_dt(main_raw)
+    if not main_dt:
+        return DriverCheckinResponse(
+            status="error",
+            message=f"主班次時間格式錯誤：{main_raw}",
+            booking_id=booking_id or None,
+        )
+
+    now = _tz_now()
+    diff_sec = (now - main_dt).total_seconds()
+    limit = 30 * 60  # 30 分鐘
+
+    # 太晚：逾期
+    if diff_sec > limit:
+        pax_str = getv("確認人數") or getv("預約人數") or "1"
+        pax = _safe_int(pax_str, 1)
+        return DriverCheckinResponse(
+            status="expired",
+            message="此班次已逾期，無法核銷上車",
+            booking_id=booking_id or None,
+            name=getv("姓名") or None,
+            pax=pax,
+            station=getv("上車地點") or None,
+        )
+
+    # 太早：尚未發車
+    if diff_sec < -limit:
+        dt_str = main_dt.strftime("%Y/%m/%d %H:%M")
+        pax_str = getv("確認人數") or getv("預約人數") or "1"
+        pax = _safe_int(pax_str, 1)
+        return DriverCheckinResponse(
+            status="not_started",
+            message=f"{dt_str} 班次，尚未發車",
+            booking_id=booking_id or None,
+            name=getv("姓名") or None,
+            pax=pax,
+            station=getv("上車地點") or None,
+        )
+
+    # OK：在主班次時間 ±30 分鐘內，允許核銷 → 更新乘車狀態 / 最後操作時間
     updates: Dict[str, str] = {}
     if "乘車狀態" in hmap:
         updates["乘車狀態"] = "已上車"
@@ -659,8 +760,8 @@ def driver_checkin(req: DriverCheckinRequest):
     return DriverCheckinResponse(
         status="success",
         message="已完成上車紀錄",
-        booking_id=booking_id,
-        name=getv("姓名"),
+        booking_id=booking_id or None,
+        name=getv("姓名") or None,
         pax=pax,
-        station=getv("上車地點"),
+        station=getv("上車地點") or None,
     )
