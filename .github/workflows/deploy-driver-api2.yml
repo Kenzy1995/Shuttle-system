@@ -3,7 +3,7 @@ name: Deploy Driver API to Cloud Run
 on:
   push:
     paths:
-      - 'driver-api/**'
+      - 'driver-api2/**'
     branches: [ main ]
 
 env:
