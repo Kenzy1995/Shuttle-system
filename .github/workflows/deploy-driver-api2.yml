@@ -8,7 +8,7 @@ on:
 
 env:
   PROJECT_ID: '${{ secrets.GCP_PROJECT_ID }}'
-  SERVICE: driver-api
+  SERVICE: driver-api2
   REGION: asia-east1
 
 jobs:
@@ -34,7 +34,7 @@ jobs:
 
     - name: Build Docker image
       run: |
-        cd driver-api
+        cd driver-api2
         docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE }} .
 
     - name: Push Docker image
