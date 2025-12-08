@@ -1,16 +1,16 @@
 from __future__ import annotations
+
 import os
 import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
-
+from threading import Lock
+from typing import Any, Dict, List, Optional, Tuple
 
 import google.auth
 import gspread
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
 
 # ========= Google Sheets 設定 =========
 
@@ -27,8 +27,26 @@ HEADER_ROW_MAIN = 2  # 第 2 列為表頭，資料從第 3 列起
 BOOKED_TEXT = "✔️ 已預約 Booked"
 CANCELLED_TEXT = "❌ 已取消 Cancelled"
 
+# ========= 快取設定 =========
+# 目標：在 5 秒 TTL 內，所有讀取 API 都共用同一份 Sheet 資料，避免重複打 Google Sheets
 
-# ========= 共用工具 =========
+CACHE_TTL_SECONDS = 5
+
+# SHEET_CACHE 結構：
+# {
+#   "values": List[List[str]] 或 None,
+#   "header_map": Dict[str, int] 或 None,
+#   "fetched_at": datetime 或 None
+# }
+SHEET_CACHE: Dict[str, Any] = {
+    "values": None,
+    "header_map": None,
+    "fetched_at": None,
+}
+CACHE_LOCK = Lock()
+
+
+# ========= 共用時間工具 =========
 
 def _tz_now() -> datetime:
     """台北時間 now（作為時間比較用）"""
@@ -36,6 +54,7 @@ def _tz_now() -> datetime:
     try:
         time.tzset()
     except Exception:
+        # 某些環境不支援 tzset
         pass
     return datetime.now()
 
@@ -44,16 +63,6 @@ def _tz_now_str() -> str:
     """台北時間 now 的字串（寫回表格用）"""
     t = _tz_now()
     return t.strftime("%Y-%m-%d %H:%M:%S")
-
-
-def _time_hm_from_any(s: str) -> str:
-    """把 '18:30', '2025/12/08 18:30', '18：30' 等轉成 'HH:MM'。"""
-    s = (s or "").strip().replace("：", ":")
-    if " " in s and ":" in s:
-        return s.split()[-1][:5]
-    if ":" in s:
-        return s[:5]
-    return s
 
 
 def _parse_main_dt(raw: str) -> Optional[datetime]:
@@ -76,24 +85,54 @@ def _parse_main_dt(raw: str) -> Optional[datetime]:
     return None
 
 
+def _safe_int(v: Any, default: int = 0) -> int:
+    """安全轉 int，用在確認人數／人數欄位。"""
+    try:
+        s = str(v).strip()
+        if not s:
+            return default
+        # 有些會是 1.0 之類
+        return int(float(s))
+    except Exception:
+        return default
+
+
+# ========= Google Sheets 基本操作 =========
+
 def open_ws(name: str) -> gspread.Worksheet:
+    """取得指定名稱的 Worksheet 物件。"""
     credentials, _ = google.auth.default(scopes=SCOPES)
     gc = gspread.authorize(credentials)
     sh = gc.open_by_key(SPREADSHEET_ID)
     return sh.worksheet(name)
 
 
-def _sheet_headers(ws: gspread.Worksheet, header_row: int) -> List[str]:
-    headers = ws.row_values(header_row)
+def _sheet_headers(
+    ws: gspread.Worksheet,
+    header_row: int,
+    values: Optional[List[List[str]]] = None,
+) -> List[str]:
+    """
+    取得表頭列文字：
+    - 若有提供 values，直接從 values 取第 header_row 列
+    - 否則呼叫 ws.row_values(header_row) 讀取
+    """
+    if values is not None and len(values) >= header_row:
+        headers = values[header_row - 1]
+    else:
+        headers = ws.row_values(header_row)
     return [(h or "").strip() for h in headers]
 
 
-def header_map_main(ws: gspread.Worksheet) -> Dict[str, int]:
+def header_map_main(
+    ws: gspread.Worksheet,
+    values: Optional[List[List[str]]] = None,
+) -> Dict[str, int]:
     """
     依表頭名稱建立 map：欄名 -> 欄 index (1-based)。
-    e.g. {"主班次時間": 19, "預約編號": 3, ...}
+    例如：{"主班次時間": 19, "預約編號": 3, ...}
     """
-    row = _sheet_headers(ws, HEADER_ROW_MAIN)
+    row = _sheet_headers(ws, HEADER_ROW_MAIN, values)
     m: Dict[str, int] = {}
     for idx, name in enumerate(row, start=1):
         if name and name not in m:
@@ -106,30 +145,10 @@ def _read_all_rows(ws: gspread.Worksheet) -> List[List[str]]:
     return ws.get_all_values()
 
 
-def _find_booking_row(
-    values: List[List[str]],
-    hmap: Dict[str, int],
-    booking_id: str
-) -> Optional[int]:
-    """
-    找到指定預約編號所在的「工作表列號」（1-based）。
-    （目前 checkin 已改用 QRCode編碼 查找，這個 function 只保留備用）
-    """
-    col = hmap.get("預約編號")
-    if not col:
-        return None
-    ci = col - 1
-    # values[0] -> row1, values[HEADER_ROW_MAIN] -> row3
-    for i, row in enumerate(values[HEADER_ROW_MAIN:], start=HEADER_ROW_MAIN + 1):
-        if ci < len(row) and (row[ci] or "").strip() == booking_id:
-            return i
-    return None
-
-
 def _find_qrcode_row(
     values: List[List[str]],
     hmap: Dict[str, int],
-    qrcode_value: str
+    qrcode_value: str,
 ) -> Optional[int]:
     """
     在『QRCode編碼』欄位裡，用「完整 qrcode 字串」找列。
@@ -147,15 +166,66 @@ def _find_qrcode_row(
     return None
 
 
-def _safe_int(v: Any, default: int = 0) -> int:
-    try:
-        s = str(v).strip()
-        if not s:
-            return default
-        # 有些會是 1.0 之類
-        return int(float(s))
-    except Exception:
-        return default
+def _col_index(hmap: Dict[str, int], name: str) -> int:
+    """將欄名轉成 0-based index，若不存在回傳 -1。"""
+    col = hmap.get(name)
+    return col - 1 if col else -1
+
+
+def _get_cell(row: List[str], idx: int) -> str:
+    """安全讀取 row[idx] 並 strip，超出範圍或 idx<0 則回空字串。"""
+    if idx < 0 or idx >= len(row):
+        return ""
+    return (row[idx] or "").strip()
+
+
+# ========= Sheet 讀取快取核心 =========
+
+def _get_sheet_data_main() -> Tuple[List[List[str]], Dict[str, int]]:
+    """
+    取得《預約審核(櫃台)》的整張表資料與 header_map。
+    - 在 CACHE_TTL_SECONDS 內，如果 cache 有值，直接回傳 cache。
+    - 超過 TTL 或 cache 無效時，重新讀取 Google Sheets 並更新 cache。
+    """
+    now = _tz_now()
+    global SHEET_CACHE
+
+    with CACHE_LOCK:
+        cached_values = SHEET_CACHE.get("values")
+        fetched_at: Optional[datetime] = SHEET_CACHE.get("fetched_at")
+
+        if (
+            cached_values is not None
+            and fetched_at is not None
+            and (now - fetched_at).total_seconds() < CACHE_TTL_SECONDS
+        ):
+            # 使用快取
+            return cached_values, SHEET_CACHE["header_map"]
+
+        # 重新讀取 Sheet
+        ws = open_ws(SHEET_NAME_MAIN)
+        values = _read_all_rows(ws)
+        hmap = header_map_main(ws, values)
+
+        SHEET_CACHE = {
+            "values": values,
+            "header_map": hmap,
+            "fetched_at": now,
+        }
+        return values, hmap
+
+
+def _invalidate_sheet_cache() -> None:
+    """
+    核銷（寫入）後呼叫，讓下一次讀取時一定會重新抓最新資料。
+    """
+    global SHEET_CACHE
+    with CACHE_LOCK:
+        SHEET_CACHE = {
+            "values": None,
+            "header_map": None,
+            "fetched_at": None,
+        }
 
 
 # ========= Pydantic Models =========
@@ -211,46 +281,36 @@ class DriverCheckinResponse(BaseModel):
     station: Optional[str] = None
 
 
-# ========= FastAPI App =========
-
-app = FastAPI(title="Shuttle Driver API", version="2.0.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+class DriverAllData(BaseModel):
+    """整合所有資料的回傳格式：一次給前端 trips / trip_passengers / passenger_list。"""
+    trips: List[DriverTrip]
+    trip_passengers: List[DriverPassenger]
+    passenger_list: List[DriverAllPassenger]
 
 
-@app.get("/health")
-def health():
-    return {"status": "ok", "time": _tz_now_str()}
+# ========= 資料運算邏輯（純函數，不打 API） =========
 
-
-# ========= 1. 班次列表（主班次時間） =========
-
-@app.get("/api/driver/trips", response_model=List[DriverTrip])
-def driver_get_trips():
+def build_driver_trips(
+    values: List[List[str]],
+    hmap: Dict[str, int],
+) -> List[DriverTrip]:
     """
-    司機用：取得未來「主班次時間」的班次列表。
-    等價於你原本 Sheet 裡的：
-      FILTER( 主班次時間 >= NOW()-1/24 ) 再 UNIQUE + 拆成日期/時間。
+    班次列表（主班次時間）：
+    - 來源：整張《預約審核(櫃台)》
+    - 條件：
+        - 主班次時間存在
+        - 主班次時間 >= NOW()-1 小時
+        - 排除已取消（含 "❌" 或 CANCELLED_TEXT）
+    - 結果：同一主班次時間彙總確認人數 total_pax
     """
-    ws = open_ws(SHEET_NAME_MAIN)
-    hmap = header_map_main(ws)
-    values = _read_all_rows(ws)
-
-    if "主班次時間" not in hmap:
-        # 主班次時間一定要存在
+    idx_main_dt = _col_index(hmap, "主班次時間")
+    if idx_main_dt < 0:
         return []
 
-    idx_main_dt = hmap["主班次時間"] - 1
-    idx_pax_col = hmap.get("確認人數", hmap.get("預約人數", 0))
-    idx_pax = idx_pax_col - 1 if idx_pax_col else None
-    idx_status_col = hmap.get("預約狀態")
-    idx_status = idx_status_col - 1 if idx_status_col else None
+    pax_col = hmap.get("確認人數", hmap.get("預約人數", 0))
+    idx_pax = pax_col - 1 if pax_col else -1
+    status_col = hmap.get("預約狀態")
+    idx_status = status_col - 1 if status_col else -1
 
     now = _tz_now()
     cutoff = now - timedelta(hours=1)  # NOW() - 1/24
@@ -263,13 +323,13 @@ def driver_get_trips():
         if idx_main_dt >= len(row):
             continue
 
-        main_raw = (row[idx_main_dt] or "").strip()
+        main_raw = _get_cell(row, idx_main_dt)
         if not main_raw:
             continue
 
         # 排除已取消（包含 ❌ 的都跳過）
-        if idx_status is not None and idx_status < len(row):
-            st = (row[idx_status] or "").strip()
+        if idx_status >= 0 and idx_status < len(row):
+            st = _get_cell(row, idx_status)
             if "❌" in st or st == CANCELLED_TEXT:
                 continue
 
@@ -288,42 +348,38 @@ def driver_get_trips():
                 total_pax=0,
             )
 
-        if idx_pax is not None and idx_pax < len(row):
+        if idx_pax >= 0 and idx_pax < len(row):
             trips_by_dt[main_raw].total_pax += _safe_int(row[idx_pax], 0)
 
     return sorted(trips_by_dt.values(), key=lambda t: (t.date, t.time))
 
 
-# ========= 2. 指定班次乘客列表（依站點） =========
-
-@app.get("/api/driver/trip_passengers", response_model=List[DriverPassenger])
-def driver_get_trip_passengers(
-    trip_id: str = Query(..., description="主班次時間原始字串，例如 2025/12/08 18:30")
-):
+def build_driver_trip_passengers(
+    values: List[List[str]],
+    hmap: Dict[str, int],
+    trip_id: Optional[str] = None,
+) -> List[DriverPassenger]:
     """
-    司機用：取得指定「主班次時間」班次的乘客清單。
-    一位乘客拆成「上車」與「下車」兩筆（用於 App 站點分組畫面）。
+    指定班次乘客列表（依站點），或全部班次乘客：
+    - 若 trip_id 為 None → 產生所有班次的乘客資料（前端可自行依 trip_id 篩選）
+    - 若 trip_id 有值 → 僅產生該主班次時間的乘客
+    - 每位乘客拆成「上車」與「下車」兩筆。
     """
-    ws = open_ws(SHEET_NAME_MAIN)
-    hmap = header_map_main(ws)
-    values = _read_all_rows(ws)
-
-    if "主班次時間" not in hmap:
+    idx_main_dt = _col_index(hmap, "主班次時間")
+    if idx_main_dt < 0:
         return []
 
-    idx_main_dt = hmap["主班次時間"] - 1
-
-    idx_booking = hmap.get("預約編號", 0) - 1
-    idx_name = hmap.get("姓名", 0) - 1
-    idx_phone = hmap.get("手機", 0) - 1
-    idx_room = hmap.get("房號", 0) - 1
-    idx_pax_col = hmap.get("確認人數", hmap.get("預約人數", 0))
-    idx_pax = idx_pax_col - 1 if idx_pax_col else None
-    idx_pick = hmap.get("上車地點", 0) - 1
-    idx_drop = hmap.get("下車地點", 0) - 1
-    idx_status = hmap.get("乘車狀態", 0) - 1
-    idx_dir = hmap.get("往返", 0) - 1
-    idx_qr = hmap.get("QRCode編碼", 0) - 1
+    idx_booking = _col_index(hmap, "預約編號")
+    idx_name = _col_index(hmap, "姓名")
+    idx_phone = _col_index(hmap, "手機")
+    idx_room = _col_index(hmap, "房號")
+    pax_col = hmap.get("確認人數", hmap.get("預約人數", 0))
+    idx_pax = pax_col - 1 if pax_col else -1
+    idx_pick = _col_index(hmap, "上車地點")
+    idx_drop = _col_index(hmap, "下車地點")
+    idx_status = _col_index(hmap, "乘車狀態")
+    idx_dir = _col_index(hmap, "往返")
+    idx_qr = _col_index(hmap, "QRCode編碼")
 
     result: List[DriverPassenger] = []
 
@@ -333,30 +389,33 @@ def driver_get_trip_passengers(
         if idx_main_dt >= len(row):
             continue
 
-        main_raw = (row[idx_main_dt] or "").strip()
-        if main_raw != trip_id:
+        main_raw = _get_cell(row, idx_main_dt)
+        if not main_raw:
             continue
 
-        booking_id = (row[idx_booking] if 0 <= idx_booking < len(row) else "").strip()
-        name = (row[idx_name] if 0 <= idx_name < len(row) else "").strip()
-        phone = (row[idx_phone] if 0 <= idx_phone < len(row) else "").strip()
-        room = (row[idx_room] if 0 <= idx_room < len(row) else "").strip()
-        ride_status = (row[idx_status] if 0 <= idx_status < len(row) else "").strip()
-        qrcode = (row[idx_qr] if 0 <= idx_qr < len(row) else "").strip()
-        direction = (row[idx_dir] if 0 <= idx_dir < len(row) else "").strip()
+        if trip_id is not None and main_raw != trip_id:
+            continue
+
+        booking_id = _get_cell(row, idx_booking)
+        name = _get_cell(row, idx_name)
+        phone = _get_cell(row, idx_phone)
+        room = _get_cell(row, idx_room)
+        ride_status = _get_cell(row, idx_status)
+        qrcode = _get_cell(row, idx_qr)
+        direction = _get_cell(row, idx_dir)
 
         pax = 1
-        if idx_pax is not None and 0 <= idx_pax < len(row):
+        if idx_pax >= 0 and idx_pax < len(row):
             pax = _safe_int(row[idx_pax], 1)
 
-        pick = (row[idx_pick] if 0 <= idx_pick < len(row) else "").strip()
-        drop = (row[idx_drop] if 0 <= idx_drop < len(row) else "").strip()
+        pick = _get_cell(row, idx_pick)
+        drop = _get_cell(row, idx_drop)
 
         # 上車
         if pick:
             result.append(
                 DriverPassenger(
-                    trip_id=trip_id,
+                    trip_id=main_raw,
                     station=pick,
                     updown="上車",
                     booking_id=booking_id,
@@ -369,11 +428,12 @@ def driver_get_trip_passengers(
                     qrcode=qrcode,
                 )
             )
+
         # 下車
         if drop:
             result.append(
                 DriverPassenger(
-                    trip_id=trip_id,
+                    trip_id=main_raw,
                     station=drop,
                     updown="下車",
                     booking_id=booking_id,
@@ -394,12 +454,12 @@ def driver_get_trip_passengers(
     return sorted(result, key=sort_key)
 
 
-# ========= 3. 乘客清單（全部班次、照出車總覽公式） =========
-
-@app.get("/api/driver/passenger_list", response_model=List[DriverAllPassenger])
-def driver_get_passenger_list():
+def build_driver_all_passengers(
+    values: List[List[str]],
+    hmap: Dict[str, int],
+) -> List[DriverAllPassenger]:
     """
-    司機 / 主管用：乘客總清單。
+    乘客清單（全部班次、照出車總覽公式）：
     完整模擬你在 Sheet 中那條「出車總覽」 ARRAYFORMULA + QUERY 的邏輯：
       - data 來源：預約審核(櫃台)
       - 用 主班次時間 >= NOW() 做篩選
@@ -409,13 +469,8 @@ def driver_get_passenger_list():
                   姓名、手機、房號、確認人數、
                   飯店(去)、捷運站、火車站、LaLaport、飯店(回)
     """
-    ws = open_ws(SHEET_NAME_MAIN)
-    hmap = header_map_main(ws)
-    values = _read_all_rows(ws)
-
-    # 需要用到的欄位索引
     def col_idx(name: str) -> int:
-        return hmap.get(name, 0) - 1
+        return _col_index(hmap, name)
 
     idx_rid = col_idx("預約編號")
     idx_car_raw = col_idx("車次")
@@ -430,6 +485,9 @@ def driver_get_passenger_list():
     idx_status = col_idx("預約狀態")
     idx_ride = col_idx("乘車狀態")
 
+    if idx_main_dt < 0:
+        return []
+
     # 站點文字（照你公式中使用的）
     hotel = "福泰大飯店 Forte Hotel"
     mrt = "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3"
@@ -443,10 +501,10 @@ def driver_get_passenger_list():
     for row in values[HEADER_ROW_MAIN:]:
         if not any(row):
             continue
-        if idx_main_dt < 0 or idx_main_dt >= len(row):
+        if idx_main_dt >= len(row):
             continue
 
-        main_raw = (row[idx_main_dt] or "").strip()
+        main_raw = _get_cell(row, idx_main_dt)
         if not main_raw:
             continue
 
@@ -455,21 +513,21 @@ def driver_get_passenger_list():
             # 只有主班次時間 >= NOW 的才保留
             continue
 
-        status_val = (row[idx_status] if 0 <= idx_status < len(row) else "").strip()
+        status_val = _get_cell(row, idx_status)
         if "❌" in status_val:
             # 排除已取消
             continue
 
-        rid = (row[idx_rid] if 0 <= idx_rid < len(row) else "").strip()
-        car_raw = (row[idx_car_raw] if 0 <= idx_car_raw < len(row) else "").strip()
-        direction = (row[idx_dir] if 0 <= idx_dir < len(row) else "").strip()
-        up = (row[idx_up] if 0 <= idx_up < len(row) else "").strip()
-        down = (row[idx_down] if 0 <= idx_down < len(row) else "").strip()
-        name = (row[idx_name] if 0 <= idx_name < len(row) else "").strip()
-        phone_raw = (row[idx_phone] if 0 <= idx_phone < len(row) else "").strip()
-        room_raw = (row[idx_room] if 0 <= idx_room < len(row) else "").strip()
-        qty_raw = (row[idx_qty] if 0 <= idx_qty < len(row) else "").strip()
-        ride_status = (row[idx_ride] if 0 <= idx_ride < len(row) else "").strip()
+        rid = _get_cell(row, idx_rid)
+        car_raw = _get_cell(row, idx_car_raw)
+        direction = _get_cell(row, idx_dir)
+        up = _get_cell(row, idx_up)
+        down = _get_cell(row, idx_down)
+        name = _get_cell(row, idx_name)
+        phone_raw = _get_cell(row, idx_phone)
+        room_raw = _get_cell(row, idx_room)
+        qty_raw = _get_cell(row, idx_qty)
+        ride_status = _get_cell(row, idx_ride)
 
         phone_text = phone_raw if phone_raw else ""
         room_text = room_raw if room_raw else ""
@@ -604,6 +662,81 @@ def driver_get_passenger_list():
     return result
 
 
+# ========= FastAPI App =========
+
+app = FastAPI(title="Shuttle Driver API", version="3.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 現在允許所有來源，方便前端在各種網域使用
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "time": _tz_now_str()}
+
+
+# ========= 新整合端點：一次給 trips / trip_passengers / passenger_list =========
+
+@app.get("/api/driver/data", response_model=DriverAllData)
+def driver_get_all_data():
+    """
+    整合端點：
+      - 讀取一次 Sheet（支援 5 秒快取）
+      - 產生三種資料：
+          1. trips           → 班次列表
+          2. trip_passengers → 所有班次乘客（每人拆上/下車兩筆，含 trip_id 可供前端過濾）
+          3. passenger_list  → 出車總覽（全部乘客）
+    """
+    values, hmap = _get_sheet_data_main()
+
+    trips = build_driver_trips(values, hmap)
+    trip_passengers = build_driver_trip_passengers(values, hmap, trip_id=None)
+    passenger_list = build_driver_all_passengers(values, hmap)
+
+    return DriverAllData(
+        trips=trips,
+        trip_passengers=trip_passengers,
+        passenger_list=passenger_list,
+    )
+
+
+# ========= 兼容舊前端的三個端點（改用快取與共用邏輯） =========
+
+@app.get("/api/driver/trips", response_model=List[DriverTrip])
+def driver_get_trips():
+    """
+    班次列表（舊端點，現在改為使用快取與共用邏輯）。
+    前端如果要更高效，可以改用 /api/driver/data。
+    """
+    values, hmap = _get_sheet_data_main()
+    return build_driver_trips(values, hmap)
+
+
+@app.get("/api/driver/trip_passengers", response_model=List[DriverPassenger])
+def driver_get_trip_passengers(
+    trip_id: str = Query(..., description="主班次時間原始字串，例如 2025/12/08 18:30"),
+):
+    """
+    指定班次乘客列表（舊端點，現在改為使用快取與共用邏輯）。
+    """
+    values, hmap = _get_sheet_data_main()
+    return build_driver_trip_passengers(values, hmap, trip_id=trip_id)
+
+
+@app.get("/api/driver/passenger_list", response_model=List[DriverAllPassenger])
+def driver_get_passenger_list():
+    """
+    乘客清單（出車總覽）（舊端點，現在改為使用快取與共用邏輯）。
+    """
+    values, hmap = _get_sheet_data_main()
+    return build_driver_all_passengers(values, hmap)
+
+
 # ========= 4. 掃描 QRCode → 更新乘車狀態（用 QRCode編碼，比對 ±30 分鐘，避免重複核銷） =========
 
 @app.post("/api/driver/checkin", response_model=DriverCheckinResponse)
@@ -636,15 +769,16 @@ def driver_checkin(req: DriverCheckinRequest):
     # 從 QRCode 中抓出 booking_id（純顯示用，不拿來找列）
     booking_id = parts[1].strip() if len(parts) >= 2 else ""
 
+    # 這裡不使用快取，改為每次讀取最新資料，避免核銷判斷用到過舊資料
     ws = open_ws(SHEET_NAME_MAIN)
-    hmap = header_map_main(ws)
     values = _read_all_rows(ws)
+    hmap = header_map_main(ws, values)
 
     # 一定要有 QRCode編碼 欄位
     if "QRCode編碼" not in hmap:
         raise HTTPException(500, "主表缺少『QRCode編碼』欄位")
 
-    # ✅ 用「QRCode編碼」來找列（完整比對整條字串）
+    # 用「QRCode編碼」來找列（完整比對整條字串）
     rowno: Optional[int] = _find_qrcode_row(values, hmap, code)
 
     if rowno is None:
@@ -668,7 +802,7 @@ def driver_checkin(req: DriverCheckinRequest):
     if sheet_booking_id:
         booking_id = sheet_booking_id
 
-    # ✨ 先檢查是否已經「已上車」→ 不重複核銷
+    # 先檢查是否已經「已上車」→ 不重複核銷
     ride_status_current = getv("乘車狀態").strip()
     if ride_status_current and ("已上車" in ride_status_current):
         pax_str = getv("確認人數") or getv("預約人數") or "1"
@@ -750,6 +884,9 @@ def driver_checkin(req: DriverCheckinRequest):
                 }
             )
         ws.batch_update(data, value_input_option="USER_ENTERED")
+
+    # 核銷成功後，清除快取，下次讀資料會重新載入最新表內容
+    _invalidate_sheet_cache()
 
     # 回傳給前端顯示
     pax_str = getv("確認人數") or getv("預約人數") or "1"
