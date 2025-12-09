@@ -45,6 +45,18 @@ SHEET_CACHE: Dict[str, Any] = {
 }
 CACHE_LOCK = Lock()
 
+# ========= 司機即時位置 (In-Memory) =========
+# 注意：若部署在 Serverless (Cloud Run) 且有多個實例，這裡的變數不會共享。
+# 但考量只有一位司機，且通常會在同一實例處理，或可接受短暫不一致。
+# 若需嚴格一致性，需寫入 Google Sheets 或 Redis。
+DRIVER_LOCATION_CACHE: Dict[str, Any] = {
+    "lat": 0.0,
+    "lng": 0.0,
+    "timestamp": 0.0,
+    "updated_at": None
+}
+LOCATION_LOCK = Lock()
+
 
 # ========= 共用時間工具 =========
 
@@ -279,6 +291,19 @@ class DriverCheckinResponse(BaseModel):
     name: Optional[str] = None
     pax: Optional[int] = None
     station: Optional[str] = None
+
+
+class DriverLocation(BaseModel):
+    lat: float
+    lng: float
+    timestamp: float
+
+class BookingIdRequest(BaseModel):
+    booking_id: str
+
+class TripStatusRequest(BaseModel):
+    main_datetime: str  # 格式: YYYY/MM/DD HH:MM
+    status: str         # 已發車 / 已結束
 
 
 class DriverAllData(BaseModel):
@@ -680,6 +705,31 @@ def health():
     return {"status": "ok", "time": _tz_now_str()}
 
 
+# ========= 5. GPS 定位功能 =========
+
+@app.post("/api/driver/location")
+def update_driver_location(loc: DriverLocation):
+    """
+    接收司機端上傳的 GPS 座標
+    """
+    global DRIVER_LOCATION_CACHE
+    with LOCATION_LOCK:
+        DRIVER_LOCATION_CACHE["lat"] = loc.lat
+        DRIVER_LOCATION_CACHE["lng"] = loc.lng
+        DRIVER_LOCATION_CACHE["timestamp"] = loc.timestamp
+        DRIVER_LOCATION_CACHE["updated_at"] = _tz_now_str()
+    return {"status": "ok", "received": loc}
+
+
+@app.get("/api/driver/location")
+def get_driver_location():
+    """
+    取得司機最新位置 (供乘客端或地圖顯示使用)
+    """
+    with LOCATION_LOCK:
+        return DRIVER_LOCATION_CACHE
+
+
 # ========= 新整合端點：一次給 trips / trip_passengers / passenger_list =========
 
 @app.get("/api/driver/data", response_model=DriverAllData)
@@ -740,7 +790,7 @@ def driver_get_passenger_list():
 # ========= 4. 掃描 QRCode → 更新乘車狀態（用 QRCode編碼，比對 ±30 分鐘，避免重複核銷） =========
 
 @app.post("/api/driver/checkin", response_model=DriverCheckinResponse)
-def driver_checkin(req: DriverCheckinRequest):
+def api_driver_checkin(req: DriverCheckinRequest):
     """
     司機用：掃描 QRCode 後，將該訂單標記為「已上車」。
 
@@ -835,10 +885,12 @@ def driver_checkin(req: DriverCheckinRequest):
 
     now = _tz_now()
     diff_sec = (now - main_dt).total_seconds()
-    limit = 30 * 60  # 30 分鐘
+    
+    limit_before = 30 * 60  # 30 分鐘前
+    limit_after = 60 * 60   # 60 分鐘後
 
-    # 太晚：逾期
-    if diff_sec > limit:
+    # 太晚：逾期 (超過班次時間 60 分鐘)
+    if diff_sec > limit_after:
         pax_str = getv("確認人數") or getv("預約人數") or "1"
         pax = _safe_int(pax_str, 1)
         return DriverCheckinResponse(
@@ -850,8 +902,8 @@ def driver_checkin(req: DriverCheckinRequest):
             station=getv("上車地點") or None,
         )
 
-    # 太早：尚未發車
-    if diff_sec < -limit:
+    # 太早：尚未發車 (早於班次時間 30 分鐘)
+    if diff_sec < -limit_before:
         dt_str = main_dt.strftime("%Y/%m/%d %H:%M")
         pax_str = getv("確認人數") or getv("預約人數") or "1"
         pax = _safe_int(pax_str, 1)
@@ -864,7 +916,7 @@ def driver_checkin(req: DriverCheckinRequest):
             station=getv("上車地點") or None,
         )
 
-    # OK：在主班次時間 ±30 分鐘內，允許核銷 → 更新乘車狀態 / 最後操作時間
+    # OK：在允許時間範圍內，允許核銷 → 更新乘車狀態 / 最後操作時間
     updates: Dict[str, str] = {}
     if "乘車狀態" in hmap:
         updates["乘車狀態"] = "已上車"
@@ -900,3 +952,100 @@ def driver_checkin(req: DriverCheckinRequest):
         pax=pax,
         station=getv("上車地點") or None,
     )
+
+
+@app.post("/api/driver/no_show")
+def api_driver_no_show(req: BookingIdRequest):
+    values, hmap = _get_sheet_data_main()
+    ws = open_ws(SHEET_NAME_MAIN)
+    idx_booking = _col_index(hmap, "預約編號")
+    if idx_booking < 0:
+        raise HTTPException(status_code=400, detail="找不到『預約編號』欄位")
+    target_rowno: Optional[int] = None
+    for i, row in enumerate(values[HEADER_ROW_MAIN:], start=HEADER_ROW_MAIN + 1):
+        if idx_booking < len(row) and (row[idx_booking] or "").strip() == req.booking_id:
+            target_rowno = i
+            break
+    if not target_rowno:
+        raise HTTPException(status_code=404, detail="找不到對應預約編號")
+    from gspread.utils import rowcol_to_a1
+    data = []
+    if "乘車狀態" in hmap:
+        data.append({"range": rowcol_to_a1(target_rowno, hmap["乘車狀態"]), "values": [["No-show"]]})
+    if "最後操作時間" in hmap:
+        data.append({"range": rowcol_to_a1(target_rowno, hmap["最後操作時間"]), "values": [[_tz_now_str() + " No-show(司機)"]]})
+    if data:
+        ws.batch_update(data, value_input_option="USER_ENTERED")
+    _invalidate_sheet_cache()
+    return {"status": "success"}
+
+
+@app.post("/api/driver/manual_boarding")
+def api_driver_manual_boarding(req: BookingIdRequest):
+    values, hmap = _get_sheet_data_main()
+    ws = open_ws(SHEET_NAME_MAIN)
+    idx_booking = _col_index(hmap, "預約編號")
+    if idx_booking < 0:
+        raise HTTPException(status_code=400, detail="找不到『預約編號』欄位")
+    target_rowno: Optional[int] = None
+    for i, row in enumerate(values[HEADER_ROW_MAIN:], start=HEADER_ROW_MAIN + 1):
+        if idx_booking < len(row) and (row[idx_booking] or "").strip() == req.booking_id:
+            target_rowno = i
+            break
+    if not target_rowno:
+        raise HTTPException(status_code=404, detail="找不到對應預約編號")
+    from gspread.utils import rowcol_to_a1
+    data = []
+    if "乘車狀態" in hmap:
+        data.append({"range": rowcol_to_a1(target_rowno, hmap["乘車狀態"]), "values": [["已上車"]]})
+    if "最後操作時間" in hmap:
+        data.append({"range": rowcol_to_a1(target_rowno, hmap["最後操作時間"]), "values": [[_tz_now_str() + " 人工驗票(司機)"]]})
+    if data:
+        ws.batch_update(data, value_input_option="USER_ENTERED")
+    _invalidate_sheet_cache()
+    return {"status": "success"}
+
+
+@app.post("/api/driver/trip_status")
+def api_driver_trip_status(req: TripStatusRequest):
+    sheet_name = "車次管理(櫃台)"
+    ws = open_ws(sheet_name)
+    headers = ws.row_values(6)
+    headers = [(h or "").strip() for h in headers]
+    def hidx(name: str) -> int:
+        try:
+            return headers.index(name)
+        except ValueError:
+            return -1
+    idx_date = hidx("日期")
+    idx_time = hidx("時間")
+    idx_status = hidx("出車狀態")
+    idx_last = hidx("最後更新")
+    if min(idx_date, idx_time, idx_status, idx_last) < 0:
+        raise HTTPException(status_code=400, detail="表頭缺少必要欄位")
+    # 解析傳入主班次時間（YYYY/MM/DD HH:MM）
+    raw = req.main_datetime.strip()
+    parts = raw.split(" ")
+    if len(parts) < 2:
+        raise HTTPException(status_code=400, detail="主班次時間格式錯誤")
+    target_date, target_time = parts[0], parts[1]
+    # 從第 7 列開始找
+    values = ws.get_all_values()
+    target_rowno: Optional[int] = None
+    for i in range(6, len(values)):
+        row = values[i]
+        d = (row[idx_date] if idx_date < len(row) else "").strip()
+        t = (row[idx_time] if idx_time < len(row) else "").strip()
+        if d == target_date and t == target_time:
+            target_rowno = i + 1  # 1-based
+            break
+    if not target_rowno:
+        raise HTTPException(status_code=404, detail="找不到對應主班次時間")
+    from gspread.utils import rowcol_to_a1
+    now_text = _tz_now().strftime("%Y-%m-%d %H:%M")
+    data = [
+        {"range": rowcol_to_a1(target_rowno, idx_status + 1), "values": [[req.status]]},
+        {"range": rowcol_to_a1(target_rowno, idx_last + 1), "values": [[now_text]]},
+    ]
+    ws.batch_update(data, value_input_option="USER_ENTERED")
+    return {"status": "success"}
