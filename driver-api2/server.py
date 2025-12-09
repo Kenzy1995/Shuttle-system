@@ -1029,14 +1029,44 @@ def api_driver_trip_status(req: TripStatusRequest):
     if len(parts) < 2:
         raise HTTPException(status_code=400, detail="主班次時間格式錯誤")
     target_date, target_time = parts[0], parts[1]
+    def norm_dates(d: str) -> list:
+        d = d.strip()
+        if "-" in d:
+            y,m,day = d.split("-")
+        else:
+            y,m,day = d.split("/")
+        m2 = str(m).zfill(2)
+        d2 = str(day).zfill(2)
+        return [f"{y}/{m2}/{d2}", f"{y}-{m2}-{d2}"]
+    def norm_time(t: str) -> list:
+        t = t.strip()
+        parts = t.split(":")
+        if len(parts) == 1:
+            return [t]
+        h = parts[0]
+        mm = parts[1] if len(parts) > 1 else "00"
+        ss = parts[2] if len(parts) > 2 else None
+        h2 = str(h).zfill(2)
+        res = [f"{h2}:{mm}", f"{int(h)}:{mm}"]
+        if ss is not None:
+            res.append(f"{h2}:{mm}:{ss}")
+        return res
+    t_dates = norm_dates(target_date)
+    t_times = norm_time(target_time)
     # 從第 7 列開始找
     values = ws.get_all_values()
     target_rowno: Optional[int] = None
     for i in range(6, len(values)):
         row = values[i]
         d = (row[idx_date] if idx_date < len(row) else "").strip()
-        t = (row[idx_time] if idx_time < len(row) else "").strip()
-        if d == target_date and t == target_time:
+        t_raw = (row[idx_time] if idx_time < len(row) else "").strip()
+        # Normalize row time HH:MM
+        try:
+            rp = t_raw.split(":")
+            t_norm = f"{str(rp[0]).zfill(2)}:{rp[1]}" if len(rp) >= 2 else t_raw
+        except Exception:
+            t_norm = t_raw
+        if (d in t_dates) and (t_raw in t_times or t_norm in t_times):
             target_rowno = i + 1  # 1-based
             break
     if not target_rowno:
