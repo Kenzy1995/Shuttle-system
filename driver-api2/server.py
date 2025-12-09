@@ -1009,7 +1009,10 @@ def api_driver_manual_boarding(req: BookingIdRequest):
 @app.post("/api/driver/trip_status")
 def api_driver_trip_status(req: TripStatusRequest):
     sheet_name = "車次管理(櫃台)"
-    ws = open_ws(sheet_name)
+    try:
+        ws = open_ws(sheet_name)
+    except Exception:
+        ws = open_ws("車次管理(備品)")
     headers = ws.row_values(6)
     headers = [(h or "").strip() for h in headers]
     def hidx(name: str) -> int:
@@ -1019,6 +1022,8 @@ def api_driver_trip_status(req: TripStatusRequest):
             return -1
     idx_date = hidx("日期")
     idx_time = hidx("時間")
+    if idx_time < 0:
+        idx_time = hidx("班次")
     idx_status = hidx("出車狀態")
     idx_last = hidx("最後更新")
     if min(idx_date, idx_time, idx_status, idx_last) < 0:
@@ -1072,7 +1077,7 @@ def api_driver_trip_status(req: TripStatusRequest):
     if not target_rowno:
         raise HTTPException(status_code=404, detail="找不到對應主班次時間")
     from gspread.utils import rowcol_to_a1
-    now_text = _tz_now().strftime("%Y-%m-%d %H:%M")
+    now_text = _tz_now().strftime("%Y/%m/%d %H:%M")
     data = [
         {"range": rowcol_to_a1(target_rowno, idx_status + 1), "values": [[req.status]]},
         {"range": rowcol_to_a1(target_rowno, idx_last + 1), "values": [[now_text]]},
