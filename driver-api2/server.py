@@ -291,6 +291,7 @@ class DriverCheckinResponse(BaseModel):
     name: Optional[str] = None
     pax: Optional[int] = None
     station: Optional[str] = None
+    main_datetime: Optional[str] = None
 
 
 class DriverLocation(BaseModel):
@@ -864,6 +865,7 @@ def api_driver_checkin(req: DriverCheckinRequest):
             name=getv("姓名") or None,
             pax=pax,
             station=getv("上車地點") or None,
+            main_datetime=main_dt.strftime("%Y/%m/%d %H:%M"),
         )
 
     # 取得主班次時間，並做 ±30 分鐘判斷
@@ -900,6 +902,7 @@ def api_driver_checkin(req: DriverCheckinRequest):
             name=getv("姓名") or None,
             pax=pax,
             station=getv("上車地點") or None,
+            main_datetime=main_dt.strftime("%Y/%m/%d %H:%M"),
         )
 
     # 太早：尚未發車 (早於班次時間 30 分鐘)
@@ -914,6 +917,7 @@ def api_driver_checkin(req: DriverCheckinRequest):
             name=getv("姓名") or None,
             pax=pax,
             station=getv("上車地點") or None,
+            main_datetime=dt_str,
         )
 
     # OK：在允許時間範圍內，允許核銷 → 更新乘車狀態 / 最後操作時間
@@ -951,6 +955,7 @@ def api_driver_checkin(req: DriverCheckinRequest):
         name=getv("姓名") or None,
         pax=pax,
         station=getv("上車地點") or None,
+        main_datetime=main_dt.strftime("%Y/%m/%d %H:%M"),
     )
 
 
@@ -1084,3 +1089,32 @@ def api_driver_trip_status(req: TripStatusRequest):
     ]
     ws.batch_update(data, value_input_option="USER_ENTERED")
     return {"status": "success"}
+class QrInfoRequest(BaseModel):
+    qrcode: str
+class QrInfoResponse(BaseModel):
+    booking_id: Optional[str]
+    name: Optional[str]
+    main_datetime: Optional[str]
+    ride_status: Optional[str]
+    station_up: Optional[str]
+    station_down: Optional[str]
+@app.post("/api/driver/qrcode_info", response_model=QrInfoResponse)
+def api_driver_qrinfo(req: QrInfoRequest):
+    values, hmap = _get_sheet_data_main()
+    ws = open_ws(SHEET_NAME_MAIN)
+    rowno = _find_qrcode_row(values, hmap, req.qrcode)
+    if not rowno:
+        return QrInfoResponse(booking_id=None, name=None, main_datetime=None, ride_status=None, station_up=None, station_down=None)
+    row = values[rowno-1]
+    def getv(col: str) -> str:
+        ci = hmap.get(col, 0)-1
+        return (row[ci] if 0 <= ci < len(row) else "").strip()
+    main_raw = getv("主班次時間")
+    return QrInfoResponse(
+        booking_id=getv("預約編號") or None,
+        name=getv("姓名") or None,
+        main_datetime=main_raw or None,
+        ride_status=getv("乘車狀態") or None,
+        station_up=getv("上車地點") or None,
+        station_down=getv("下車地點") or None,
+    )
