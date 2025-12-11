@@ -11,6 +11,9 @@ import gspread
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import base64
+import json
+import requests
 
 # ========= Google Sheets 設定 =========
 
@@ -983,6 +986,126 @@ def api_driver_no_show(req: BookingIdRequest):
         ws.batch_update(data, value_input_option="USER_ENTERED")
     _invalidate_sheet_cache()
     return {"status": "success"}
+
+# ========= HyperTrack / 路線 =========
+
+class TripRouteResponse(BaseModel):
+    main_datetime: str
+    stops: List[Dict[str, float]]
+
+class HyperTrackTripRequest(BaseModel):
+    main_datetime: str
+    device_id: str
+    stops: List[Dict[str, float]]
+
+class HyperTrackTripCompleteRequest(BaseModel):
+    trip_id: str
+
+STATION_COORDS = {
+    "hotel_go": { "name": "福泰大飯店 (去)", "lat": 25.0673, "lng": 121.6463 },
+    "hotel_back": { "name": "福泰大飯店 (回)", "lat": 25.0673, "lng": 121.6463 },
+    "mrt": { "name": "南港捷運站", "lat": 25.0553, "lng": 121.6171 },
+    "train": { "name": "南港火車站", "lat": 25.0522, "lng": 121.6073 },
+    "mall": { "name": "LaLaport 購物中心", "lat": 25.0549, "lng": 121.6148 },
+}
+
+def _hyper_headers():
+    account_id = os.getenv("HYPERTRACK_ACCOUNT_ID", "")
+    secret = os.getenv("HYPERTRACK_SECRET_KEY", "")
+    token = base64.b64encode(f"{account_id}:{secret}".encode("utf-8")).decode("utf-8")
+    return {
+        "Authorization": f"Basic {token}",
+        "Content-Type": "application/json",
+    }
+
+@app.get("/api/driver/trip_route", response_model=TripRouteResponse)
+def api_driver_trip_route(main_datetime: str = Query(..., description="YYYY/MM/DD HH:MM")):
+    try:
+        ws = open_ws("車次管理(櫃台)")
+    except Exception:
+        ws = open_ws("車次管理(備品)")
+    headers = ws.row_values(6)
+    headers = [(h or "").strip() for h in headers]
+    def hidx(name: str) -> int:
+        try:
+            return headers.index(name)
+        except ValueError:
+            return -1
+    idx_date = hidx("日期")
+    idx_time = hidx("班次") if hidx("班次") >= 0 else hidx("時間")
+    idx_hotel = hidx("福泰大飯店")
+    idx_mrt = hidx("南港捷運站")
+    idx_train = hidx("南港火車站")
+    idx_mall = hidx("LaLaport")
+    if min(idx_date, idx_time, idx_hotel, idx_mrt, idx_train, idx_mall) < 0:
+        raise HTTPException(status_code=400, detail="表頭缺少必要欄位")
+    def norm_date(d: str) -> str:
+        d = d.strip()
+        if "-" in d:
+            y,m,day = d.split("-")
+        else:
+            y,m,day = d.split("/")
+        return f"{y}/{str(m).zfill(2)}/{str(day).zfill(2)}"
+    def norm_time(t: str) -> str:
+        t = t.strip()
+        parts = t.split(":")
+        h = parts[0] if parts else t
+        mm = parts[1] if len(parts) > 1 else "00"
+        return f"{str(h).zfill(2)}:{mm}"
+    target_date, target_time = main_datetime.split(" ")
+    target_date = norm_date(target_date)
+    target_time = norm_time(target_time)
+    values = ws.get_all_values()
+    stops: List[Dict[str, float]] = []
+    for i in range(6, len(values)):
+        row = values[i]
+        d = (row[idx_date] if idx_date < len(row) else "").strip()
+        t_raw = (row[idx_time] if idx_time < len(row) else "").strip()
+        t_norm = norm_time(t_raw)
+        if d == target_date and (t_raw == target_time or t_norm == target_time):
+            def should_stop(val: str) -> bool:
+                v = (val or "").strip().upper()
+                return not (v == "TRUE" or v == "✔" or v == "✅")
+            if should_stop(row[idx_hotel] if idx_hotel < len(row) else ""):
+                s = STATION_COORDS["hotel_go"]; stops.append({"id":"hotel_go","lat":s["lat"],"lng":s["lng"]})
+            if should_stop(row[idx_mrt] if idx_mrt < len(row) else ""):
+                s = STATION_COORDS["mrt"]; stops.append({"id":"mrt","lat":s["lat"],"lng":s["lng"]})
+            if should_stop(row[idx_train] if idx_train < len(row) else ""):
+                s = STATION_COORDS["train"]; stops.append({"id":"train","lat":s["lat"],"lng":s["lng"]})
+            if should_stop(row[idx_mall] if idx_mall < len(row) else ""):
+                s = STATION_COORDS["mall"]; stops.append({"id":"mall","lat":s["lat"],"lng":s["lng"]})
+            s2 = STATION_COORDS["hotel_back"]; stops.append({"id":"hotel_back","lat":s2["lat"],"lng":s2["lng"]})
+            break
+    if not stops:
+        # fallback 全站
+        for key in ["hotel_go","mrt","train","mall","hotel_back"]:
+            s = STATION_COORDS[key]; stops.append({"id":key,"lat":s["lat"],"lng":s["lng"]})
+    return TripRouteResponse(main_datetime=main_datetime, stops=stops)
+
+@app.post("/api/driver/hypertrack/trip")
+def api_driver_hypertrack_trip(req: HyperTrackTripRequest):
+    url = os.getenv("HYPERTRACK_TRIPS_URL", "https://v3.api.hypertrack.com/trips")
+    body = {
+        "device_id": req.device_id,
+        "metadata": { "main_datetime": req.main_datetime },
+        "orders": [
+            { "destination": { "geometry": { "type":"Point", "coordinates": [s["lng"], s["lat"]] }, "name": s.get("id","") } }
+            for s in req.stops
+        ]
+    }
+    r = requests.post(url, headers=_hyper_headers(), data=json.dumps(body), timeout=10)
+    if r.status_code not in (200,201):
+        raise HTTPException(status_code=400, detail=f"HyperTrack error {r.status_code}: {r.text}")
+    data = r.json()
+    return {"status":"success","trip_id": data.get("data",{}).get("id") or data.get("id")}
+
+@app.post("/api/driver/hypertrack/trip_complete")
+def api_driver_hypertrack_trip_complete(req: HyperTrackTripCompleteRequest):
+    base = os.getenv("HYPERTRACK_TRIPS_URL", "https://v3.api.hypertrack.com/trips")
+    r = requests.post(f"{base}/{req.trip_id}/complete", headers=_hyper_headers(), timeout=10)
+    if r.status_code not in (200,204):
+        raise HTTPException(status_code=400, detail=f"HyperTrack error {r.status_code}: {r.text}")
+    return {"status":"success"}
 
 
 @app.post("/api/driver/manual_boarding")
