@@ -15,6 +15,7 @@ import base64
 import json
 import requests
 from gspread.utils import rowcol_to_a1
+import re
 
 # ========= Google Sheets 設定 =========
 
@@ -1276,36 +1277,17 @@ def api_driver_trip_status(req: TripStatusRequest):
     idx_last = hidx("最後更新")
     if min(idx_date, idx_time, idx_status, idx_last) < 0:
         raise HTTPException(status_code=400, detail="表頭缺少必要欄位")
-    # 解析傳入主班次時間（YYYY/MM/DD HH:MM）
-    raw = req.main_datetime.strip()
-    parts = raw.split(" ")
-    if len(parts) < 2:
+    # 解析傳入主班次時間（多格式容錯）
+    raw = (req.main_datetime or "").strip()
+    raw = raw.replace("T", " ").replace("+", " ")
+    raw = re.sub(r"\s+", " ", raw)
+    dt = _parse_main_dt(raw)
+    if not dt:
         raise HTTPException(status_code=400, detail="主班次時間格式錯誤")
-    target_date, target_time = parts[0], parts[1]
-    def norm_dates(d: str) -> list:
-        d = d.strip()
-        if "-" in d:
-            y,m,day = d.split("-")
-        else:
-            y,m,day = d.split("/")
-        m2 = str(m).zfill(2)
-        d2 = str(day).zfill(2)
-        return [f"{y}/{m2}/{d2}", f"{y}-{m2}-{d2}"]
-    def norm_time(t: str) -> list:
-        t = t.strip()
-        parts = t.split(":")
-        if len(parts) == 1:
-            return [t]
-        h = parts[0]
-        mm = parts[1] if len(parts) > 1 else "00"
-        ss = parts[2] if len(parts) > 2 else None
-        h2 = str(h).zfill(2)
-        res = [f"{h2}:{mm}", f"{int(h)}:{mm}"]
-        if ss is not None:
-            res.append(f"{h2}:{mm}:{ss}")
-        return res
-    t_dates = norm_dates(target_date)
-    t_times = norm_time(target_time)
+    target_date = dt.strftime("%Y/%m/%d")
+    target_time = dt.strftime("%H:%M")
+    t_dates = [target_date, target_date.replace("/", "-")]
+    t_times = [target_time, f"{int(target_time.split(':')[0])}:{target_time.split(':')[1]}", f"{target_time}:00"]
     # 從第 7 列開始找
     values = ws.get_all_values()
     target_rowno: Optional[int] = None
@@ -1357,35 +1339,16 @@ def api_driver_trip_status_get(
     idx_last = hidx("最後更新")
     if min(idx_date, idx_time, idx_status, idx_last) < 0:
         raise HTTPException(status_code=400, detail="表頭缺少必要欄位")
-    raw = main_datetime.strip()
-    parts = raw.split(" ")
-    if len(parts) < 2:
+    raw = (main_datetime or "").strip()
+    raw = raw.replace("T", " ").replace("+", " ")
+    raw = re.sub(r"\s+", " ", raw)
+    dt = _parse_main_dt(raw)
+    if not dt:
         raise HTTPException(status_code=400, detail="主班次時間格式錯誤")
-    target_date, target_time = parts[0], parts[1]
-    def norm_dates(d: str) -> list:
-        d = d.strip()
-        if "-" in d:
-            y,m,day = d.split("-")
-        else:
-            y,m,day = d.split("/")
-        m2 = str(m).zfill(2)
-        d2 = str(day).zfill(2)
-        return [f"{y}/{m2}/{d2}", f"{y}-{m2}-{d2}"]
-    def norm_time(t: str) -> list:
-        t = t.strip()
-        parts = t.split(":")
-        if len(parts) == 1:
-            return [t]
-        h = parts[0]
-        mm = parts[1] if len(parts) > 1 else "00"
-        ss = parts[2] if len(parts) > 2 else None
-        h2 = str(h).zfill(2)
-        res = [f"{h2}:{mm}", f"{int(h)}:{mm}"]
-        if ss is not None:
-            res.append(f"{h2}:{mm}:{ss}")
-        return res
-    t_dates = norm_dates(target_date)
-    t_times = norm_time(target_time)
+    target_date = dt.strftime("%Y/%m/%d")
+    target_time = dt.strftime("%H:%M")
+    t_dates = [target_date, target_date.replace("/", "-")]
+    t_times = [target_time, f"{int(target_time.split(':')[0])}:{target_time.split(':')[1]}", f"{target_time}:00"]
     values = ws.get_all_values()
     target_rowno: Optional[int] = None
     for i in range(6, len(values)):
