@@ -428,7 +428,7 @@ def build_driver_trip_passengers(
         booking_id = _get_cell(row, idx_booking)
         name = _get_cell(row, idx_name)
         phone = _get_cell(row, idx_phone)
-        room = _get_cell(row, idx_room)or "(餐客)"
+        room = _get_cell(row, idx_room)
         ride_status = _get_cell(row, idx_status)
         qrcode = _get_cell(row, idx_qr)
         direction = _get_cell(row, idx_dir)
@@ -1097,7 +1097,11 @@ def api_driver_hypertrack_trip(req: HyperTrackTripRequest):
     if r.status_code not in (200,201):
         raise HTTPException(status_code=400, detail=f"HyperTrack error {r.status_code}: {r.text}")
     data = r.json()
-    return {"status":"success","trip_id": data.get("data",{}).get("id") or data.get("id")}
+    return {
+        "status":"success",
+        "trip_id": data.get("data",{}).get("id") or data.get("id"),
+        "share_url": (data.get("data",{}).get("share_url") or data.get("share_url") or None)
+    }
 
 @app.post("/api/driver/hypertrack/trip_complete")
 def api_driver_hypertrack_trip_complete(req: HyperTrackTripCompleteRequest):
