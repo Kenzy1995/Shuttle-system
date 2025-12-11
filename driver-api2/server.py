@@ -425,7 +425,7 @@ def build_driver_trip_passengers(
         booking_id = _get_cell(row, idx_booking)
         name = _get_cell(row, idx_name)
         phone = _get_cell(row, idx_phone)
-        room = _get_cell(row, idx_room)
+        room = _get_cell(row, idx_room)or "(餐客)"
         ride_status = _get_cell(row, idx_status)
         qrcode = _get_cell(row, idx_qr)
         direction = _get_cell(row, idx_dir)
