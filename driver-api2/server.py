@@ -1188,6 +1188,7 @@ def _store_trip_share(main_datetime: str, share_url: str, trip_id: str) -> None:
             headers.append("HyperTrack TripID")
         if new_updates:
             ws.batch_update(new_updates, value_input_option="USER_ENTERED")
+        print(f"[share_store] headers prepared: url_col={idx_url+1}, id_col={idx_id+1}")
         data = []
         if share_url:
             data.append({"range": rowcol_to_a1(target_rowno, idx_url+1), "values": [[share_url]]})
@@ -1195,9 +1196,10 @@ def _store_trip_share(main_datetime: str, share_url: str, trip_id: str) -> None:
             data.append({"range": rowcol_to_a1(target_rowno, idx_id+1), "values": [[trip_id]]})
         if data:
             ws.batch_update(data, value_input_option="USER_ENTERED")
+            print(f"[share_store] updated row={target_rowno}, url={'Y' if share_url else 'N'}, id={'Y' if trip_id else 'N'}")
         return
     except Exception:
-        pass
+        print("[share_store] main sheet write failed, fallback to Trip分享(系統)")
     try:
         credentials, _ = google.auth.default(scopes=SCOPES)
         gc = gspread.authorize(credentials)
@@ -1211,8 +1213,19 @@ def _store_trip_share(main_datetime: str, share_url: str, trip_id: str) -> None:
         date_txt = parts[0] if parts else ""
         time_txt = parts[1] if len(parts)>1 else ""
         ws2.append_row([date_txt, time_txt, share_url, trip_id], value_input_option="USER_ENTERED")
+        print(f"[share_store] appended fallback row: {date_txt} {time_txt}")
     except Exception:
-        pass
+        print("[share_store] fallback write failed")
+
+class StoreShareRequest(BaseModel):
+    main_datetime: str
+    share_url: str
+    trip_id: str
+
+@app.post("/api/driver/hypertrack/share_store")
+def api_driver_share_store(req: StoreShareRequest):
+    _store_trip_share(req.main_datetime, req.share_url, req.trip_id)
+    return {"status":"success"}
 
 
 @app.post("/api/driver/manual_boarding")
@@ -1315,6 +1328,84 @@ def api_driver_trip_status(req: TripStatusRequest):
     now_text = _tz_now().strftime("%Y/%m/%d %H:%M")
     data = [
         {"range": rowcol_to_a1(target_rowno, idx_status + 1), "values": [[req.status]]},
+        {"range": rowcol_to_a1(target_rowno, idx_last + 1), "values": [[now_text]]},
+    ]
+    ws.batch_update(data, value_input_option="USER_ENTERED")
+    return {"status": "success"}
+@app.get("/api/driver/trip_status")
+def api_driver_trip_status_get(
+    main_datetime: str = Query(..., description="YYYY/MM/DD HH:MM"),
+    status: str = Query(..., description="已發車 / 已結束"),
+):
+    sheet_name = "車次管理(櫃台)"
+    try:
+        ws = open_ws(sheet_name)
+    except Exception:
+        ws = open_ws("車次管理(備品)")
+    headers = ws.row_values(6)
+    headers = [(h or "").strip() for h in headers]
+    def hidx(name: str) -> int:
+        try:
+            return headers.index(name)
+        except ValueError:
+            return -1
+    idx_date = hidx("日期")
+    idx_time = hidx("時間")
+    if idx_time < 0:
+        idx_time = hidx("班次")
+    idx_status = hidx("出車狀態")
+    idx_last = hidx("最後更新")
+    if min(idx_date, idx_time, idx_status, idx_last) < 0:
+        raise HTTPException(status_code=400, detail="表頭缺少必要欄位")
+    raw = main_datetime.strip()
+    parts = raw.split(" ")
+    if len(parts) < 2:
+        raise HTTPException(status_code=400, detail="主班次時間格式錯誤")
+    target_date, target_time = parts[0], parts[1]
+    def norm_dates(d: str) -> list:
+        d = d.strip()
+        if "-" in d:
+            y,m,day = d.split("-")
+        else:
+            y,m,day = d.split("/")
+        m2 = str(m).zfill(2)
+        d2 = str(day).zfill(2)
+        return [f"{y}/{m2}/{d2}", f"{y}-{m2}-{d2}"]
+    def norm_time(t: str) -> list:
+        t = t.strip()
+        parts = t.split(":")
+        if len(parts) == 1:
+            return [t]
+        h = parts[0]
+        mm = parts[1] if len(parts) > 1 else "00"
+        ss = parts[2] if len(parts) > 2 else None
+        h2 = str(h).zfill(2)
+        res = [f"{h2}:{mm}", f"{int(h)}:{mm}"]
+        if ss is not None:
+            res.append(f"{h2}:{mm}:{ss}")
+        return res
+    t_dates = norm_dates(target_date)
+    t_times = norm_time(target_time)
+    values = ws.get_all_values()
+    target_rowno: Optional[int] = None
+    for i in range(6, len(values)):
+        row = values[i]
+        d = (row[idx_date] if idx_date < len(row) else "").strip()
+        t_raw = (row[idx_time] if idx_time < len(row) else "").strip()
+        try:
+            rp = t_raw.split(":")
+            t_norm = f"{str(rp[0]).zfill(2)}:{rp[1]}" if len(rp) >= 2 else t_raw
+        except Exception:
+            t_norm = t_raw
+        if (d in t_dates) and (t_raw in t_times or t_norm in t_times):
+            target_rowno = i + 1
+            break
+    if not target_rowno:
+        raise HTTPException(status_code=404, detail="找不到對應主班次時間")
+    from gspread.utils import rowcol_to_a1
+    now_text = _tz_now().strftime("%Y/%m/%d %H:%M")
+    data = [
+        {"range": rowcol_to_a1(target_rowno, idx_status + 1), "values": [[status]]},
         {"range": rowcol_to_a1(target_rowno, idx_last + 1), "values": [[now_text]]},
     ]
     ws.batch_update(data, value_input_option="USER_ENTERED")
