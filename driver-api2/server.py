@@ -14,6 +14,7 @@ from pydantic import BaseModel
 import base64
 import json
 import requests
+from gspread.utils import rowcol_to_a1
 
 # ========= Google Sheets 設定 =========
 
@@ -1097,10 +1098,16 @@ def api_driver_hypertrack_trip(req: HyperTrackTripRequest):
     if r.status_code not in (200,201):
         raise HTTPException(status_code=400, detail=f"HyperTrack error {r.status_code}: {r.text}")
     data = r.json()
+    trip_id = data.get("data",{}).get("id") or data.get("id")
+    share_url = data.get("data",{}).get("share_url") or data.get("share_url")
+    try:
+        _store_trip_share(req.main_datetime, share_url or "", trip_id or "")
+    except Exception:
+        pass
     return {
         "status":"success",
-        "trip_id": data.get("data",{}).get("id") or data.get("id"),
-        "share_url": (data.get("data",{}).get("share_url") or data.get("share_url") or None)
+        "trip_id": trip_id,
+        "share_url": share_url or None
     }
 
 @app.post("/api/driver/hypertrack/trip_complete")
@@ -1110,6 +1117,102 @@ def api_driver_hypertrack_trip_complete(req: HyperTrackTripCompleteRequest):
     if r.status_code not in (200,204):
         raise HTTPException(status_code=400, detail=f"HyperTrack error {r.status_code}: {r.text}")
     return {"status":"success"}
+
+def _store_trip_share(main_datetime: str, share_url: str, trip_id: str) -> None:
+    try:
+        try:
+            ws = open_ws("車次管理(櫃台)")
+        except Exception:
+            ws = open_ws("車次管理(備品)")
+        headers = ws.row_values(6)
+        headers = [(h or "").strip() for h in headers]
+        def hidx(name: str) -> int:
+            try:
+                return headers.index(name)
+            except ValueError:
+                return -1
+        idx_date = hidx("日期")
+        idx_time = hidx("班次") if hidx("班次") >= 0 else hidx("時間")
+        if min(idx_date, idx_time) < 0:
+            raise RuntimeError("headers missing")
+        def norm_date(d: str) -> str:
+            d = d.strip()
+            if "-" in d:
+                y,m,day = d.split("-")
+            else:
+                y,m,day = d.split("/")
+            return f"{y}/{str(m).zfill(2)}/{str(day).zfill(2)}"
+        def norm_time(t: str) -> str:
+            t = t.strip()
+            parts = t.split(":")
+            h = parts[0] if parts else t
+            mm = parts[1] if len(parts) > 1 else "00"
+            return f"{str(h).zfill(2)}:{mm}"
+        parts = main_datetime.strip().split(" ")
+        target_date = norm_date(parts[0])
+        target_time = norm_time(parts[1] if len(parts)>1 else parts[0])
+        values = ws.get_all_values()
+        target_rowno = None
+        for i in range(6, len(values)):
+            row = values[i]
+            d = (row[idx_date] if idx_date < len(row) else "").strip()
+            t_raw = (row[idx_time] if idx_time < len(row) else "").strip()
+            t_norm = norm_time(t_raw)
+            if d == target_date and (t_raw == target_time or t_norm == target_time):
+                target_rowno = i + 1
+                break
+        if not target_rowno:
+            raise RuntimeError("row not found")
+        url_col_names = ["分享連結","Share URL","分享網址"]
+        id_col_names = ["HyperTrack TripID","TripID","Trip Id"]
+        idx_url = -1
+        idx_id = -1
+        for nm in url_col_names:
+            x = hidx(nm)
+            if x >= 0:
+                idx_url = x
+                break
+        for nm in id_col_names:
+            x = hidx(nm)
+            if x >= 0:
+                idx_id = x
+                break
+        new_updates = []
+        if idx_url < 0 and share_url:
+            idx_url = len(headers)
+            new_updates.append({"range": rowcol_to_a1(6, idx_url+1), "values": [["分享連結"]]})
+            headers.append("分享連結")
+        if idx_id < 0 and trip_id:
+            idx_id = len(headers)
+            new_updates.append({"range": rowcol_to_a1(6, idx_id+1), "values": [["HyperTrack TripID"]]})
+            headers.append("HyperTrack TripID")
+        if new_updates:
+            ws.batch_update(new_updates, value_input_option="USER_ENTERED")
+        data = []
+        if share_url:
+            data.append({"range": rowcol_to_a1(target_rowno, idx_url+1), "values": [[share_url]]})
+        if trip_id:
+            data.append({"range": rowcol_to_a1(target_rowno, idx_id+1), "values": [[trip_id]]})
+        if data:
+            ws.batch_update(data, value_input_option="USER_ENTERED")
+        return
+    except Exception:
+        pass
+    try:
+        credentials, _ = google.auth.default(scopes=SCOPES)
+        gc = gspread.authorize(credentials)
+        sh = gc.open_by_key(SPREADSHEET_ID)
+        try:
+            ws2 = sh.worksheet("Trip分享(系統)")
+        except Exception:
+            ws2 = sh.add_worksheet(title="Trip分享(系統)", rows=100, cols=6)
+            ws2.update("A1:D1", [["日期","時間","分享連結","TripID"]])
+        parts = main_datetime.strip().split(" ")
+        date_txt = parts[0] if parts else ""
+        time_txt = parts[1] if len(parts)>1 else ""
+        ws2.append_row([date_txt, time_txt, share_url, trip_id], value_input_option="USER_ENTERED")
+    except Exception:
+        pass
 
 
 @app.post("/api/driver/manual_boarding")
