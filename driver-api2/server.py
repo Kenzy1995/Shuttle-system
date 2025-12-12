@@ -16,6 +16,8 @@ import json
 import requests
 from gspread.utils import rowcol_to_a1
 import re
+import firebase_admin
+from firebase_admin import credentials, db
 
 # ========= Google Sheets 設定 =========
 
@@ -1102,7 +1104,7 @@ def api_driver_hypertrack_trip(req: HyperTrackTripRequest):
     trip_id = data.get("data",{}).get("id") or data.get("id")
     share_url = data.get("data",{}).get("share_url") or data.get("share_url")
     try:
-        _store_trip_share(req.main_datetime, share_url or "", trip_id or "")
+        _store_trip_share_rtdb(req.main_datetime, req.device_id, share_url or "", trip_id or "", req.stops)
     except Exception:
         pass
     return {
@@ -1225,8 +1227,115 @@ class StoreShareRequest(BaseModel):
 
 @app.post("/api/driver/hypertrack/share_store")
 def api_driver_share_store(req: StoreShareRequest):
-    _store_trip_share(req.main_datetime, req.share_url, req.trip_id)
+    _store_trip_share_rtdb(req.main_datetime, "", req.share_url, req.trip_id, [])
     return {"status":"success"}
+
+def _init_rtdb():
+    if not firebase_admin._apps:
+        cred = credentials.ApplicationDefault()
+        url = os.getenv("FIREBASE_RTDB_URL", "")
+        firebase_admin.initialize_app(cred, {"databaseURL": url})
+
+def _store_trip_share_rtdb(main_datetime: str, device_id: str, share_url: str, trip_id: str, stops: List[Dict[str, float]]) -> None:
+    _init_rtdb()
+    ref = db.reference("driver_trips")
+    key = trip_id or main_datetime.replace(" ", "_").replace("/", "-")
+    doc = {"main_datetime": main_datetime, "trip_id": trip_id, "share_url": share_url, "device_id": device_id, "stops": stops, "updated_at": _tz_now_str()}
+    ref.child(key).set(doc)
+
+@app.get("/api/driver/hypertrack/trip_info")
+def api_driver_trip_info(trip_id: Optional[str] = Query(None), main_datetime: Optional[str] = Query(None)):
+    _init_rtdb()
+    ref = db.reference("driver_trips")
+    if trip_id:
+        snap = ref.child(trip_id).get()
+        if snap:
+            return snap
+        raise HTTPException(status_code=404, detail="not found")
+    if main_datetime:
+        key = main_datetime.replace(" ", "_").replace("/", "-")
+        snap = ref.child(key).get()
+        if snap:
+            return snap
+        raise HTTPException(status_code=404, detail="not found")
+    raise HTTPException(status_code=400, detail="missing identifier")
+
+def _read_trip_stops(main_datetime: str) -> List[Dict[str, float]]:
+    try:
+        ws = open_ws("車次管理(櫃台)")
+    except Exception:
+        ws = open_ws("車次管理(備品)")
+    headers = ws.row_values(6)
+    headers = [(h or "").strip() for h in headers]
+    def hidx(name: str) -> int:
+        try:
+            return headers.index(name)
+        except ValueError:
+            return -1
+    idx_date = hidx("日期")
+    idx_time = hidx("班次") if hidx("班次") >= 0 else hidx("時間")
+    idx_hotel = hidx("福泰大飯店")
+    idx_mrt = hidx("南港捷運站")
+    idx_train = hidx("南港火車站")
+    idx_mall = hidx("LaLaport")
+    def norm_date(d: str) -> str:
+        d = d.strip()
+        if "-" in d:
+            y,m,day = d.split("-")
+        else:
+            y,m,day = d.split("/")
+        return f"{y}/{str(m).zfill(2)}/{str(day).zfill(2)}"
+    def norm_time(t: str) -> str:
+        t = t.strip()
+        parts = t.split(":")
+        h = parts[0] if parts else t
+        mm = parts[1] if len(parts) > 1 else "00"
+        return f"{str(h).zfill(2)}:{mm}"
+    parts = (main_datetime or "").strip().split(" ")
+    target_date = norm_date(parts[0])
+    target_time = norm_time(parts[1] if len(parts)>1 else parts[0])
+    values = ws.get_all_values()
+    stops: List[Dict[str, float]] = []
+    for i in range(6, len(values)):
+        row = values[i]
+        d = (row[idx_date] if idx_date < len(row) else "").strip()
+        t_raw = (row[idx_time] if idx_time < len(row) else "").strip()
+        t_norm = norm_time(t_raw)
+        if d == target_date and (t_raw == target_time or t_norm == target_time):
+            def should_stop(val: str) -> bool:
+                v = (val or "").strip().upper()
+                return not (v == "TRUE" or v == "✔" or v == "✅")
+            s = STATION_COORDS["hotel_go"]; stops.append({"id":"hotel_go","lat":s["lat"],"lng":s["lng"]})
+            if should_stop(row[idx_mrt] if idx_mrt < len(row) else ""):
+                s = STATION_COORDS["mrt"]; stops.append({"id":"mrt","lat":s["lat"],"lng":s["lng"]})
+            if should_stop(row[idx_train] if idx_train < len(row) else ""):
+                s = STATION_COORDS["train"]; stops.append({"id":"train","lat":s["lat"],"lng":s["lng"]})
+            if should_stop(row[idx_mall] if idx_mall < len(row) else ""):
+                s = STATION_COORDS["mall"]; stops.append({"id":"mall","lat":s["lat"],"lng":s["lng"]})
+            s2 = STATION_COORDS["hotel_back"]; stops.append({"id":"hotel_back","lat":s2["lat"],"lng":s2["lng"]})
+            break
+    if not stops:
+        for key in ["hotel_go","mrt","train","mall","hotel_back"]:
+            s = STATION_COORDS[key]; stops.append({"id":key,"lat":s["lat"],"lng":s["lng"]})
+    return stops
+
+class TripStartRequest(BaseModel):
+    main_datetime: str
+    device_id: str
+
+@app.post("/api/driver/hypertrack/trip_start")
+def api_driver_trip_start(req: TripStartRequest):
+    stops = _read_trip_stops(req.main_datetime)
+    body = {"main_datetime": req.main_datetime, "device_id": req.device_id, "stops": stops}
+    url = os.getenv("HYPERTRACK_TRIPS_URL", "https://v3.api.hypertrack.com/trips")
+    r = requests.post(url, headers=_hyper_headers(), data=json.dumps(body), timeout=10)
+    if r.status_code not in (200,201):
+        raise HTTPException(status_code=400, detail=f"HyperTrack error {r.status_code}: {r.text}")
+    data = r.json()
+    trip_id = data.get("data",{}).get("id") or data.get("id")
+    share_url = data.get("data",{}).get("share_url") or data.get("share_url")
+    _store_trip_share_rtdb(req.main_datetime, req.device_id, share_url or "", trip_id or "", stops)
+    return {"status":"success","trip_id": trip_id, "share_url": share_url, "stops": stops}
 
 
 @app.post("/api/driver/manual_boarding")
