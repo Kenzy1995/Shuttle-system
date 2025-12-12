@@ -1369,7 +1369,25 @@ class TripStartRequest(BaseModel):
 @app.post("/api/driver/hypertrack/trip_start")
 def api_driver_trip_start(req: TripStartRequest):
     stops = _read_trip_stops(req.main_datetime)
-    body = {"main_datetime": req.main_datetime, "device_id": req.device_id, "stops": stops}
+    body = {
+        "device_id": req.device_id,
+        "metadata": {
+            "main_datetime": req.main_datetime,
+            "driver_role": req.driver_role or ""
+        },
+        "orders": [
+            {
+                "destination": {
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [s["lng"], s["lat"]],
+                    },
+                    "name": s.get("id", ""),
+                }
+            }
+            for s in stops
+        ],
+    }
     url = os.getenv("HYPERTRACK_TRIPS_URL", "https://v3.api.hypertrack.com/trips")
     r = requests.post(url, headers=_hyper_headers(), data=json.dumps(body), timeout=10)
     if r.status_code not in (200,201):
