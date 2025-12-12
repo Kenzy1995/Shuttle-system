@@ -7,6 +7,9 @@ google-auth>=2.23
 google-auth-httplib2>=0.2.0
 google-api-python-client>=2.124.0
 
+# Firebase Admin SDK（給 RTDB / FCM 用）
+firebase-admin
+
 pydantic>=2.6
 pydantic-core>=2.16
 
