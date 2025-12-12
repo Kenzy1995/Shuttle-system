@@ -1245,8 +1245,16 @@ def api_driver_share_store(req: StoreShareRequest):
 def _store_driver_share_to_system(driver_role: str, share_url: str) -> None:
     if not driver_role:
         return
-    ws = open_ws("系統")
-    # Map role to row
+    try:
+        ws = open_ws("系統")
+    except Exception:
+        credentials, _ = google.auth.default(scopes=SCOPES)
+        gc = gspread.authorize(credentials)
+        sh = gc.open_by_key(SPREADSHEET_ID)
+        try:
+            ws = sh.worksheet("系統")
+        except Exception:
+            ws = sh.add_worksheet(title="系統", rows=40, cols=10)
     role_row = {
         "driverA": 19,
         "driverB": 20,
@@ -1365,6 +1373,10 @@ def api_driver_trip_start(req: TripStartRequest):
     url = os.getenv("HYPERTRACK_TRIPS_URL", "https://v3.api.hypertrack.com/trips")
     r = requests.post(url, headers=_hyper_headers(), data=json.dumps(body), timeout=10)
     if r.status_code not in (200,201):
+        try:
+            print(f"[trip_start] payload={json.dumps(body)} status={r.status_code} resp={r.text}")
+        except Exception:
+            pass
         raise HTTPException(status_code=400, detail=f"HyperTrack error {r.status_code}: {r.text}")
     data = r.json()
     trip_id = data.get("data",{}).get("id") or data.get("id")
