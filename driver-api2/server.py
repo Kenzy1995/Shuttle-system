@@ -24,6 +24,7 @@ SCOPES = [
 SPREADSHEET_ID = "1xp54tKOczklmT8uacW-HMxwV8r0VOR2ui33jYcE2pUQ"
 SHEET_NAME_MAIN = "預約審核(櫃台)"
 HEADER_ROW_MAIN = 2  # 第 2 列為表頭，資料從第 3 列起
+SHEET_NAME_SYSTEM = "系統"
 
 # 預約狀態文字（與 booking-manager 保持一致）
 BOOKED_TEXT = "✔️ 已預約 Booked"
@@ -745,7 +746,25 @@ def update_driver_location(loc: DriverLocation):
 def get_driver_location():
     """
     取得司機最新位置 (供乘客端或地圖顯示使用)
+    優先從 Firebase 讀取，若失敗則回傳記憶體快取。
     """
+    # 嘗試從 Firebase 讀取 (解決 Cloud Run 多實例問題)
+    try:
+        if not firebase_admin._apps:
+             cred = credentials.ApplicationDefault()
+             db_url = os.environ.get("FIREBASE_RTDB_URL")
+             if db_url:
+                 firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+        
+        if firebase_admin._apps:
+            ref = db.reference("/driver_location")
+            data = ref.get()
+            if data:
+                return data
+    except Exception:
+        pass
+
+    # 若 Firebase 未設定或讀取失敗，回傳記憶體快取
     with LOCATION_LOCK:
         return DRIVER_LOCATION_CACHE
 
@@ -1159,11 +1178,36 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
     if not dt:
         raise HTTPException(status_code=400, detail="主班次時間格式錯誤")
     trip_id = dt.strftime("%Y/%m/%d %H:%M")
-    # 以 Google Maps 建立分享 URL（此為簡化版，以飯店座標為示例）
-    # Forte Hotel 汐止近似座標（可依需求改）
+    # 系統啟用旗標：系統!E19 為 TRUE 才啟用追蹤
+    try:
+        ws = open_ws(SHEET_NAME_SYSTEM)
+        e19 = (ws.acell("E19").value or "").strip().lower()
+        enabled = e19 in ("true", "t", "yes", "1")
+    except Exception:
+        enabled = True  # 若讀取失敗，預設啟用（可依需求改為 False）
+    if not enabled:
+        return GoogleTripStartResponse(trip_id=None, share_url=None, stops=None)
+    # 產生乘客端地圖分享 URL（使用環境變數指定基底網址）
+    base = os.environ.get("PASSENGER_MAP_URL_BASE", "")
+    api_base = os.environ.get("DRIVER_API_BASE", "")
+    query = []
+    if base:
+        if os.environ.get("VITE_GOOGLE_MAPS_API_KEY"):
+            query.append("key=" + os.environ.get("VITE_GOOGLE_MAPS_API_KEY"))
+        if api_base:
+            query.append("api=" + api_base)
+        share_url = base + ("?" + "&".join(query) if query else "")
+    else:
+        share_url = ""  # 未設定則留空
+    # 將 URL 寫入 系統!D19
+    try:
+        if share_url:
+            ws.update("D19", share_url)
+    except Exception:
+        pass
+    # 範例 stops（可改為從 Sheet/行程計算）
     lat, lng = 25.068, 121.662
-    share_url = f"https://www.google.com/maps/search/?api=1&query={lat}%2C{lng}"
-    return GoogleTripStartResponse(trip_id=trip_id, share_url=share_url, stops=[{"lat": lat, "lng": lng}])
+    return GoogleTripStartResponse(trip_id=trip_id, share_url=share_url or None, stops=[{"lat": lat, "lng": lng}])
 
 @app.post("/api/driver/google/trip_complete")
 def api_driver_google_trip_complete(req: GoogleTripCompleteRequest):
