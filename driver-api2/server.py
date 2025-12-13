@@ -11,6 +11,8 @@ import gspread
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import firebase_admin
+from firebase_admin import credentials, db
 
 # ========= Google Sheets 設定 =========
 
@@ -719,6 +721,23 @@ def update_driver_location(loc: DriverLocation):
         DRIVER_LOCATION_CACHE["lng"] = loc.lng
         DRIVER_LOCATION_CACHE["timestamp"] = loc.timestamp
         DRIVER_LOCATION_CACHE["updated_at"] = _tz_now_str()
+    # 寫入 Firebase Realtime Database（若環境已設定）
+    try:
+        if not firebase_admin._apps:
+            cred = credentials.ApplicationDefault()
+            db_url = os.environ.get("FIREBASE_RTDB_URL")
+            if db_url:
+                firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+        if firebase_admin._apps:
+            ref = db.reference("/driver_location")
+            ref.set({
+                "lat": loc.lat,
+                "lng": loc.lng,
+                "timestamp": loc.timestamp,
+                "updated_at": DRIVER_LOCATION_CACHE["updated_at"],
+            })
+    except Exception:
+        pass
     return {"status": "ok", "received": loc}
 
 
