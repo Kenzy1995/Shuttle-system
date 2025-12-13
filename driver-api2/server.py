@@ -729,6 +729,9 @@ def update_driver_location(loc: DriverLocation):
             db_url = os.environ.get("FIREBASE_RTDB_URL")
             if db_url:
                 firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+            else:
+                print("Warning: FIREBASE_RTDB_URL environment variable not set.")
+        
         if firebase_admin._apps:
             ref = db.reference("/driver_location")
             ref.set({
@@ -737,8 +740,9 @@ def update_driver_location(loc: DriverLocation):
                 "timestamp": loc.timestamp,
                 "updated_at": DRIVER_LOCATION_CACHE["updated_at"],
             })
-    except Exception:
-        pass
+            # print(f"Firebase write success: {loc.lat}, {loc.lng}")
+    except Exception as e:
+        print(f"Firebase write error: {e}")
     return {"status": "ok", "received": loc}
 
 
@@ -746,27 +750,33 @@ def update_driver_location(loc: DriverLocation):
 def get_driver_location():
     """
     取得司機最新位置 (供乘客端或地圖顯示使用)
-    優先從 Firebase 讀取，若失敗則回傳記憶體快取。
+    強制從 Firebase 讀取，不使用記憶體快取，以便除錯。
     """
-    # 嘗試從 Firebase 讀取 (解決 Cloud Run 多實例問題)
     try:
         if not firebase_admin._apps:
              cred = credentials.ApplicationDefault()
              db_url = os.environ.get("FIREBASE_RTDB_URL")
              if db_url:
                  firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+             else:
+                 print("Error: FIREBASE_RTDB_URL environment variable not set.")
+                 raise HTTPException(status_code=500, detail="Server config error: FIREBASE_RTDB_URL not set")
         
         if firebase_admin._apps:
             ref = db.reference("/driver_location")
             data = ref.get()
+            # print(f"Firebase read result: {data}")
             if data:
                 return data
-    except Exception:
-        pass
+            else:
+                return {"lat": 0, "lng": 0, "timestamp": 0, "status": "no_data_in_firebase"}
+    except Exception as e:
+        print(f"Firebase read error: {e}")
+        # 發生錯誤時，回傳錯誤訊息給前端，而不是切換回快取
+        raise HTTPException(status_code=500, detail=f"Firebase read error: {str(e)}")
 
-    # 若 Firebase 未設定或讀取失敗，回傳記憶體快取
-    with LOCATION_LOCK:
-        return DRIVER_LOCATION_CACHE
+    # 只有在完全無法連線時才回傳空
+    return {"lat": 0, "lng": 0, "timestamp": 0, "status": "firebase_not_initialized"}
 
 
 # ========= 新整合端點：一次給 trips / trip_passengers / passenger_list =========
