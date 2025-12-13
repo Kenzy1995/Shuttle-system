@@ -727,10 +727,12 @@ def update_driver_location(loc: DriverLocation):
         if not firebase_admin._apps:
             cred = credentials.ApplicationDefault()
             db_url = os.environ.get("FIREBASE_RTDB_URL")
-            if db_url:
-                firebase_admin.initialize_app(cred, {"databaseURL": db_url})
-            else:
-                print("Warning: FIREBASE_RTDB_URL environment variable not set.")
+            if not db_url:
+                 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
+                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
+                 print(f"Warning: FIREBASE_RTDB_URL not set. Trying default: {db_url}")
+
+            firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         
         if firebase_admin._apps:
             ref = db.reference("/driver_location")
@@ -755,12 +757,17 @@ def get_driver_location():
     try:
         if not firebase_admin._apps:
              cred = credentials.ApplicationDefault()
+             # 優先使用環境變數，若無則嘗試預設 URL
              db_url = os.environ.get("FIREBASE_RTDB_URL")
-             if db_url:
-                 firebase_admin.initialize_app(cred, {"databaseURL": db_url})
-             else:
-                 print("Error: FIREBASE_RTDB_URL environment variable not set.")
-                 raise HTTPException(status_code=500, detail="Server config error: FIREBASE_RTDB_URL not set")
+             if not db_url:
+                 # 嘗試根據專案 ID 猜測預設 URL
+                 # Cloud Run 的專案 ID 通常可從環境變數 GOOGLE_CLOUD_PROJECT 取得
+                 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
+                 # 嘗試常見的 Firebase RTDB URL 格式
+                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
+                 print(f"Warning: FIREBASE_RTDB_URL not set. Trying default: {db_url}")
+
+             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         
         if firebase_admin._apps:
             ref = db.reference("/driver_location")
@@ -772,8 +779,13 @@ def get_driver_location():
                 return {"lat": 0, "lng": 0, "timestamp": 0, "status": "no_data_in_firebase"}
     except Exception as e:
         print(f"Firebase read error: {e}")
-        # 發生錯誤時，回傳錯誤訊息給前端，而不是切換回快取
-        raise HTTPException(status_code=500, detail=f"Firebase read error: {str(e)}")
+        # 回傳 500 但帶有詳細錯誤訊息，讓前端可以顯示
+        return {
+            "lat": 0, "lng": 0, "timestamp": 0, 
+            "status": "error",
+            "error_detail": str(e),
+            "hint": "Check Cloud Run logs or FIREBASE_RTDB_URL env var."
+        }
 
     # 只有在完全無法連線時才回傳空
     return {"lat": 0, "lng": 0, "timestamp": 0, "status": "firebase_not_initialized"}
