@@ -71,7 +71,9 @@ function handleScroll() {
   );
   const btn = document.getElementById("backToTop");
   if (!btn) return;
-  btn.style.display = y > 300 ? "block" : "none";
+  // 超過一個畫面高度就顯示（使用 window.innerHeight 作為一個畫面高度）
+  const oneScreenHeight = window.innerHeight || document.documentElement.clientHeight || 300;
+  btn.style.display = y > oneScreenHeight ? "block" : "none";
 }
 
 function showPage(id) {
@@ -170,8 +172,7 @@ function closeMarquee() {
     nav.style.top = '0';
   }
 
-  // 移除 body 的 has-marquee class，避免上面空一條
-  document.body.classList.remove("has-marquee");
+  // 跑馬燈關閉，不需要額外操作
 }
 
 function toggleCollapse(id) {
@@ -214,13 +215,11 @@ function showMarquee() {
 
   if (!marqueeData.text) {
     marqueeContainer.style.display = "none";
-    document.body.classList.remove("has-marquee");
     return;
   }
 
   marqueeContent.textContent = marqueeData.text;
   marqueeContainer.style.display = "block";
-  document.body.classList.add("has-marquee");
   restartMarqueeAnimation();
 }
 
@@ -2219,23 +2218,24 @@ async function renderLiveLocationPlaceholder() {
 
 function initLiveLocation(mount) {
   const cfg = getLiveConfig();
-  // 即時位置區塊：標題在左上角，MAP 在下面，資訊覆蓋在 MAP 左上角（所有內容都在這個區塊內，不要嵌套容器）
+  // 即時位置區塊：移除重複標題，狀態改為小綠燈/紅燈，按鈕放在狀態旁邊
   mount.innerHTML = `
-    <h2 style="margin:0 0 12px 0;font-size:24px;font-weight:800;color:var(--primary);">即時位置</h2>
     <div id="rt-map-wrapper" style="position:relative;width:100%;height:500px;min-height:500px;border-radius:12px;overflow:hidden;">
       <div id="rt-map" style="width:100%;height:100%;"></div>
       <!-- 灰色透明遮罩，預設顯示 -->
       <div id="rt-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10;">
         <button id="rt-start-btn" class="button" style="padding:16px 32px;font-size:18px;font-weight:700;background:var(--primary);color:#fff;border:none;border-radius:12px;cursor:pointer;">查看即時位置</button>
       </div>
-      <!-- MAP 左上角資訊覆蓋層（狀態、班次、即將抵達） -->
-      <div id="rt-info-overlay" style="position:absolute;top:0;left:0;z-index:5;pointer-events:none;display:none;padding:12px;background:linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(255,255,255,0.85));border-radius:0 0 12px 0;max-width:280px;">
-        <div id="rt-status-badge" style="display:inline-block;padding:4px 10px;background:#28a745;color:#fff;border-radius:6px;font-size:13px;font-weight:700;margin-bottom:6px;">狀態: 良好</div>
+      <!-- 左上角資訊覆蓋層（狀態燈、班次、即將抵達、刷新按鈕） -->
+      <div id="rt-info-overlay" style="position:absolute;top:0;left:0;z-index:5;pointer-events:none;display:none;padding:12px;background:linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(255,255,255,0.85));border-radius:0 0 12px 0;max-width:320px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div id="rt-status-light" style="width:12px;height:12px;border-radius:50%;background:#28a745;box-shadow:0 0 8px rgba(40,167,69,0.6);"></div>
+          <span id="rt-status-text" style="font-size:14px;color:#28a745;font-weight:700;">良好</span>
+          <button id="rt-refresh" style="margin-left:auto;padding:6px 12px;background:#fff;border:1px solid #ddd;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.1);pointer-events:auto;">刷新</button>
+        </div>
         <div id="rt-trip-info" style="font-size:15px;color:#333;margin:4px 0;font-weight:600;">班次: <span id="rt-trip-datetime"></span></div>
         <div id="rt-next-stop" style="font-size:15px;color:#333;margin:4px 0;font-weight:600;">即將抵達: <span id="rt-next-stop-name"></span></div>
       </div>
-      <!-- 右上角刷新按鈕 -->
-      <button id="rt-refresh" style="position:absolute;top:0;right:0;z-index:6;padding:8px 16px;background:#fff;border:1px solid #ddd;border-radius:0 0 0 12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.15);display:none;">刷新</button>
       <!-- 班次結束提示 -->
       <div id="rt-ended-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:15;pointer-events:none;">
         <div style="text-align:center;color:#fff;font-size:20px;font-weight:700;">
@@ -2247,11 +2247,10 @@ function initLiveLocation(mount) {
   const overlayEl = mount.querySelector("#rt-overlay");
   const startBtn = mount.querySelector("#rt-start-btn");
   const infoOverlay = mount.querySelector("#rt-info-overlay");
-  const statusBadge = mount.querySelector("#rt-status-badge");
+  const statusLight = mount.querySelector("#rt-status-light");
+  const statusText = mount.querySelector("#rt-status-text");
   const tripDatetimeEl = mount.querySelector("#rt-trip-datetime");
   const nextStopNameEl = mount.querySelector("#rt-next-stop-name");
-  const etaEl = mount.querySelector("#rt-eta");
-  const etaValueEl = mount.querySelector("#rt-eta-value");
   const btnRefresh = mount.querySelector("#rt-refresh");
   const endedOverlay = mount.querySelector("#rt-ended-overlay");
   const endedTextEl = mount.querySelector("#rt-ended-text");
@@ -2408,9 +2407,11 @@ function initLiveLocation(mount) {
       const apiUrl = "https://booking-api-995728097341.asia-east1.run.app/api/realtime/location";
       const r = await fetch(apiUrl);
       if (!r.ok) {
-        if (statusBadge) {
-          statusBadge.textContent = "狀態: 連線失敗";
-          statusBadge.style.background = "#dc3545";
+        if (statusLight && statusText) {
+          statusLight.style.background = "#dc3545";
+          statusLight.style.boxShadow = "0 0 8px rgba(220,53,69,0.6)";
+          statusText.textContent = "連線失敗";
+          statusText.style.color = "#dc3545";
         }
         return;
       }
@@ -2420,7 +2421,6 @@ function initLiveLocation(mount) {
       if (!data.gps_system_enabled) {
         if (overlayEl) overlayEl.style.display = "flex";
         if (infoOverlay) infoOverlay.style.display = "none";
-        if (btnRefresh) btnRefresh.style.display = "none";
         return;
       }
       
@@ -2431,12 +2431,10 @@ function initLiveLocation(mount) {
           endedDatetimeEl.textContent = data.last_trip_datetime || data.current_trip_datetime || "";
         }
         if (infoOverlay) infoOverlay.style.display = "none";
-        if (btnRefresh) btnRefresh.style.display = "none";
         return;
       } else {
         if (endedOverlay) endedOverlay.style.display = "none";
         if (infoOverlay) infoOverlay.style.display = "block";
-        if (btnRefresh) btnRefresh.style.display = "block";
       }
       
       // 更新班次信息
@@ -2472,14 +2470,18 @@ function initLiveLocation(mount) {
           });
         }
         
-        if (statusBadge) {
-          statusBadge.textContent = "狀態: 良好";
-          statusBadge.style.background = "#28a745";
+        if (statusLight && statusText) {
+          statusLight.style.background = "#28a745";
+          statusLight.style.boxShadow = "0 0 8px rgba(40,167,69,0.6)";
+          statusText.textContent = "良好";
+          statusText.style.color = "#28a745";
         }
       } else {
-        if (statusBadge) {
-          statusBadge.textContent = "狀態: 連線中";
-          statusBadge.style.background = "#ffc107";
+        if (statusLight && statusText) {
+          statusLight.style.background = "#ffc107";
+          statusLight.style.boxShadow = "0 0 8px rgba(255,193,7,0.6)";
+          statusText.textContent = "連線中";
+          statusText.style.color = "#ffc107";
         }
       }
       
@@ -2493,10 +2495,12 @@ function initLiveLocation(mount) {
       currentTripData = data;
     } catch (e) {
       console.error("Fetch location error:", e);
-        if (statusBadge) {
-          statusBadge.textContent = "狀態: 錯誤";
-          statusBadge.style.background = "#dc3545";
-        }
+      if (statusLight && statusText) {
+        statusLight.style.background = "#dc3545";
+        statusLight.style.boxShadow = "0 0 8px rgba(220,53,69,0.6)";
+        statusText.textContent = "錯誤";
+        statusText.style.color = "#dc3545";
+      }
     }
   };
 
@@ -2532,10 +2536,9 @@ function initLiveLocation(mount) {
       } 
     });
     
-    // 隱藏遮罩，顯示資訊和刷新按鈕
+    // 隱藏遮罩，顯示資訊
     if (overlayEl) overlayEl.style.display = "none";
     if (infoOverlay) infoOverlay.style.display = "block";
-    if (btnRefresh) btnRefresh.style.display = "block";
     
     // 首次獲取數據並繪製路線
     await fetchLocation();
