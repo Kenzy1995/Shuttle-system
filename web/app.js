@@ -2179,15 +2179,32 @@ const FEATURE_TOGGLE = {
 };
 
 // === 即時位置渲染 ===
-function renderLiveLocationPlaceholder() {
+async function renderLiveLocationPlaceholder() {
   const sec = document.querySelector('[data-feature="liveLocation"]');
   if (!sec) return;
-
-  sec.style.display = FEATURE_TOGGLE.LIVE_LOCATION ? "" : "none";
 
   const mount = document.getElementById("realtimeMount");
   if (!mount) return;
 
+  // 檢查 GPS 系統總開關（從 booking-api 讀取）
+  try {
+    const apiUrl = "https://booking-api-995728097341.asia-east1.run.app/api/realtime/location";
+    const r = await fetch(apiUrl);
+    if (r.ok) {
+      const data = await r.json();
+      if (!data.gps_system_enabled) {
+        // GPS 系統總開關關閉，隱藏整個區塊
+        sec.style.display = "none";
+        mount.innerHTML = "";
+        return;
+      }
+    }
+  } catch (e) {
+    console.error("Check GPS system status error:", e);
+  }
+
+  // GPS 系統啟用，顯示並初始化
+  sec.style.display = FEATURE_TOGGLE.LIVE_LOCATION ? "" : "none";
   if (!FEATURE_TOGGLE.LIVE_LOCATION) {
     mount.innerHTML = "";
     return;
@@ -2197,33 +2214,63 @@ function renderLiveLocationPlaceholder() {
 
 function initLiveLocation(mount) {
   const cfg = getLiveConfig();
+  // 全屏地圖，不要嵌套容器
   mount.innerHTML = `
-    <div id="rt-status" style="display:flex;align-items:center;gap:12px;padding:8px;background:#fff;border-bottom:1px solid #eee">
-      <span id="rt-status-text">載入中...</span>
-      <div style="margin-left:auto;display:flex;gap:8px">
-        <button id="rt-refresh" class="button btn-ghost">手動刷新</button>
-        <button id="rt-watch" class="button btn-ghost">查看即時位置</button>
+    <div id="rt-map" style="position:relative;width:100%;height:100vh;min-height:500px;"></div>
+    <!-- 灰色透明遮罩，預設顯示 -->
+    <div id="rt-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10;">
+      <button id="rt-start-btn" class="button" style="padding:16px 32px;font-size:18px;font-weight:700;background:var(--fh-blue);color:#fff;border:none;border-radius:12px;cursor:pointer;">[查看即時位置]</button>
+    </div>
+    <!-- 左上角標題和資訊覆蓋層 -->
+    <div id="rt-info-overlay" style="position:absolute;top:0;left:0;right:0;z-index:5;pointer-events:none;display:none;">
+      <div style="padding:16px;background:linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(255,255,255,0.8));">
+        <h2 style="margin:0 0 12px 0;font-size:24px;font-weight:800;color:var(--fh-blue);">即時位置</h2>
+        <div id="rt-status-badge" style="display:inline-block;padding:4px 12px;background:#28a745;color:#fff;border-radius:6px;font-size:14px;font-weight:700;margin-bottom:8px;">良好</div>
+        <div id="rt-trip-info" style="font-size:16px;color:#333;margin:4px 0;">班次: <span id="rt-trip-datetime"></span></div>
+        <div id="rt-next-stop" style="font-size:16px;color:#333;margin:4px 0;">即將抵達: <span id="rt-next-stop-name"></span></div>
+        <div id="rt-eta" style="font-size:16px;color:#333;margin:4px 0;display:none;">預估時間: <span id="rt-eta-value"></span></div>
       </div>
     </div>
-    <div id="rt-map" style="height: 380px;"></div>
+    <!-- 右上角刷新按鈕 -->
+    <button id="rt-refresh" style="position:absolute;top:16px;right:16px;z-index:6;padding:8px 16px;background:#fff;border:1px solid #ddd;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.15);display:none;">[刷新]</button>
+    <!-- 班次結束提示 -->
+    <div id="rt-ended-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:15;pointer-events:none;">
+      <div style="text-align:center;color:#fff;font-size:20px;font-weight:700;">
+        <div id="rt-ended-text">班次: <span id="rt-ended-datetime"></span> 已結束</div>
+      </div>
+    </div>
   `;
-  const statusTextEl = mount.querySelector("#rt-status-text");
+  const overlayEl = mount.querySelector("#rt-overlay");
+  const startBtn = mount.querySelector("#rt-start-btn");
+  const infoOverlay = mount.querySelector("#rt-info-overlay");
+  const statusBadge = mount.querySelector("#rt-status-badge");
+  const tripDatetimeEl = mount.querySelector("#rt-trip-datetime");
+  const nextStopNameEl = mount.querySelector("#rt-next-stop-name");
+  const etaEl = mount.querySelector("#rt-eta");
+  const etaValueEl = mount.querySelector("#rt-eta-value");
   const btnRefresh = mount.querySelector("#rt-refresh");
-  const btnWatch = mount.querySelector("#rt-watch");
+  const endedOverlay = mount.querySelector("#rt-ended-overlay");
+  const endedTextEl = mount.querySelector("#rt-ended-text");
+  const endedDatetimeEl = mount.querySelector("#rt-ended-datetime");
   const mapEl = mount.querySelector("#rt-map");
 
   const loadMaps = () =>
     new Promise((resolve, reject) => {
-      if (!cfg.key) { statusTextEl.textContent = "缺少地圖 key"; return; }
+      if (!cfg.key) { 
+        if (startBtn) startBtn.textContent = "缺少地圖 key";
+        return; 
+      }
       const s = document.createElement("script");
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(cfg.key)}`;
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(cfg.key)}&libraries=places,directions`;
       s.async = true;
       s.onload = resolve;
       s.onerror = reject;
       document.head.appendChild(s);
     });
 
-  let map, marker, mainPolyline, walkedPolyline;
+  let map, marker, mainPolyline, walkedPolyline, stationMarkers = [];
+  let currentTripData = null;
+  let isInitialized = false;
   const ensureFirebase = async () => {
     if (!cfg.fbdb || !cfg.fbkey) return false;
     // 動態載入 Firebase SDK
@@ -2247,48 +2294,161 @@ function initLiveLocation(mount) {
     return true;
   };
 
-  const drawRoute = async () => {
+  const drawRoute = async (tripData) => {
     try {
-      let path = null;
-      // 優先從 Firebase 讀取 route
-      if (cfg.fbdb && cfg.fbkey && cfg.trip) {
-        const ok = await ensureFirebase();
-        if (ok) {
-          const ref = firebase.database().ref(`/trip/${cfg.trip}/route`);
-          const snap = await ref.get();
-          const d = snap.val();
-          path = (d && d.polyline && d.polyline.path) || null;
+      if (!tripData || !tripData.current_trip_route) return;
+      
+      const route = tripData.current_trip_route;
+      const stops = route.stops || [];
+      const path = route.polyline?.path || null;
+      
+      // 清除舊的標記
+      stationMarkers.forEach(m => m.setMap(null));
+      stationMarkers = [];
+      
+      // 繪製站點標記
+      const stationCoords = {
+        "福泰大飯店 Forte Hotel": { lat: 25.055550556928008, lng: 121.63210245291367 },
+        "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": { lat: 25.055017007293404, lng: 121.61818547695053 },
+        "南港火車站 Nangang Train Station": { lat: 25.052822671279454, lng: 121.60771823129633 },
+        "LaLaport Shopping Park": { lat: 25.05629820919232, lng: 121.61700981622211 },
+        "福泰大飯店(回) Forte Hotel (Back)": { lat: 25.055550556928008, lng: 121.63210245291367 }
+      };
+      
+      stops.forEach((stop, idx) => {
+        const coord = typeof stop === "object" && stop.lat ? stop : stationCoords[stop.name || stop] || stop;
+        if (coord && coord.lat && coord.lng) {
+          const marker = new google.maps.Marker({
+            position: { lat: coord.lat, lng: coord.lng },
+            map: map,
+            label: { text: String(idx + 1), color: "#fff" },
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 12,
+              fillColor: "#0b63ce",
+              fillOpacity: 1,
+              strokeColor: "#fff",
+              strokeWeight: 2
+            }
+          });
+          stationMarkers.push(marker);
         }
-      }
-      // 退回後端 API
-      if (!path && cfg.api && cfg.trip) {
-        const url = cfg.api.replace(/\/$/, "") + `/api/driver/route?trip_id=${encodeURIComponent(cfg.trip)}`;
-        const r = await fetch(url);
-        const d = await r.json();
-        path = (d && d.polyline && d.polyline.path) || null;
-      }
+      });
+      
+      // 繪製路線
       if (path && Array.isArray(path) && path.length > 1) {
         const gPath = path.map(p => new google.maps.LatLng(p.lat, p.lng));
         if (mainPolyline) mainPolyline.setMap(null);
-        mainPolyline = new google.maps.Polyline({ path: gPath, strokeColor: "#0b63ce", strokeOpacity: 0.8, strokeWeight: 6, map });
+        mainPolyline = new google.maps.Polyline({ 
+          path: gPath, 
+          strokeColor: "#999", 
+          strokeOpacity: 0.6, 
+          strokeWeight: 6, 
+          map 
+        });
         const bounds = new google.maps.LatLngBounds();
         gPath.forEach(pt => bounds.extend(pt));
+        if (stops.length > 0) {
+          stops.forEach(stop => {
+            const coord = typeof stop === "object" && stop.lat ? stop : stationCoords[stop.name || stop] || stop;
+            if (coord && coord.lat && coord.lng) {
+              bounds.extend({ lat: coord.lat, lng: coord.lng });
+            }
+          });
+        }
         map.fitBounds(bounds);
+      } else if (stops.length >= 2) {
+        // 如果沒有 polyline，使用 Google Directions API 生成路線
+        const directionsService = new google.maps.DirectionsService();
+        const directionsRenderer = new google.maps.DirectionsRenderer({ map: map });
+        
+        const waypoints = stops.slice(1, -1).map(stop => {
+          const coord = typeof stop === "object" && stop.lat ? stop : stationCoords[stop.name || stop] || stop;
+          return { location: { lat: coord.lat, lng: coord.lng } };
+        });
+        
+        const origin = stops[0];
+        const destination = stops[stops.length - 1];
+        const originCoord = typeof origin === "object" && origin.lat ? origin : stationCoords[origin.name || origin] || origin;
+        const destCoord = typeof destination === "object" && destination.lat ? destination : stationCoords[destination.name || destination] || destination;
+        
+        directionsService.route({
+          origin: { lat: originCoord.lat, lng: originCoord.lng },
+          destination: { lat: destCoord.lat, lng: destCoord.lng },
+          waypoints: waypoints,
+          travelMode: google.maps.TravelMode.DRIVING
+        }, (result, status) => {
+          if (status === "OK") {
+            directionsRenderer.setDirections(result);
+            const route = result.routes[0];
+            const path = route.overview_path;
+            if (mainPolyline) mainPolyline.setMap(null);
+            mainPolyline = new google.maps.Polyline({ 
+              path: path, 
+              strokeColor: "#999", 
+              strokeOpacity: 0.6, 
+              strokeWeight: 6, 
+              map 
+            });
+          }
+        });
       }
-    } catch {}
+    } catch (e) {
+      console.error("Draw route error:", e);
+    }
   };
   const fetchLocation = async () => {
     try {
-      if (!cfg.api) return;
-      const url = cfg.api.replace(/\/$/, "") + "/api/driver/location";
-      const r = await fetch(url);
-      const d = await r.json();
-      if (d.status === "error") { statusTextEl.textContent = "錯誤"; statusTextEl.style.color = "red"; return; }
-      if (!r.ok) return;
-      if (typeof d.lat === "number" && typeof d.lng === "number") {
-        const pos = { lat: d.lat, lng: d.lng };
-        marker.setPosition(pos);
-        map.panTo(pos);
+      // 從 booking-api 讀取即時位置資料
+      const apiUrl = "https://booking-api-995728097341.asia-east1.run.app/api/realtime/location";
+      const r = await fetch(apiUrl);
+      if (!r.ok) {
+        if (statusBadge) {
+          statusBadge.textContent = "連線失敗";
+          statusBadge.style.background = "#dc3545";
+        }
+        return;
+      }
+      const data = await r.json();
+      
+      // 檢查 GPS 系統總開關
+      if (!data.gps_system_enabled) {
+        if (overlayEl) overlayEl.style.display = "flex";
+        if (infoOverlay) infoOverlay.style.display = "none";
+        if (btnRefresh) btnRefresh.style.display = "none";
+        return;
+      }
+      
+      // 檢查班次狀態
+      if (data.current_trip_status === "ended") {
+        if (endedOverlay) {
+          endedOverlay.style.display = "flex";
+          endedDatetimeEl.textContent = data.last_trip_datetime || data.current_trip_datetime || "";
+        }
+        if (infoOverlay) infoOverlay.style.display = "none";
+        if (btnRefresh) btnRefresh.style.display = "none";
+        return;
+      } else {
+        if (endedOverlay) endedOverlay.style.display = "none";
+        if (infoOverlay) infoOverlay.style.display = "block";
+        if (btnRefresh) btnRefresh.style.display = "block";
+      }
+      
+      // 更新班次信息
+      if (data.current_trip_datetime && tripDatetimeEl) {
+        tripDatetimeEl.textContent = data.current_trip_datetime;
+      }
+      
+      // 更新司機位置
+      const driverLoc = data.driver_location;
+      if (driverLoc && typeof driverLoc.lat === "number" && typeof driverLoc.lng === "number") {
+        const pos = { lat: driverLoc.lat, lng: driverLoc.lng };
+        if (marker) {
+          marker.setPosition(pos);
+          map.panTo(pos);
+        }
+        
+        // 更新已走過的路線
         if (mainPolyline) {
           const path = mainPolyline.getPath().getArray();
           let nearestIdx = 0, best = Infinity;
@@ -2298,76 +2458,128 @@ function initLiveLocation(mount) {
             if (dist < best) { best = dist; nearestIdx = i; }
           }
           if (walkedPolyline) walkedPolyline.setMap(null);
-          walkedPolyline = new google.maps.Polyline({ path: path.slice(0, Math.max(1, nearestIdx)), strokeColor: "#0b63ce", strokeOpacity: 1, strokeWeight: 8, map });
+          walkedPolyline = new google.maps.Polyline({ 
+            path: path.slice(0, Math.max(1, nearestIdx + 1)), 
+            strokeColor: "#0b63ce", 
+            strokeOpacity: 1, 
+            strokeWeight: 8, 
+            map 
+          });
         }
-        statusTextEl.textContent = "● 訊號良好";
-        statusTextEl.style.color = "#28a745";
+        
+        if (statusBadge) {
+          statusBadge.textContent = "良好";
+          statusBadge.style.background = "#28a745";
+        }
+      } else {
+        if (statusBadge) {
+          statusBadge.textContent = "連線中";
+          statusBadge.style.background = "#ffc107";
+        }
       }
-    } catch {
-      statusTextEl.textContent = "○ 正在連線...";
-      statusTextEl.style.color = "#666";
+      
+      // 更新下一站信息（如果有）
+      const stations = data.current_trip_stations?.stops || [];
+      if (stations.length > 0 && nextStopNameEl) {
+        // 簡單邏輯：顯示第一個站點（實際應該根據位置判斷）
+        nextStopNameEl.textContent = stations[0] || "未知";
+      }
+      
+      currentTripData = data;
+    } catch (e) {
+      console.error("Fetch location error:", e);
+      if (statusBadge) {
+        statusBadge.textContent = "錯誤";
+        statusBadge.style.background = "#dc3545";
+      }
     }
   };
 
-  loadMaps().then(async () => {
-    statusTextEl.textContent = "載入地圖中...";
-    map = new google.maps.Map(mapEl, { center: { lat: 25.068, lng: 121.662 }, zoom: 14, disableDefaultUI: false, zoomControl: true, mapTypeControl: false, streetViewControl: false });
-    marker = new google.maps.Marker({ position: { lat: 25.068, lng: 121.662 }, map, title: "司機位置", icon: { path: google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: "#4285F4", fillOpacity: 1, strokeColor: "white", strokeWeight: 2 } });
-    // 若未指定 trip 且可用 Firebase，則自動讀取 current_trip_id
-    if (!cfg.trip && cfg.fbdb && cfg.fbkey) {
-      const ok = await ensureFirebase();
-      if (ok) {
-        try {
-          const idSnap = await firebase.database().ref('/current_trip_id').get();
-          const tid = idSnap.val();
-          if (tid) cfg.trip = tid;
-        } catch {}
-      }
-    }
-    await drawRoute();
+  // 初始化地圖（點擊"查看即時位置"按鈕後）
+  const initMap = async () => {
+    if (isInitialized) return;
+    isInitialized = true;
+    
+    await loadMaps();
+    
+    // 初始化地圖
+    map = new google.maps.Map(mapEl, { 
+      center: { lat: 25.055550556928008, lng: 121.63210245291367 }, 
+      zoom: 14, 
+      disableDefaultUI: false, 
+      zoomControl: true, 
+      mapTypeControl: false, 
+      streetViewControl: false 
+    });
+    
+    // 創建司機位置標記
+    marker = new google.maps.Marker({ 
+      position: { lat: 25.055550556928008, lng: 121.63210245291367 }, 
+      map, 
+      title: "司機位置", 
+      icon: { 
+        path: google.maps.SymbolPath.CIRCLE, 
+        scale: 12, 
+        fillColor: "#4285F4", 
+        fillOpacity: 1, 
+        strokeColor: "white", 
+        strokeWeight: 3 
+      } 
+    });
+    
+    // 隱藏遮罩，顯示資訊和刷新按鈕
+    if (overlayEl) overlayEl.style.display = "none";
+    if (infoOverlay) infoOverlay.style.display = "block";
+    if (btnRefresh) btnRefresh.style.display = "block";
+    
+    // 首次獲取數據並繪製路線
     await fetchLocation();
-  });
-
-  const AUTO_REFRESH_MS = 5 * 60 * 1000;
-  let autoTimer = setInterval(fetchLocation, AUTO_REFRESH_MS);
-  btnRefresh.addEventListener("click", () => { drawRoute(); fetchLocation(); });
-
-  let unsub = null;
-  btnWatch.addEventListener("click", async () => {
-    if (!cfg.fbdb || !cfg.fbkey) { statusTextEl.textContent = "未設定 Firebase 監聽"; statusTextEl.style.color = "#666"; return; }
-    if (!unsub) {
-      try {
-        await new Promise((resolve, reject) => { const s = document.createElement("script"); s.src = "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js"; s.onload = resolve; s.onerror = reject; document.head.appendChild(s); });
-        await new Promise((resolve, reject) => { const s = document.createElement("script"); s.src = "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js"; s.onload = resolve; s.onerror = reject; document.head.appendChild(s); });
-        const app = firebase.initializeApp({ apiKey: cfg.fbkey, databaseURL: cfg.fbdb });
-        const dbref = firebase.database().ref("/driver_location");
-        clearInterval(autoTimer); autoTimer = null;
-        const handler = (snap) => {
-          const d = snap.val();
-          if (d && typeof d.lat === "number" && typeof d.lng === "number") {
-            const pos = { lat: d.lat, lng: d.lng };
-            marker.setPosition(pos);
-            map.panTo(pos);
-            statusTextEl.textContent = "● 即時監聽中";
-            statusTextEl.style.color = "#28a745";
-          }
-        };
-        dbref.on("value", handler);
-        unsub = () => dbref.off("value", handler);
-        btnWatch.textContent = "停止監聽";
-      } catch {
-        statusTextEl.textContent = "監聽初始化失敗";
-        statusTextEl.style.color = "red";
-      }
-    } else {
-      try { unsub(); } catch {}
-      unsub = null;
-      btnWatch.textContent = "查看即時位置";
-      statusTextEl.textContent = "○ 已停止監聽";
-      statusTextEl.style.color = "#666";
-      if (!autoTimer) autoTimer = setInterval(fetchLocation, AUTO_REFRESH_MS);
+    if (currentTripData) {
+      await drawRoute(currentTripData);
     }
-  });
+  };
+  
+  // "查看即時位置"按鈕點擊事件
+  if (startBtn) {
+    startBtn.addEventListener("click", initMap);
+  }
+  
+  // 刷新按鈕點擊事件
+  if (btnRefresh) {
+    btnRefresh.addEventListener("click", async () => {
+      await fetchLocation();
+      if (currentTripData) {
+        await drawRoute(currentTripData);
+      }
+    });
+  }
+  
+  // 預設每3分鐘自動刷新
+  const AUTO_REFRESH_MS = 3 * 60 * 1000;
+  let autoTimer = null;
+  
+  // 開始自動刷新（僅在初始化後）
+  const startAutoRefresh = () => {
+    if (autoTimer) clearInterval(autoTimer);
+    autoTimer = setInterval(async () => {
+      if (isInitialized) {
+        await fetchLocation();
+        if (currentTripData) {
+          await drawRoute(currentTripData);
+        }
+      }
+    }, AUTO_REFRESH_MS);
+  };
+  
+  // 監聽初始化完成後開始自動刷新
+  if (startBtn) {
+    const originalInit = initMap;
+    initMap = async () => {
+      await originalInit();
+      startAutoRefresh();
+    };
+    startBtn.addEventListener("click", initMap);
+  }
 }
 
 async function init() {

@@ -301,6 +301,7 @@ class DriverLocation(BaseModel):
     lat: float
     lng: float
     timestamp: float
+    trip_id: Optional[str] = None
 
 class BookingIdRequest(BaseModel):
     booking_id: str
@@ -772,12 +773,15 @@ def update_driver_location(loc: DriverLocation):
         
         if firebase_admin._apps:
             ref = db.reference("/driver_location")
-            ref.set({
+            location_data = {
                 "lat": loc.lat,
                 "lng": loc.lng,
                 "timestamp": loc.timestamp,
                 "updated_at": DRIVER_LOCATION_CACHE["updated_at"],
-            })
+            }
+            if loc.trip_id:
+                location_data["trip_id"] = loc.trip_id
+            ref.set(location_data)
             # print(f"Firebase write success: {loc.lat}, {loc.lng}")
     except Exception as e:
         print(f"Firebase write error: {e}")
@@ -1313,13 +1317,13 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                 is_skip = val in ("true", "t", "yes", "1")
                 if not is_skip:
                     stops_names.append(s)
-        # 站點座標（若未提供座標，前端可用 Directions 生成路徑）
+        # 站點座標（精確座標）
         COORDS = {
-            "福泰大飯店 Forte Hotel": {"lat": 25.068, "lng": 121.662},
-            "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": {"lat": 25.0558, "lng": 121.6179},
-            "南港火車站 Nangang Train Station": {"lat": 25.052, "lng": 121.607},
-            "LaLaport Shopping Park": {"lat": 25.055, "lng": 121.615},
-            "福泰大飯店(回) Forte Hotel (Back)": {"lat": 25.068, "lng": 121.662},
+            "福泰大飯店 Forte Hotel": {"lat": 25.055550556928008, "lng": 121.63210245291367},
+            "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": {"lat": 25.055017007293404, "lng": 121.61818547695053},
+            "南港火車站 Nangang Train Station": {"lat": 25.052822671279454, "lng": 121.60771823129633},
+            "LaLaport Shopping Park": {"lat": 25.05629820919232, "lng": 121.61700981622211},
+            "福泰大飯店(回) Forte Hotel (Back)": {"lat": 25.055550556928008, "lng": 121.63210245291367},
         }
         stops: List[Dict[str, float]] = []
         for name in stops_names:
@@ -1412,10 +1416,18 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
             if polyline_obj:
                 payload["polyline"] = polyline_obj
             ref.set(payload)
-            # 寫入目前班次 ID 與快取路線，供乘客端直接讀取
+            # 寫入目前班次 ID、狀態、日期時間、路線和站點信息，供乘客端直接讀取
             try:
                 db.reference("/current_trip_id").set(trip_id)
+                db.reference("/current_trip_status").set("active")
+                db.reference("/current_trip_datetime").set(req.main_datetime)
                 db.reference("/current_trip_route").set(payload)
+                # 寫入站點信息（哪些站點會停靠）
+                stations_info = {
+                    "stops": stops_names,
+                    "all_stations": STATIONS
+                }
+                db.reference("/current_trip_stations").set(stations_info)
             except Exception as e2:
                 print(f"Write current_trip metadata error: {e2}")
         except Exception as fe:
@@ -1443,8 +1455,19 @@ def api_driver_google_trip_complete(req: GoogleTripCompleteRequest):
                 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+        # 清除目前班次標記，並設置結束狀態
         db.reference("/current_trip_id").set("")
         db.reference("/current_trip_route").set({})
+        db.reference("/current_trip_status").set("ended")
+        # 保存最後一次班次的日期時間
+        try:
+            last_trip_datetime = db.reference("/current_trip_datetime").get()
+            if last_trip_datetime:
+                db.reference("/last_trip_datetime").set(last_trip_datetime)
+        except:
+            pass
+        db.reference("/current_trip_datetime").set("")
+        db.reference("/current_trip_stations").set({})
     except Exception as e:
         print(f"Trip complete cleanup error: {e}")
     return {"status": "success"}
@@ -1473,3 +1496,56 @@ def api_driver_route(trip_id: str = Query(..., description="主班次時間，�
     except Exception as e:
         print(f"Route read error: {e}")
         raise HTTPException(status_code=500, detail=f"Route read error: {str(e)}")
+
+@app.get("/api/driver/system_status")
+def api_driver_system_status():
+    """
+    讀取 GPS 系統總開關狀態（從 Firebase）
+    """
+    try:
+        if not firebase_admin._apps:
+            service_account_path = "service_account.json"
+            if os.path.exists(service_account_path):
+                cred = credentials.Certificate(service_account_path)
+            else:
+                cred = credentials.ApplicationDefault()
+            db_url = os.environ.get("FIREBASE_RTDB_URL")
+            if not db_url:
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
+                db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
+            firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+        ref = db.reference("/gps_system_enabled")
+        enabled = ref.get()
+        if enabled is None:
+            enabled = True  # 預設啟用
+        return {"enabled": bool(enabled), "message": "GPS系統總開關狀態"}
+    except Exception as e:
+        print(f"System status read error: {e}")
+        return {"enabled": True, "message": "讀取失敗，預設啟用"}
+
+class SystemStatusRequest(BaseModel):
+    enabled: bool
+
+@app.post("/api/driver/system_status")
+def api_driver_set_system_status(req: SystemStatusRequest):
+    """
+    寫入 GPS 系統總開關狀態（到 Firebase）
+    """
+    try:
+        if not firebase_admin._apps:
+            service_account_path = "service_account.json"
+            if os.path.exists(service_account_path):
+                cred = credentials.Certificate(service_account_path)
+            else:
+                cred = credentials.ApplicationDefault()
+            db_url = os.environ.get("FIREBASE_RTDB_URL")
+            if not db_url:
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
+                db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
+            firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+        ref = db.reference("/gps_system_enabled")
+        ref.set(bool(req.enabled))
+        return {"status": "success", "enabled": bool(req.enabled), "message": "GPS系統總開關狀態已更新"}
+    except Exception as e:
+        print(f"System status write error: {e}")
+        raise HTTPException(status_code=500, detail=f"寫入失敗: {str(e)}")
