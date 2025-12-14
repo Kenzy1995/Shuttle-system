@@ -11,7 +11,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import urllib.parse
 import secrets  
 
-
 import qrcode
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
