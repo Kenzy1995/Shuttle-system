@@ -77,42 +77,60 @@ function handleScroll() {
 }
 
 function showPage(id) {
-  hardResetOverlays();
+  try {
+    hardResetOverlays();
 
-  document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
+    const pages = document.querySelectorAll(".page");
+    if (pages.length === 0) {
+      console.error("No pages found");
+      return;
+    }
+    pages.forEach((p) => p.classList.remove("active"));
+    
+    const targetPage = document.getElementById(id);
+    if (!targetPage) {
+      console.error(`Page with id "${id}" not found`);
+      return;
+    }
+    targetPage.classList.add("active");
 
-  document
-    .querySelectorAll(".nav-links button")
-    .forEach((b) => b.classList.remove("active"));
-  const navId =
-    id === "reservation"
-      ? "nav-reservation"
-      : id === "check"
-      ? "nav-check"
-      : id === "schedule"
-      ? "nav-schedule"
-      : id === "station"
-      ? "nav-station"
-      : "nav-contact";
-  const navEl = document.getElementById(navId);
-  if (navEl) navEl.classList.add("active");
+    const navButtons = document.querySelectorAll(".nav-links button");
+    if (navButtons.length > 0) {
+      navButtons.forEach((b) => b.classList.remove("active"));
+    }
+    
+    const navId =
+      id === "reservation"
+        ? "nav-reservation"
+        : id === "check"
+        ? "nav-check"
+        : id === "schedule"
+        ? "nav-schedule"
+        : id === "station"
+        ? "nav-station"
+        : "nav-contact";
+    const navEl = document.getElementById(navId);
+    if (navEl) navEl.classList.add("active");
 
-  document
-    .querySelectorAll(".mobile-tabbar button")
-    .forEach((b) => b.classList.remove("active"));
-  const mId =
-    id === "reservation"
-      ? "m-reservation"
-      : id === "check"
-      ? "m-check"
-      : id === "schedule"
-      ? "m-schedule"
-      : id === "station"
-      ? "m-station"
-      : "m-contact";
-  const mEl = document.getElementById(mId);
-  if (mEl) mEl.classList.add("active");
+    const mobileButtons = document.querySelectorAll(".mobile-tabbar button");
+    if (mobileButtons.length > 0) {
+      mobileButtons.forEach((b) => b.classList.remove("active"));
+    }
+    const mId =
+      id === "reservation"
+        ? "m-reservation"
+        : id === "check"
+        ? "m-check"
+        : id === "schedule"
+        ? "m-schedule"
+        : id === "station"
+        ? "m-station"
+        : "m-contact";
+    const mEl = document.getElementById(mId);
+    if (mEl) mEl.classList.add("active");
+  } catch (e) {
+    console.error("showPage error:", e, "id:", id);
+  }
 
   window.scrollTo({ top: 0, behavior: "smooth" });
 
