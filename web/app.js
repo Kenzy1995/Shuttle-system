@@ -131,10 +131,7 @@ function showPage(id) {
     loadScheduleData();
   }
   if (id === "station") {
-    // 使用 try-catch 確保錯誤不會阻塞頁面
-    renderLiveLocationPlaceholder().catch(e => {
-      console.error("renderLiveLocationPlaceholder error in showPage:", e);
-    });
+    renderLiveLocationPlaceholder();
   }
   handleScroll();
 }
@@ -2863,7 +2860,7 @@ function initLiveLocation(mount) {
     }
   };
   
-  // "查看即時位置"按鈕點擊事件（只綁定一次）
+  // "查看即時位置"按鈕點擊事件
   if (startBtn) {
     startBtn.addEventListener("click", initMap);
   }
@@ -2871,25 +2868,17 @@ function initLiveLocation(mount) {
   // 刷新按鈕點擊事件（手機版和電腦版）
   if (btnRefresh) {
     btnRefresh.addEventListener("click", async () => {
-      try {
-        await fetchLocation();
-        if (currentTripData) {
-          await drawRoute(currentTripData);
-        }
-      } catch (e) {
-        console.error("Refresh button error:", e);
+      await fetchLocation();
+      if (currentTripData) {
+        await drawRoute(currentTripData);
       }
     });
   }
   if (btnRefreshDesktop) {
     btnRefreshDesktop.addEventListener("click", async () => {
-      try {
-        await fetchLocation();
-        if (currentTripData) {
-          await drawRoute(currentTripData);
-        }
-      } catch (e) {
-        console.error("Refresh desktop button error:", e);
+      await fetchLocation();
+      if (currentTripData) {
+        await drawRoute(currentTripData);
       }
     });
   }
@@ -2903,33 +2892,22 @@ function initLiveLocation(mount) {
     if (autoTimer) clearInterval(autoTimer);
     autoTimer = setInterval(async () => {
       if (isInitialized) {
-        try {
-          await fetchLocation();
-          if (currentTripData) {
-            await drawRoute(currentTripData);
-          }
-        } catch (e) {
-          console.error("Auto refresh error:", e);
+        await fetchLocation();
+        if (currentTripData) {
+          await drawRoute(currentTripData);
         }
       }
     }, AUTO_REFRESH_MS);
   };
   
-  // 修改 initMap 以在初始化完成後開始自動刷新
-  const originalInitMap = initMap;
-  const wrappedInitMap = async () => {
-    try {
-      await originalInitMap();
-      startAutoRefresh();
-    } catch (e) {
-      console.error("initMap error:", e);
-    }
-  };
-  
-  // 重新綁定事件（使用修改後的 initMap）
+  // 監聽初始化完成後開始自動刷新
   if (startBtn) {
-    startBtn.removeEventListener("click", originalInitMap);
-    startBtn.addEventListener("click", wrappedInitMap);
+    const originalInit = initMap;
+    initMap = async () => {
+      await originalInit();
+      startAutoRefresh();
+    };
+    startBtn.addEventListener("click", initMap);
   }
 }
 
@@ -2949,12 +2927,7 @@ async function init() {
   applyI18N();
 
   // 2. 載入系統設定（會順便把跑馬燈文字載入 + showMarquee）
-  try {
-    await loadSystemConfig();
-  } catch (e) {
-    console.error("loadSystemConfig error:", e);
-    // 即使載入失敗，也要繼續初始化
-  }
+  await loadSystemConfig();
 
   // 3. 顯示預約分頁（此時 marqueeData 已經有內容）
   showPage('reservation');
@@ -2984,7 +2957,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (el) el.classList.remove("open");
   });
 
-  init();
+  // 使用 try-catch 確保 init() 的錯誤不會阻塞整個頁面
+  init().catch(e => {
+    console.error("init() error:", e);
+    // 即使初始化失敗，也要確保按鈕可以點擊
+    try {
+      showPage('reservation');
+    } catch (e2) {
+      console.error("showPage error in init catch:", e2);
+    }
+  });
 });
 
 window.addEventListener("scroll", handleScroll, { passive: true });
