@@ -2216,25 +2216,45 @@ async function renderLiveLocationPlaceholder() {
   initLiveLocation(mount);
 }
 
+// 站點座標映射（全局定義，供多處使用）
+const stationCoords = {
+  "福泰大飯店 Forte Hotel": { lat: 25.055550556928008, lng: 121.63210245291367 },
+  "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": { lat: 25.055017007293404, lng: 121.61818547695053 },
+  "南港火車站 Nangang Train Station": { lat: 25.052822671279454, lng: 121.60771823129633 },
+  "LaLaport Shopping Park": { lat: 25.05629820919232, lng: 121.61700981622211 },
+  "福泰大飯店(回) Forte Hotel (Back)": { lat: 25.055550556928008, lng: 121.63210245291367 }
+};
+
 function initLiveLocation(mount) {
   const cfg = getLiveConfig();
-  // 即時位置區塊：移除重複標題，狀態改為小綠燈/紅燈，按鈕放在狀態旁邊
+  // 即時位置區塊：標題在容器內，手機版將狀態、班次、即將抵達、按鈕放在標題下；電腦版維持覆蓋在地圖上
   mount.innerHTML = `
+    <h2 style="margin:0 0 12px 0;font-size:24px;font-weight:800;color:var(--primary);">即時位置</h2>
+    <!-- 手機版：資訊放在標題下（使用媒體查詢控制顯示） -->
+    <div id="rt-info-mobile" style="margin-bottom:12px;padding:12px;background:#f9f9f9;border-radius:8px;display:none;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div id="rt-status-light" style="width:12px;height:12px;border-radius:50%;background:#28a745;box-shadow:0 0 8px rgba(40,167,69,0.6);"></div>
+        <span id="rt-status-text" style="font-size:14px;color:#28a745;font-weight:700;">良好</span>
+        <button id="rt-refresh" style="margin-left:auto;padding:6px 12px;background:#fff;border:1px solid #ddd;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.1);">刷新</button>
+      </div>
+      <div id="rt-trip-info" style="font-size:15px;color:#333;margin:4px 0;font-weight:600;">班次: <span id="rt-trip-datetime"></span></div>
+      <div id="rt-next-stop" style="font-size:15px;color:#333;margin:4px 0;font-weight:600;">即將抵達: <span id="rt-next-stop-name"></span></div>
+    </div>
     <div id="rt-map-wrapper" style="position:relative;width:100%;height:500px;min-height:500px;border-radius:12px;overflow:hidden;">
       <div id="rt-map" style="width:100%;height:100%;"></div>
       <!-- 灰色透明遮罩，預設顯示 -->
       <div id="rt-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10;">
         <button id="rt-start-btn" class="button" style="padding:16px 32px;font-size:18px;font-weight:700;background:var(--primary);color:#fff;border:none;border-radius:12px;cursor:pointer;">查看即時位置</button>
       </div>
-      <!-- 左上角資訊覆蓋層（狀態燈、班次、即將抵達、刷新按鈕） -->
+      <!-- 電腦版：左上角資訊覆蓋層（狀態燈、班次、即將抵達、刷新按鈕） -->
       <div id="rt-info-overlay" style="position:absolute;top:0;left:0;z-index:5;pointer-events:none;display:none;padding:12px;background:linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(255,255,255,0.85));border-radius:0 0 12px 0;max-width:320px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          <div id="rt-status-light" style="width:12px;height:12px;border-radius:50%;background:#28a745;box-shadow:0 0 8px rgba(40,167,69,0.6);"></div>
-          <span id="rt-status-text" style="font-size:14px;color:#28a745;font-weight:700;">良好</span>
-          <button id="rt-refresh" style="margin-left:auto;padding:6px 12px;background:#fff;border:1px solid #ddd;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.1);pointer-events:auto;">刷新</button>
+          <div id="rt-status-light-desktop" style="width:12px;height:12px;border-radius:50%;background:#28a745;box-shadow:0 0 8px rgba(40,167,69,0.6);"></div>
+          <span id="rt-status-text-desktop" style="font-size:14px;color:#28a745;font-weight:700;">良好</span>
+          <button id="rt-refresh-desktop" style="margin-left:auto;padding:6px 12px;background:#fff;border:1px solid #ddd;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.1);pointer-events:auto;">刷新</button>
         </div>
-        <div id="rt-trip-info" style="font-size:15px;color:#333;margin:4px 0;font-weight:600;">班次: <span id="rt-trip-datetime"></span></div>
-        <div id="rt-next-stop" style="font-size:15px;color:#333;margin:4px 0;font-weight:600;">即將抵達: <span id="rt-next-stop-name"></span></div>
+        <div id="rt-trip-info-desktop" style="font-size:15px;color:#333;margin:4px 0;font-weight:600;">班次: <span id="rt-trip-datetime-desktop"></span></div>
+        <div id="rt-next-stop-desktop" style="font-size:15px;color:#333;margin:4px 0;font-weight:600;">即將抵達: <span id="rt-next-stop-name-desktop"></span></div>
       </div>
       <!-- 班次結束提示 -->
       <div id="rt-ended-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:15;pointer-events:none;">
@@ -2247,11 +2267,81 @@ function initLiveLocation(mount) {
   const overlayEl = mount.querySelector("#rt-overlay");
   const startBtn = mount.querySelector("#rt-start-btn");
   const infoOverlay = mount.querySelector("#rt-info-overlay");
+  const infoMobile = mount.querySelector("#rt-info-mobile");
+  
+  // 檢測設備類型（使用媒體查詢或窗口寬度）
+  const checkIsMobile = () => window.innerWidth <= 768;
+  let isMobile = checkIsMobile();
+  
+  // 初始設置顯示（根據設備類型）
+  if (isMobile) {
+    if (infoMobile) infoMobile.style.display = "block";
+    if (infoOverlay) infoOverlay.style.display = "none";
+  } else {
+    if (infoMobile) infoMobile.style.display = "none";
+    if (infoOverlay) infoOverlay.style.display = "none"; // 初始隱藏，等待數據載入後顯示
+  }
+  
+  // 監聽窗口大小變化
+  const handleResize = () => {
+    const wasMobile = isMobile;
+    isMobile = checkIsMobile();
+    if (wasMobile !== isMobile && infoMobile && infoOverlay) {
+      // 設備類型改變時切換顯示
+      if (isMobile) {
+        infoMobile.style.display = "block";
+        infoOverlay.style.display = "none";
+      } else {
+        infoMobile.style.display = "none";
+        // 電腦版只有在有數據時才顯示
+        if (currentTripData && currentTripData.current_trip_status !== "ended") {
+          infoOverlay.style.display = "block";
+        }
+      }
+    }
+  };
+  window.addEventListener("resize", handleResize);
+  
+  // 根據設備選擇對應的元素（手機版和電腦版都有各自的元素）
   const statusLight = mount.querySelector("#rt-status-light");
   const statusText = mount.querySelector("#rt-status-text");
+  const statusLightDesktop = mount.querySelector("#rt-status-light-desktop");
+  const statusTextDesktop = mount.querySelector("#rt-status-text-desktop");
   const tripDatetimeEl = mount.querySelector("#rt-trip-datetime");
+  const tripDatetimeElDesktop = mount.querySelector("#rt-trip-datetime-desktop");
   const nextStopNameEl = mount.querySelector("#rt-next-stop-name");
+  const nextStopNameElDesktop = mount.querySelector("#rt-next-stop-name-desktop");
   const btnRefresh = mount.querySelector("#rt-refresh");
+  const btnRefreshDesktop = mount.querySelector("#rt-refresh-desktop");
+  
+  // 更新狀態的輔助函數（同時更新手機版和電腦版）
+  const updateStatus = (color, text) => {
+    if (statusLight && statusText) {
+      statusLight.style.background = color;
+      statusLight.style.boxShadow = `0 0 8px ${color}66`;
+      statusText.textContent = text;
+      statusText.style.color = color;
+    }
+    if (statusLightDesktop && statusTextDesktop) {
+      statusLightDesktop.style.background = color;
+      statusLightDesktop.style.boxShadow = `0 0 8px ${color}66`;
+      statusTextDesktop.textContent = text;
+      statusTextDesktop.style.color = color;
+    }
+  };
+  
+  // 更新班次信息的輔助函數
+  const updateTripInfo = (datetime) => {
+    if (tripDatetimeEl) tripDatetimeEl.textContent = datetime || "";
+    if (tripDatetimeElDesktop) tripDatetimeElDesktop.textContent = datetime || "";
+  };
+  
+  // 更新下一站的輔助函數（同時更新手機版和電腦版）
+  const updateNextStop = (stopName) => {
+    const displayText = stopName || "未知";
+    if (nextStopNameEl) nextStopNameEl.textContent = displayText;
+    if (nextStopNameElDesktop) nextStopNameElDesktop.textContent = displayText;
+  };
   const endedOverlay = mount.querySelector("#rt-ended-overlay");
   const endedTextEl = mount.querySelector("#rt-ended-text");
   const endedDatetimeEl = mount.querySelector("#rt-ended-datetime");
@@ -2298,9 +2388,183 @@ function initLiveLocation(mount) {
     return true;
   };
 
+  // 從站點列表繪製路線的輔助函數
+  const drawRouteFromStops = async (stops, mapInstance) => {
+    return new Promise((resolve) => {
+      if (!mapInstance || !google.maps) {
+        resolve();
+        return;
+      }
+      const directionsService = new google.maps.DirectionsService();
+      const directionsRenderer = new google.maps.DirectionsRenderer({ 
+        map: mapInstance,
+        suppressMarkers: true // 不顯示默認標記，我們自己繪製
+      });
+      
+      // 確保至少有2個站點
+      if (stops.length < 2) {
+        resolve();
+        return;
+      }
+      
+      const waypoints = stops.length > 2 ? stops.slice(1, -1).map(stop => {
+        const coord = typeof stop === "object" && stop.lat ? stop : stationCoords[stop.name || stop] || stop;
+        if (coord && coord.lat && coord.lng) {
+          return { location: { lat: coord.lat, lng: coord.lng } };
+        }
+        return null;
+      }).filter(Boolean) : [];
+      
+      const origin = stops[0];
+      const destination = stops[stops.length - 1];
+      const originCoord = typeof origin === "object" && origin.lat ? origin : stationCoords[origin.name || origin] || origin;
+      const destCoord = typeof destination === "object" && destination.lat ? destination : stationCoords[destination.name || destination] || destination;
+      
+      if (!originCoord || !originCoord.lat || !destCoord || !destCoord.lat) {
+        resolve();
+        return;
+      }
+      
+      directionsService.route({
+        origin: { lat: originCoord.lat, lng: originCoord.lng },
+        destination: { lat: destCoord.lat, lng: destCoord.lng },
+        waypoints: waypoints,
+        travelMode: google.maps.TravelMode.DRIVING,
+        optimizeWaypoints: false // 保持站點順序
+      }, (result, status) => {
+        if (status === "OK" && result.routes && result.routes.length > 0) {
+          const route = result.routes[0];
+          const path = route.overview_path;
+          if (mainPolyline) mainPolyline.setMap(null);
+          mainPolyline = new google.maps.Polyline({ 
+            path: path, 
+            strokeColor: "#999", 
+            strokeOpacity: 0.6, 
+            strokeWeight: 6, 
+            map: mapInstance
+          });
+          
+          // 調整地圖視圖以包含所有站點
+          const bounds = new google.maps.LatLngBounds();
+          path.forEach(pt => bounds.extend(pt));
+          stops.forEach(stop => {
+            const coord = typeof stop === "object" && stop.lat ? stop : stationCoords[stop.name || stop] || stop;
+            if (coord && coord.lat && coord.lng) {
+              bounds.extend({ lat: coord.lat, lng: coord.lng });
+            }
+          });
+          mapInstance.fitBounds(bounds);
+        }
+        resolve();
+      });
+    });
+  };
+
+  // 從站點列表繪製路線的輔助函數
+  const drawRouteFromStops = async (stops, mapInstance) => {
+    return new Promise((resolve) => {
+      if (!mapInstance || !google.maps) {
+        resolve();
+        return;
+      }
+      const directionsService = new google.maps.DirectionsService();
+      const directionsRenderer = new google.maps.DirectionsRenderer({ 
+        map: mapInstance,
+        suppressMarkers: true // 不顯示默認標記，我們自己繪製
+      });
+      
+      // 確保至少有2個站點
+      if (stops.length < 2) {
+        resolve();
+        return;
+      }
+      
+      const waypoints = stops.length > 2 ? stops.slice(1, -1).map(stop => {
+        const coord = typeof stop === "object" && stop.lat ? stop : stationCoords[stop.name || stop] || stop;
+        if (coord && coord.lat && coord.lng) {
+          return { location: { lat: coord.lat, lng: coord.lng } };
+        }
+        return null;
+      }).filter(Boolean) : [];
+      
+      const origin = stops[0];
+      const destination = stops[stops.length - 1];
+      const originCoord = typeof origin === "object" && origin.lat ? origin : stationCoords[origin.name || origin] || origin;
+      const destCoord = typeof destination === "object" && destination.lat ? destination : stationCoords[destination.name || destination] || destination;
+      
+      if (!originCoord || !originCoord.lat || !destCoord || !destCoord.lat) {
+        resolve();
+        return;
+      }
+      
+      directionsService.route({
+        origin: { lat: originCoord.lat, lng: originCoord.lng },
+        destination: { lat: destCoord.lat, lng: destCoord.lng },
+        waypoints: waypoints,
+        travelMode: google.maps.TravelMode.DRIVING,
+        optimizeWaypoints: false // 保持站點順序
+      }, (result, status) => {
+        if (status === "OK" && result.routes && result.routes.length > 0) {
+          const route = result.routes[0];
+          const path = route.overview_path;
+          if (mainPolyline) mainPolyline.setMap(null);
+          mainPolyline = new google.maps.Polyline({ 
+            path: path, 
+            strokeColor: "#999", 
+            strokeOpacity: 0.6, 
+            strokeWeight: 6, 
+            map: mapInstance
+          });
+          
+          // 調整地圖視圖以包含所有站點
+          const bounds = new google.maps.LatLngBounds();
+          path.forEach(pt => bounds.extend(pt));
+          stops.forEach(stop => {
+            const coord = typeof stop === "object" && stop.lat ? stop : stationCoords[stop.name || stop] || stop;
+            if (coord && coord.lat && coord.lng) {
+              bounds.extend({ lat: coord.lat, lng: coord.lng });
+            }
+          });
+          mapInstance.fitBounds(bounds);
+        }
+        resolve();
+      });
+    });
+  };
+
   const drawRoute = async (tripData) => {
     try {
-      if (!tripData || !tripData.current_trip_route) return;
+      if (!tripData || !tripData.current_trip_route) {
+        // 如果沒有路線數據，使用站點數據繪製基本路線
+        const stations = tripData.current_trip_stations?.stops || [];
+        if (stations.length > 0) {
+          // 使用站點名稱對應座標
+          const displayStops = stations.map(name => {
+            const coord = stationCoords[name] || stationCoords[name.replace(/\(回\)|\(Back\)/g, "").trim()];
+            if (coord) {
+              return { name, lat: coord.lat, lng: coord.lng };
+            }
+            return null;
+          }).filter(Boolean);
+          
+          // 確保路線是閉環：如果最後一站不是飯店，添加飯店作為終點
+          if (displayStops.length > 0) {
+            const lastStop = displayStops[displayStops.length - 1];
+            const hotelCoord = stationCoords["福泰大飯店 Forte Hotel"];
+            const isLastStopHotel = lastStop && (
+              (lastStop.lat === hotelCoord.lat && lastStop.lng === hotelCoord.lng) ||
+              (lastStop.name && (lastStop.name.includes("福泰") || lastStop.name.includes("Forte Hotel")))
+            );
+            if (!isLastStopHotel && hotelCoord) {
+              displayStops.push({ name: "福泰大飯店(回) Forte Hotel (Back)", lat: hotelCoord.lat, lng: hotelCoord.lng });
+            }
+            
+            // 使用 Google Directions API 生成路線
+            await drawRouteFromStops(displayStops, map);
+          }
+        }
+        return;
+      }
       
       const route = tripData.current_trip_route;
       const stops = route.stops || [];
@@ -2310,16 +2574,32 @@ function initLiveLocation(mount) {
       stationMarkers.forEach(m => m.setMap(null));
       stationMarkers = [];
       
-      // 繪製站點標記
-      const stationCoords = {
-        "福泰大飯店 Forte Hotel": { lat: 25.055550556928008, lng: 121.63210245291367 },
-        "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": { lat: 25.055017007293404, lng: 121.61818547695053 },
-        "南港火車站 Nangang Train Station": { lat: 25.052822671279454, lng: 121.60771823129633 },
-        "LaLaport Shopping Park": { lat: 25.05629820919232, lng: 121.61700981622211 },
-        "福泰大飯店(回) Forte Hotel (Back)": { lat: 25.055550556928008, lng: 121.63210245291367 }
-      };
+      // 確保路線是閉環：如果最後一站不是飯店，添加飯店作為終點
+      let displayStops = [...stops];
+      const lastStop = displayStops[displayStops.length - 1];
+      const hotelCoord = stationCoords["福泰大飯店 Forte Hotel"];
+      const isLastStopHotel = lastStop && (
+        (typeof lastStop === "object" && lastStop.lat === hotelCoord.lat && lastStop.lng === hotelCoord.lng) ||
+        (typeof lastStop === "string" && (lastStop.includes("福泰") || lastStop.includes("Forte Hotel")))
+      );
+      if (!isLastStopHotel && hotelCoord) {
+        displayStops.push({ name: "福泰大飯店(回) Forte Hotel (Back)", lat: hotelCoord.lat, lng: hotelCoord.lng });
+      }
       
-      stops.forEach((stop, idx) => {
+      // 將站點名稱轉換為座標對象
+      displayStops = displayStops.map(stop => {
+        if (typeof stop === "object" && stop.lat && stop.lng) {
+          return stop;
+        }
+        const name = typeof stop === "string" ? stop : (stop.name || "");
+        const coord = stationCoords[name] || stationCoords[name.replace(/\(回\)|\(Back\)/g, "").trim()];
+        if (coord) {
+          return { name, lat: coord.lat, lng: coord.lng };
+        }
+        return null;
+      }).filter(Boolean);
+      
+      displayStops.forEach((stop, idx) => {
         const coord = typeof stop === "object" && stop.lat ? stop : stationCoords[stop.name || stop] || stop;
         if (coord && coord.lat && coord.lng) {
           const marker = new google.maps.Marker({
@@ -2352,8 +2632,8 @@ function initLiveLocation(mount) {
         });
         const bounds = new google.maps.LatLngBounds();
         gPath.forEach(pt => bounds.extend(pt));
-        if (stops.length > 0) {
-          stops.forEach(stop => {
+        if (displayStops.length > 0) {
+          displayStops.forEach(stop => {
             const coord = typeof stop === "object" && stop.lat ? stop : stationCoords[stop.name || stop] || stop;
             if (coord && coord.lat && coord.lng) {
               bounds.extend({ lat: coord.lat, lng: coord.lng });
@@ -2361,41 +2641,9 @@ function initLiveLocation(mount) {
           });
         }
         map.fitBounds(bounds);
-      } else if (stops.length >= 2) {
+      } else if (displayStops.length >= 2) {
         // 如果沒有 polyline，使用 Google Directions API 生成路線
-        const directionsService = new google.maps.DirectionsService();
-        const directionsRenderer = new google.maps.DirectionsRenderer({ map: map });
-        
-        const waypoints = stops.slice(1, -1).map(stop => {
-          const coord = typeof stop === "object" && stop.lat ? stop : stationCoords[stop.name || stop] || stop;
-          return { location: { lat: coord.lat, lng: coord.lng } };
-        });
-        
-        const origin = stops[0];
-        const destination = stops[stops.length - 1];
-        const originCoord = typeof origin === "object" && origin.lat ? origin : stationCoords[origin.name || origin] || origin;
-        const destCoord = typeof destination === "object" && destination.lat ? destination : stationCoords[destination.name || destination] || destination;
-        
-        directionsService.route({
-          origin: { lat: originCoord.lat, lng: originCoord.lng },
-          destination: { lat: destCoord.lat, lng: destCoord.lng },
-          waypoints: waypoints,
-          travelMode: google.maps.TravelMode.DRIVING
-        }, (result, status) => {
-          if (status === "OK") {
-            directionsRenderer.setDirections(result);
-            const route = result.routes[0];
-            const path = route.overview_path;
-            if (mainPolyline) mainPolyline.setMap(null);
-            mainPolyline = new google.maps.Polyline({ 
-              path: path, 
-              strokeColor: "#999", 
-              strokeOpacity: 0.6, 
-              strokeWeight: 6, 
-              map 
-            });
-          }
-        });
+        await drawRouteFromStops(displayStops, map);
       }
     } catch (e) {
       console.error("Draw route error:", e);
@@ -2407,12 +2655,7 @@ function initLiveLocation(mount) {
       const apiUrl = "https://booking-api-995728097341.asia-east1.run.app/api/realtime/location";
       const r = await fetch(apiUrl);
       if (!r.ok) {
-        if (statusLight && statusText) {
-          statusLight.style.background = "#dc3545";
-          statusLight.style.boxShadow = "0 0 8px rgba(220,53,69,0.6)";
-          statusText.textContent = "連線失敗";
-          statusText.style.color = "#dc3545";
-        }
+        updateStatus("#dc3545", "連線失敗");
         return;
       }
       const data = await r.json();
@@ -2420,7 +2663,11 @@ function initLiveLocation(mount) {
       // 檢查 GPS 系統總開關
       if (!data.gps_system_enabled) {
         if (overlayEl) overlayEl.style.display = "flex";
-        if (infoOverlay) infoOverlay.style.display = "none";
+        if (isMobile) {
+          if (infoMobile) infoMobile.style.display = "none";
+        } else {
+          if (infoOverlay) infoOverlay.style.display = "none";
+        }
         return;
       }
       
@@ -2430,16 +2677,24 @@ function initLiveLocation(mount) {
           endedOverlay.style.display = "flex";
           endedDatetimeEl.textContent = data.last_trip_datetime || data.current_trip_datetime || "";
         }
-        if (infoOverlay) infoOverlay.style.display = "none";
+        if (isMobile) {
+          if (infoMobile) infoMobile.style.display = "none";
+        } else {
+          if (infoOverlay) infoOverlay.style.display = "none";
+        }
         return;
       } else {
         if (endedOverlay) endedOverlay.style.display = "none";
-        if (infoOverlay) infoOverlay.style.display = "block";
+        if (isMobile) {
+          if (infoMobile) infoMobile.style.display = "block";
+        } else {
+          if (infoOverlay) infoOverlay.style.display = "block";
+        }
       }
       
       // 更新班次信息
-      if (data.current_trip_datetime && tripDatetimeEl) {
-        tripDatetimeEl.textContent = data.current_trip_datetime;
+      if (data.current_trip_datetime) {
+        updateTripInfo(data.current_trip_datetime);
       }
       
       // 更新司機位置
@@ -2447,8 +2702,8 @@ function initLiveLocation(mount) {
       if (driverLoc && typeof driverLoc.lat === "number" && typeof driverLoc.lng === "number") {
         const pos = { lat: driverLoc.lat, lng: driverLoc.lng };
         if (marker) {
-          marker.setPosition(pos);
-          map.panTo(pos);
+        marker.setPosition(pos);
+        map.panTo(pos);
         }
         
         // 更新已走過的路線
@@ -2470,37 +2725,91 @@ function initLiveLocation(mount) {
           });
         }
         
-        if (statusLight && statusText) {
-          statusLight.style.background = "#28a745";
-          statusLight.style.boxShadow = "0 0 8px rgba(40,167,69,0.6)";
-          statusText.textContent = "良好";
-          statusText.style.color = "#28a745";
-        }
+        updateStatus("#28a745", "良好");
       } else {
-        if (statusLight && statusText) {
-          statusLight.style.background = "#ffc107";
-          statusLight.style.boxShadow = "0 0 8px rgba(255,193,7,0.6)";
-          statusText.textContent = "連線中";
-          statusText.style.color = "#ffc107";
-        }
+        updateStatus("#ffc107", "連線中");
       }
       
-      // 更新下一站信息（如果有）
+      // 更新下一站信息（判斷是否在發車時間前，並根據司機位置判斷下一站）
       const stations = data.current_trip_stations?.stops || [];
-      if (stations.length > 0 && nextStopNameEl) {
-        // 簡單邏輯：顯示第一個站點（實際應該根據位置判斷）
-        nextStopNameEl.textContent = stations[0] || "未知";
+      const tripDateTime = data.current_trip_datetime;
+      const route = data.current_trip_route;
+      if (nextStopNameEl) {
+        if (tripDateTime) {
+          // 解析班次時間
+          const [datePart, timePart] = tripDateTime.split(" ");
+          if (datePart && timePart) {
+            const [year, month, day] = datePart.split(/[\/\-]/);
+            const [hour, minute] = timePart.split(":");
+            const tripTime = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute || 0));
+            const now = new Date();
+            
+            // 如果還沒到發車時間，顯示"準備發車中"
+            if (now < tripTime) {
+              updateNextStop("準備發車中");
+            } else if (stations.length > 0 && driverLoc && typeof driverLoc.lat === "number" && route && route.stops && route.stops.length > 0) {
+              // 已發車，根據司機位置判斷下一站
+              const routeStops = route.stops;
+              // 找到司機位置最接近的站點索引
+              let nearestIdx = 0;
+              let minDist = Infinity;
+              routeStops.forEach((stop, idx) => {
+                const coord = typeof stop === "object" && stop.lat ? stop : stationCoords[stop.name || stop] || stop;
+                if (coord && coord.lat && coord.lng) {
+                  const dx = coord.lat - driverLoc.lat;
+                  const dy = coord.lng - driverLoc.lng;
+                  const dist = dx * dx + dy * dy;
+                  if (dist < minDist) {
+                    minDist = dist;
+                    nearestIdx = idx;
+                  }
+                }
+              });
+              // 下一站是最近站點的下一站（如果是最後一站，下一站是第一站形成閉環）
+              const nextIdx = (nearestIdx + 1) % routeStops.length;
+              const nextStop = routeStops[nextIdx];
+              let nextStopName = "未知";
+              if (typeof nextStop === "object" && nextStop.name) {
+                nextStopName = nextStop.name;
+              } else if (typeof nextStop === "string") {
+                nextStopName = nextStop;
+              } else if (typeof nextStop === "object" && nextStop.lat) {
+                // 如果是座標對象，查找對應的站點名稱
+                const found = Object.entries(stationCoords).find(([name, coord]) => 
+                  Math.abs(coord.lat - nextStop.lat) < 0.0001 && Math.abs(coord.lng - nextStop.lng) < 0.0001
+                );
+                nextStopName = found ? found[0] : "未知";
+              }
+              updateNextStop(nextStopName);
+            } else if (stations.length > 0) {
+              // 沒有司機位置或路線數據，但已發車，顯示第二站（第一站是飯店）
+              const nextStop = stations.length > 1 ? stations[1] : stations[0];
+              let nextStopName = "未知";
+              if (typeof nextStop === "object" && nextStop.name) {
+                nextStopName = nextStop.name;
+              } else if (typeof nextStop === "string") {
+                nextStopName = nextStop;
+              }
+              updateNextStop(nextStopName);
+            } else {
+              updateNextStop("未知");
+            }
+          } else {
+            const nextStopName = stations.length > 0 ? (typeof stations[0] === "object" && stations[0].name ? stations[0].name : stations[0] || "未知") : "未知";
+            updateNextStop(nextStopName);
+          }
+        } else if (stations.length > 0) {
+          const nextStopName = typeof stations[0] === "object" && stations[0].name ? stations[0].name : (stations[0] || "未知");
+          updateNextStop(nextStopName);
+        } else {
+          updateNextStop("未知");
+        }
       }
       
       currentTripData = data;
     } catch (e) {
       console.error("Fetch location error:", e);
-      if (statusLight && statusText) {
-        statusLight.style.background = "#dc3545";
-        statusLight.style.boxShadow = "0 0 8px rgba(220,53,69,0.6)";
-        statusText.textContent = "錯誤";
-        statusText.style.color = "#dc3545";
-      }
+      updateStatus("#dc3545", "錯誤");
     }
   };
 
@@ -2538,7 +2847,11 @@ function initLiveLocation(mount) {
     
     // 隱藏遮罩，顯示資訊
     if (overlayEl) overlayEl.style.display = "none";
-    if (infoOverlay) infoOverlay.style.display = "block";
+    if (isMobile) {
+      if (infoMobile) infoMobile.style.display = "block";
+    } else {
+      if (infoOverlay) infoOverlay.style.display = "block";
+    }
     
     // 首次獲取數據並繪製路線
     await fetchLocation();
@@ -2552,9 +2865,17 @@ function initLiveLocation(mount) {
     startBtn.addEventListener("click", initMap);
   }
   
-  // 刷新按鈕點擊事件
+  // 刷新按鈕點擊事件（手機版和電腦版）
   if (btnRefresh) {
     btnRefresh.addEventListener("click", async () => {
+      await fetchLocation();
+      if (currentTripData) {
+        await drawRoute(currentTripData);
+      }
+    });
+  }
+  if (btnRefreshDesktop) {
+    btnRefreshDesktop.addEventListener("click", async () => {
       await fetchLocation();
       if (currentTripData) {
         await drawRoute(currentTripData);
