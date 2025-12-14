@@ -1251,24 +1251,8 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
         enabled = True  # 若讀取失敗，預設啟用（可依需求改為 False）
     if not enabled:
         return GoogleTripStartResponse(trip_id=None, share_url=None, stops=None)
-    # 產生乘客端地圖分享 URL（使用環境變數指定基底網址）
-    base = os.environ.get("PASSENGER_MAP_URL_BASE", "")
-    api_base = os.environ.get("DRIVER_API_BASE", "")
-    query = []
-    if base:
-        if os.environ.get("VITE_GOOGLE_MAPS_API_KEY"):
-            query.append("key=" + os.environ.get("VITE_GOOGLE_MAPS_API_KEY"))
-        if api_base:
-            query.append("api=" + api_base)
-        share_url = base + ("?" + "&".join(query) if query else "")
-    else:
-        share_url = ""  # 未設定則留空
-    # 將 URL 寫入 系統!D19
-    try:
-        if share_url:
-            ws.update("D19", share_url)
-    except Exception:
-        pass
+    # 不再自動生成乘客地圖分享連結；由前端固定網址負責
+    share_url = ""
     # 從《車次管理(櫃台)》讀取該班次停靠站，並寫入 Firebase（route/stops）
     try:
         try:
@@ -1342,6 +1326,73 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
             coord = COORDS.get(name)
             if coord:
                 stops.append({"lat": coord["lat"], "lng": coord["lng"], "name": name})  # type: ignore
+        # 嘗試生成 Google Directions polyline
+        polyline_obj: Dict[str, Any] = {}
+        try:
+            import urllib.parse
+            import urllib.request
+            import json as _json
+            api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
+            if api_key and len(stops) >= 2:
+                origin = f"{stops[0]['lat']},{stops[0]['lng']}"
+                destination = f"{stops[-1]['lat']},{stops[-1]['lng']}"
+                if len(stops) > 2:
+                    wp = "|".join([f"{s['lat']},{s['lng']}" for s in stops[1:-1]])
+                else:
+                    wp = ""
+                params = {
+                    "origin": origin,
+                    "destination": destination,
+                    "mode": "driving",
+                    "key": api_key,
+                }
+                if wp:
+                    params["waypoints"] = wp
+                url = "https://maps.googleapis.com/maps/api/directions/json?" + urllib.parse.urlencode(params)
+                with urllib.request.urlopen(url, timeout=10) as resp:
+                    data = _json.loads(resp.read().decode("utf-8"))
+                if data.get("status") == "OK":
+                    routes = data.get("routes", [])
+                    if routes:
+                        points = routes[0].get("overview_polyline", {}).get("points", "")
+                        # decode polyline to path
+                        def _decode_polyline(poly: str) -> List[Dict[str, float]]:
+                            coords: List[Dict[str, float]] = []
+                            index, lat, lng = 0, 0, 0
+                            while index < len(poly):
+                                result, shift = 0, 0
+                                while True:
+                                    b = ord(poly[index]) - 63
+                                    index += 1
+                                    result |= (b & 0x1f) << shift
+                                    shift += 5
+                                    if b < 0x20:
+                                        break
+                                dlat = ~(result >> 1) if (result & 1) else (result >> 1)
+                                lat += dlat
+                                result, shift = 0, 0
+                                while True:
+                                    b = ord(poly[index]) - 63
+                                    index += 1
+                                    result |= (b & 0x1f) << shift
+                                    shift += 5
+                                    if b < 0x20:
+                                        break
+                                dlng = ~(result >> 1) if (result & 1) else (result >> 1)
+                                lng += dlng
+                                coords.append({"lat": lat / 1e5, "lng": lng / 1e5})
+                            return coords
+                        path = _decode_polyline(points) if points else []
+                        polyline_obj = {"points": points, "path": path}
+                else:
+                    print(f"Directions API error: {data.get('status')} {data.get('error_message')}")
+            else:
+                if not api_key:
+                    print("Directions skipped: GOOGLE_MAPS_API_KEY not set.")
+                if len(stops) < 2:
+                    print("Directions skipped: insufficient stops.")
+        except Exception as de:
+            print(f"Directions generation error: {de}")
         # 將結果寫入 Firebase
         try:
             if not firebase_admin._apps:
@@ -1357,17 +1408,68 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                     db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
                 firebase_admin.initialize_app(cred, {"databaseURL": db_url})
             ref = db.reference(f"/trip/{trip_id}/route")
-            ref.set({"stops": stops})
+            payload = {"stops": stops}
+            if polyline_obj:
+                payload["polyline"] = polyline_obj
+            ref.set(payload)
+            # 寫入目前班次 ID 與快取路線，供乘客端直接讀取
+            try:
+                db.reference("/current_trip_id").set(trip_id)
+                db.reference("/current_trip_route").set(payload)
+            except Exception as e2:
+                print(f"Write current_trip metadata error: {e2}")
         except Exception as fe:
             print(f"Firebase route write error: {fe}")
-        return GoogleTripStartResponse(trip_id=trip_id, share_url=share_url or None, stops=stops or None)
+        return GoogleTripStartResponse(trip_id=trip_id, share_url=None, stops=stops or None)
     except Exception as e:
         print(f"Trip start route generation error: {e}")
-        return GoogleTripStartResponse(trip_id=trip_id, share_url=share_url or None, stops=None)
+        return GoogleTripStartResponse(trip_id=trip_id, share_url=None, stops=None)
 
 @app.post("/api/driver/google/trip_complete")
 def api_driver_google_trip_complete(req: GoogleTripCompleteRequest):
     if not req.trip_id:
         raise HTTPException(status_code=400, detail="缺少 trip_id")
     # 此端點目前僅作為狀態回報，不寫入 Sheets。
+    # 清除目前班次標記
+    try:
+        if not firebase_admin._apps:
+            service_account_path = "service_account.json"
+            if os.path.exists(service_account_path):
+                cred = credentials.Certificate(service_account_path)
+            else:
+                cred = credentials.ApplicationDefault()
+            db_url = os.environ.get("FIREBASE_RTDB_URL")
+            if not db_url:
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
+                db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
+            firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+        db.reference("/current_trip_id").set("")
+        db.reference("/current_trip_route").set({})
+    except Exception as e:
+        print(f"Trip complete cleanup error: {e}")
     return {"status": "success"}
+
+@app.get("/api/driver/route")
+def api_driver_route(trip_id: str = Query(..., description="主班次時間，例如 2025/12/14 14:30")):
+    """
+    讀取 Firebase 中該班次的路線資料（stops + polyline）
+    """
+    try:
+        if not firebase_admin._apps:
+            # 使用 Application Default 或本地金鑰
+            service_account_path = "service_account.json"
+            if os.path.exists(service_account_path):
+                cred = credentials.Certificate(service_account_path)
+            else:
+                cred = credentials.ApplicationDefault()
+            db_url = os.environ.get("FIREBASE_RTDB_URL")
+            if not db_url:
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
+                db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
+            firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+        ref = db.reference(f"/trip/{trip_id}/route")
+        data = ref.get()
+        return data or {"stops": [], "polyline": None}
+    except Exception as e:
+        print(f"Route read error: {e}")
+        raise HTTPException(status_code=500, detail=f"Route read error: {str(e)}")
