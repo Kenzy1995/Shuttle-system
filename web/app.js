@@ -7,6 +7,25 @@ const OPS_URL =
   "https://booking-manager-995728097341.asia-east1.run.app/api/ops";
 const QR_ORIGIN = "https://booking-manager-995728097341.asia-east1.run.app";
 
+const LIVE_LOCATION_CONFIG = {
+  key: "",
+  api: "",
+  trip: "",
+  fbdb: "",
+  fbkey: ""
+};
+
+function getLiveConfig() {
+  const qs = new URLSearchParams(location.search);
+  const cfg = { ...LIVE_LOCATION_CONFIG };
+  if (qs.get("key")) cfg.key = qs.get("key");
+  if (qs.get("api")) cfg.api = qs.get("api");
+  if (qs.get("trip")) cfg.trip = qs.get("trip");
+  if (qs.get("fbdb")) cfg.fbdb = qs.get("fbdb");
+  if (qs.get("fbkey")) cfg.fbkey = qs.get("fbkey");
+  return cfg;
+}
+
 /* ====== 狀態與工具 ====== */
 let allRows = [];
 let selectedDirection = "";
@@ -2169,12 +2188,186 @@ function renderLiveLocationPlaceholder() {
   const mount = document.getElementById("realtimeMount");
   if (!mount) return;
 
-  if (FEATURE_TOGGLE.LIVE_LOCATION) {
-    mount.innerHTML =
-      '<iframe src="/realtime.html" width="100%" height="420" style="border:0;border-radius:12px" loading="lazy" referrerpolicy="no-referrer"></iframe>';
-  } else {
+  if (!FEATURE_TOGGLE.LIVE_LOCATION) {
     mount.innerHTML = "";
+    return;
   }
+  initLiveLocation(mount);
+}
+
+function initLiveLocation(mount) {
+  const cfg = getLiveConfig();
+  mount.innerHTML = `
+    <div id="rt-status" style="display:flex;align-items:center;gap:12px;padding:8px;background:#fff;border-bottom:1px solid #eee">
+      <span id="rt-status-text">載入中...</span>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button id="rt-refresh" class="button btn-ghost">手動刷新</button>
+        <button id="rt-watch" class="button btn-ghost">查看即時位置</button>
+      </div>
+    </div>
+    <div id="rt-map" style="height: 380px;"></div>
+  `;
+  const statusTextEl = mount.querySelector("#rt-status-text");
+  const btnRefresh = mount.querySelector("#rt-refresh");
+  const btnWatch = mount.querySelector("#rt-watch");
+  const mapEl = mount.querySelector("#rt-map");
+
+  const loadMaps = () =>
+    new Promise((resolve, reject) => {
+      if (!cfg.key) { statusTextEl.textContent = "缺少地圖 key"; return; }
+      const s = document.createElement("script");
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(cfg.key)}`;
+      s.async = true;
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+
+  let map, marker, mainPolyline, walkedPolyline;
+  const ensureFirebase = async () => {
+    if (!cfg.fbdb || !cfg.fbkey) return false;
+    // 動態載入 Firebase SDK
+    await new Promise((resolve, reject) => {
+      if (window.firebase && firebase.app) { resolve(); return; }
+      const s = document.createElement("script");
+      s.src = "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+      s.onload = resolve; s.onerror = reject; document.head.appendChild(s);
+    });
+    await new Promise((resolve, reject) => {
+      if (window.firebase && firebase.database) { resolve(); return; }
+      const s = document.createElement("script");
+      s.src = "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+      s.onload = resolve; s.onerror = reject; document.head.appendChild(s);
+    });
+    try {
+      if (!firebase.apps || !firebase.apps.length) {
+        firebase.initializeApp({ apiKey: cfg.fbkey, databaseURL: cfg.fbdb });
+      }
+    } catch {}
+    return true;
+  };
+
+  const drawRoute = async () => {
+    try {
+      let path = null;
+      // 優先從 Firebase 讀取 route
+      if (cfg.fbdb && cfg.fbkey && cfg.trip) {
+        const ok = await ensureFirebase();
+        if (ok) {
+          const ref = firebase.database().ref(`/trip/${cfg.trip}/route`);
+          const snap = await ref.get();
+          const d = snap.val();
+          path = (d && d.polyline && d.polyline.path) || null;
+        }
+      }
+      // 退回後端 API
+      if (!path && cfg.api && cfg.trip) {
+        const url = cfg.api.replace(/\/$/, "") + `/api/driver/route?trip_id=${encodeURIComponent(cfg.trip)}`;
+        const r = await fetch(url);
+        const d = await r.json();
+        path = (d && d.polyline && d.polyline.path) || null;
+      }
+      if (path && Array.isArray(path) && path.length > 1) {
+        const gPath = path.map(p => new google.maps.LatLng(p.lat, p.lng));
+        if (mainPolyline) mainPolyline.setMap(null);
+        mainPolyline = new google.maps.Polyline({ path: gPath, strokeColor: "#0b63ce", strokeOpacity: 0.8, strokeWeight: 6, map });
+        const bounds = new google.maps.LatLngBounds();
+        gPath.forEach(pt => bounds.extend(pt));
+        map.fitBounds(bounds);
+      }
+    } catch {}
+  };
+  const fetchLocation = async () => {
+    try {
+      if (!cfg.api) return;
+      const url = cfg.api.replace(/\/$/, "") + "/api/driver/location";
+      const r = await fetch(url);
+      const d = await r.json();
+      if (d.status === "error") { statusTextEl.textContent = "錯誤"; statusTextEl.style.color = "red"; return; }
+      if (!r.ok) return;
+      if (typeof d.lat === "number" && typeof d.lng === "number") {
+        const pos = { lat: d.lat, lng: d.lng };
+        marker.setPosition(pos);
+        map.panTo(pos);
+        if (mainPolyline) {
+          const path = mainPolyline.getPath().getArray();
+          let nearestIdx = 0, best = Infinity;
+          for (let i = 0; i < path.length; i++) {
+            const dx = path[i].lat() - pos.lat, dy = path[i].lng() - pos.lng;
+            const dist = dx * dx + dy * dy;
+            if (dist < best) { best = dist; nearestIdx = i; }
+          }
+          if (walkedPolyline) walkedPolyline.setMap(null);
+          walkedPolyline = new google.maps.Polyline({ path: path.slice(0, Math.max(1, nearestIdx)), strokeColor: "#0b63ce", strokeOpacity: 1, strokeWeight: 8, map });
+        }
+        statusTextEl.textContent = "● 訊號良好";
+        statusTextEl.style.color = "#28a745";
+      }
+    } catch {
+      statusTextEl.textContent = "○ 正在連線...";
+      statusTextEl.style.color = "#666";
+    }
+  };
+
+  loadMaps().then(async () => {
+    statusTextEl.textContent = "載入地圖中...";
+    map = new google.maps.Map(mapEl, { center: { lat: 25.068, lng: 121.662 }, zoom: 14, disableDefaultUI: false, zoomControl: true, mapTypeControl: false, streetViewControl: false });
+    marker = new google.maps.Marker({ position: { lat: 25.068, lng: 121.662 }, map, title: "司機位置", icon: { path: google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: "#4285F4", fillOpacity: 1, strokeColor: "white", strokeWeight: 2 } });
+    // 若未指定 trip 且可用 Firebase，則自動讀取 current_trip_id
+    if (!cfg.trip && cfg.fbdb && cfg.fbkey) {
+      const ok = await ensureFirebase();
+      if (ok) {
+        try {
+          const idSnap = await firebase.database().ref('/current_trip_id').get();
+          const tid = idSnap.val();
+          if (tid) cfg.trip = tid;
+        } catch {}
+      }
+    }
+    await drawRoute();
+    await fetchLocation();
+  });
+
+  const AUTO_REFRESH_MS = 5 * 60 * 1000;
+  let autoTimer = setInterval(fetchLocation, AUTO_REFRESH_MS);
+  btnRefresh.addEventListener("click", () => { drawRoute(); fetchLocation(); });
+
+  let unsub = null;
+  btnWatch.addEventListener("click", async () => {
+    if (!cfg.fbdb || !cfg.fbkey) { statusTextEl.textContent = "未設定 Firebase 監聽"; statusTextEl.style.color = "#666"; return; }
+    if (!unsub) {
+      try {
+        await new Promise((resolve, reject) => { const s = document.createElement("script"); s.src = "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js"; s.onload = resolve; s.onerror = reject; document.head.appendChild(s); });
+        await new Promise((resolve, reject) => { const s = document.createElement("script"); s.src = "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js"; s.onload = resolve; s.onerror = reject; document.head.appendChild(s); });
+        const app = firebase.initializeApp({ apiKey: cfg.fbkey, databaseURL: cfg.fbdb });
+        const dbref = firebase.database().ref("/driver_location");
+        clearInterval(autoTimer); autoTimer = null;
+        const handler = (snap) => {
+          const d = snap.val();
+          if (d && typeof d.lat === "number" && typeof d.lng === "number") {
+            const pos = { lat: d.lat, lng: d.lng };
+            marker.setPosition(pos);
+            map.panTo(pos);
+            statusTextEl.textContent = "● 即時監聽中";
+            statusTextEl.style.color = "#28a745";
+          }
+        };
+        dbref.on("value", handler);
+        unsub = () => dbref.off("value", handler);
+        btnWatch.textContent = "停止監聽";
+      } catch {
+        statusTextEl.textContent = "監聽初始化失敗";
+        statusTextEl.style.color = "red";
+      }
+    } else {
+      try { unsub(); } catch {}
+      unsub = null;
+      btnWatch.textContent = "查看即時位置";
+      statusTextEl.textContent = "○ 已停止監聽";
+      statusTextEl.style.color = "#666";
+      if (!autoTimer) autoTimer = setInterval(fetchLocation, AUTO_REFRESH_MS);
+    }
+  });
 }
 
 async function init() {
@@ -2247,3 +2440,4 @@ function isExpiredByCarDateTime(carDateTime) {
     return tripTime < Date.now();
   } catch (e) { return true; }
 }
+
