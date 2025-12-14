@@ -62,11 +62,13 @@ function getCurrentLang() {
 }
 
 function handleScroll() {
-  const y =
-    window.scrollY ||
-    document.documentElement.scrollTop ||
-    document.body.scrollTop ||
-    0;
+  // 支援多種滾動位置獲取方式，確保手機版也能正常運作
+  const y = Math.max(
+    window.scrollY || 0,
+    document.documentElement.scrollTop || 0,
+    document.body.scrollTop || 0,
+    window.pageYOffset || 0
+  );
   const btn = document.getElementById("backToTop");
   if (!btn) return;
   btn.style.display = y > 300 ? "block" : "none";
@@ -168,8 +170,8 @@ function closeMarquee() {
     nav.style.top = '0';
   }
 
-  // 也把 body 的 padding-top 拿掉，避免上面空一條
-  document.body.style.paddingTop = '0';
+  // 移除 body 的 has-marquee class，避免上面空一條
+  document.body.classList.remove("has-marquee");
 }
 
 function toggleCollapse(id) {
@@ -202,6 +204,7 @@ function showMarquee() {
     if (marqueeContainer) {
       marqueeContainer.style.display = "none";
     }
+    document.body.classList.remove("has-marquee");
     return;
   }
 
@@ -211,11 +214,13 @@ function showMarquee() {
 
   if (!marqueeData.text) {
     marqueeContainer.style.display = "none";
+    document.body.classList.remove("has-marquee");
     return;
   }
 
   marqueeContent.textContent = marqueeData.text;
   marqueeContainer.style.display = "block";
+  document.body.classList.add("has-marquee");
   restartMarqueeAnimation();
 }
 
@@ -2214,29 +2219,28 @@ async function renderLiveLocationPlaceholder() {
 
 function initLiveLocation(mount) {
   const cfg = getLiveConfig();
-  // 全屏地圖，不要嵌套容器
+  // 即時位置區塊：標題在左上角，MAP 在下面，資訊覆蓋在 MAP 左上角（所有內容都在這個區塊內，不要嵌套容器）
   mount.innerHTML = `
-    <div id="rt-map" style="position:relative;width:100%;height:100vh;min-height:500px;"></div>
-    <!-- 灰色透明遮罩，預設顯示 -->
-    <div id="rt-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10;">
-      <button id="rt-start-btn" class="button" style="padding:16px 32px;font-size:18px;font-weight:700;background:var(--fh-blue);color:#fff;border:none;border-radius:12px;cursor:pointer;">[查看即時位置]</button>
-    </div>
-    <!-- 左上角標題和資訊覆蓋層 -->
-    <div id="rt-info-overlay" style="position:absolute;top:0;left:0;right:0;z-index:5;pointer-events:none;display:none;">
-      <div style="padding:16px;background:linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(255,255,255,0.8));">
-        <h2 style="margin:0 0 12px 0;font-size:24px;font-weight:800;color:var(--fh-blue);">即時位置</h2>
-        <div id="rt-status-badge" style="display:inline-block;padding:4px 12px;background:#28a745;color:#fff;border-radius:6px;font-size:14px;font-weight:700;margin-bottom:8px;">良好</div>
-        <div id="rt-trip-info" style="font-size:16px;color:#333;margin:4px 0;">班次: <span id="rt-trip-datetime"></span></div>
-        <div id="rt-next-stop" style="font-size:16px;color:#333;margin:4px 0;">即將抵達: <span id="rt-next-stop-name"></span></div>
-        <div id="rt-eta" style="font-size:16px;color:#333;margin:4px 0;display:none;">預估時間: <span id="rt-eta-value"></span></div>
+    <h2 style="margin:0 0 12px 0;font-size:24px;font-weight:800;color:var(--primary);">即時位置</h2>
+    <div id="rt-map-wrapper" style="position:relative;width:100%;height:500px;min-height:500px;border-radius:12px;overflow:hidden;">
+      <div id="rt-map" style="width:100%;height:100%;"></div>
+      <!-- 灰色透明遮罩，預設顯示 -->
+      <div id="rt-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10;">
+        <button id="rt-start-btn" class="button" style="padding:16px 32px;font-size:18px;font-weight:700;background:var(--primary);color:#fff;border:none;border-radius:12px;cursor:pointer;">查看即時位置</button>
       </div>
-    </div>
-    <!-- 右上角刷新按鈕 -->
-    <button id="rt-refresh" style="position:absolute;top:16px;right:16px;z-index:6;padding:8px 16px;background:#fff;border:1px solid #ddd;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.15);display:none;">[刷新]</button>
-    <!-- 班次結束提示 -->
-    <div id="rt-ended-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:15;pointer-events:none;">
-      <div style="text-align:center;color:#fff;font-size:20px;font-weight:700;">
-        <div id="rt-ended-text">班次: <span id="rt-ended-datetime"></span> 已結束</div>
+      <!-- MAP 左上角資訊覆蓋層（狀態、班次、即將抵達） -->
+      <div id="rt-info-overlay" style="position:absolute;top:0;left:0;z-index:5;pointer-events:none;display:none;padding:12px;background:linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(255,255,255,0.85));border-radius:0 0 12px 0;max-width:280px;">
+        <div id="rt-status-badge" style="display:inline-block;padding:4px 10px;background:#28a745;color:#fff;border-radius:6px;font-size:13px;font-weight:700;margin-bottom:6px;">狀態: 良好</div>
+        <div id="rt-trip-info" style="font-size:15px;color:#333;margin:4px 0;font-weight:600;">班次: <span id="rt-trip-datetime"></span></div>
+        <div id="rt-next-stop" style="font-size:15px;color:#333;margin:4px 0;font-weight:600;">即將抵達: <span id="rt-next-stop-name"></span></div>
+      </div>
+      <!-- 右上角刷新按鈕 -->
+      <button id="rt-refresh" style="position:absolute;top:0;right:0;z-index:6;padding:8px 16px;background:#fff;border:1px solid #ddd;border-radius:0 0 0 12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.15);display:none;">刷新</button>
+      <!-- 班次結束提示 -->
+      <div id="rt-ended-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:15;pointer-events:none;">
+        <div style="text-align:center;color:#fff;font-size:20px;font-weight:700;">
+          <div id="rt-ended-text">班次: <span id="rt-ended-datetime"></span> 已結束</div>
+        </div>
       </div>
     </div>
   `;
@@ -2253,6 +2257,7 @@ function initLiveLocation(mount) {
   const endedTextEl = mount.querySelector("#rt-ended-text");
   const endedDatetimeEl = mount.querySelector("#rt-ended-datetime");
   const mapEl = mount.querySelector("#rt-map");
+  const mapWrapper = mount.querySelector("#rt-map-wrapper");
 
   const loadMaps = () =>
     new Promise((resolve, reject) => {
@@ -2404,7 +2409,7 @@ function initLiveLocation(mount) {
       const r = await fetch(apiUrl);
       if (!r.ok) {
         if (statusBadge) {
-          statusBadge.textContent = "連線失敗";
+          statusBadge.textContent = "狀態: 連線失敗";
           statusBadge.style.background = "#dc3545";
         }
         return;
@@ -2468,12 +2473,12 @@ function initLiveLocation(mount) {
         }
         
         if (statusBadge) {
-          statusBadge.textContent = "良好";
+          statusBadge.textContent = "狀態: 良好";
           statusBadge.style.background = "#28a745";
         }
       } else {
         if (statusBadge) {
-          statusBadge.textContent = "連線中";
+          statusBadge.textContent = "狀態: 連線中";
           statusBadge.style.background = "#ffc107";
         }
       }
@@ -2488,10 +2493,10 @@ function initLiveLocation(mount) {
       currentTripData = data;
     } catch (e) {
       console.error("Fetch location error:", e);
-      if (statusBadge) {
-        statusBadge.textContent = "錯誤";
-        statusBadge.style.background = "#dc3545";
-      }
+        if (statusBadge) {
+          statusBadge.textContent = "狀態: 錯誤";
+          statusBadge.style.background = "#dc3545";
+        }
     }
   };
 

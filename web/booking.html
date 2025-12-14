@@ -32,10 +32,13 @@
       -webkit-text-size-adjust:100%;
     }
 
-    /* 只讓 body 做 flex 排版，並預留跑馬燈高度 52px */
+    /* 只讓 body 做 flex 排版，並預留跑馬燈高度 */
     body {
       display:flex;
       flex-direction:column;
+      padding-top:0;  /* 動態調整，只在有跑馬燈時才添加 padding */
+    }
+    body.has-marquee {
       padding-top:24px;  /* 跟 .marquee-container 的 height 一樣 */
     }
 
