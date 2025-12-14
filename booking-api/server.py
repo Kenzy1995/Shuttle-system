@@ -7,6 +7,7 @@ import os
 import firebase_admin
 from firebase_admin import credentials, db
 
+
 app = Flask(__name__)
 CORS(app, origins=[
     "https://hotel-web-3addcbkbgq-de.a.run.app",
