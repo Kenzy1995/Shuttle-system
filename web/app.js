@@ -77,60 +77,42 @@ function handleScroll() {
 }
 
 function showPage(id) {
-  try {
-    hardResetOverlays();
+  hardResetOverlays();
 
-    const pages = document.querySelectorAll(".page");
-    if (pages.length === 0) {
-      console.error("No pages found");
-      return;
-    }
-    pages.forEach((p) => p.classList.remove("active"));
-    
-    const targetPage = document.getElementById(id);
-    if (!targetPage) {
-      console.error(`Page with id "${id}" not found`);
-      return;
-    }
-    targetPage.classList.add("active");
+  document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
 
-    const navButtons = document.querySelectorAll(".nav-links button");
-    if (navButtons.length > 0) {
-      navButtons.forEach((b) => b.classList.remove("active"));
-    }
-    
-    const navId =
-      id === "reservation"
-        ? "nav-reservation"
-        : id === "check"
-        ? "nav-check"
-        : id === "schedule"
-        ? "nav-schedule"
-        : id === "station"
-        ? "nav-station"
-        : "nav-contact";
-    const navEl = document.getElementById(navId);
-    if (navEl) navEl.classList.add("active");
+  document
+    .querySelectorAll(".nav-links button")
+    .forEach((b) => b.classList.remove("active"));
+  const navId =
+    id === "reservation"
+      ? "nav-reservation"
+      : id === "check"
+      ? "nav-check"
+      : id === "schedule"
+      ? "nav-schedule"
+      : id === "station"
+      ? "nav-station"
+      : "nav-contact";
+  const navEl = document.getElementById(navId);
+  if (navEl) navEl.classList.add("active");
 
-    const mobileButtons = document.querySelectorAll(".mobile-tabbar button");
-    if (mobileButtons.length > 0) {
-      mobileButtons.forEach((b) => b.classList.remove("active"));
-    }
-    const mId =
-      id === "reservation"
-        ? "m-reservation"
-        : id === "check"
-        ? "m-check"
-        : id === "schedule"
-        ? "m-schedule"
-        : id === "station"
-        ? "m-station"
-        : "m-contact";
-    const mEl = document.getElementById(mId);
-    if (mEl) mEl.classList.add("active");
-  } catch (e) {
-    console.error("showPage error:", e, "id:", id);
-  }
+  document
+    .querySelectorAll(".mobile-tabbar button")
+    .forEach((b) => b.classList.remove("active"));
+  const mId =
+    id === "reservation"
+      ? "m-reservation"
+      : id === "check"
+      ? "m-check"
+      : id === "schedule"
+      ? "m-schedule"
+      : id === "station"
+      ? "m-station"
+      : "m-contact";
+  const mEl = document.getElementById(mId);
+  if (mEl) mEl.classList.add("active");
 
   window.scrollTo({ top: 0, behavior: "smooth" });
 
@@ -149,7 +131,10 @@ function showPage(id) {
     loadScheduleData();
   }
   if (id === "station") {
-    renderLiveLocationPlaceholder();
+    // 使用 try-catch 確保錯誤不會阻塞頁面
+    renderLiveLocationPlaceholder().catch(e => {
+      console.error("renderLiveLocationPlaceholder error in showPage:", e);
+    });
   }
   handleScroll();
 }
@@ -2878,7 +2863,7 @@ function initLiveLocation(mount) {
     }
   };
   
-  // "查看即時位置"按鈕點擊事件
+  // "查看即時位置"按鈕點擊事件（只綁定一次）
   if (startBtn) {
     startBtn.addEventListener("click", initMap);
   }
@@ -2886,17 +2871,25 @@ function initLiveLocation(mount) {
   // 刷新按鈕點擊事件（手機版和電腦版）
   if (btnRefresh) {
     btnRefresh.addEventListener("click", async () => {
-      await fetchLocation();
-      if (currentTripData) {
-        await drawRoute(currentTripData);
+      try {
+        await fetchLocation();
+        if (currentTripData) {
+          await drawRoute(currentTripData);
+        }
+      } catch (e) {
+        console.error("Refresh button error:", e);
       }
     });
   }
   if (btnRefreshDesktop) {
     btnRefreshDesktop.addEventListener("click", async () => {
-      await fetchLocation();
-      if (currentTripData) {
-        await drawRoute(currentTripData);
+      try {
+        await fetchLocation();
+        if (currentTripData) {
+          await drawRoute(currentTripData);
+        }
+      } catch (e) {
+        console.error("Refresh desktop button error:", e);
       }
     });
   }
@@ -2910,22 +2903,33 @@ function initLiveLocation(mount) {
     if (autoTimer) clearInterval(autoTimer);
     autoTimer = setInterval(async () => {
       if (isInitialized) {
-        await fetchLocation();
-        if (currentTripData) {
-          await drawRoute(currentTripData);
+        try {
+          await fetchLocation();
+          if (currentTripData) {
+            await drawRoute(currentTripData);
+          }
+        } catch (e) {
+          console.error("Auto refresh error:", e);
         }
       }
     }, AUTO_REFRESH_MS);
   };
   
-  // 監聽初始化完成後開始自動刷新
-  if (startBtn) {
-    const originalInit = initMap;
-    initMap = async () => {
-      await originalInit();
+  // 修改 initMap 以在初始化完成後開始自動刷新
+  const originalInitMap = initMap;
+  const wrappedInitMap = async () => {
+    try {
+      await originalInitMap();
       startAutoRefresh();
-    };
-    startBtn.addEventListener("click", initMap);
+    } catch (e) {
+      console.error("initMap error:", e);
+    }
+  };
+  
+  // 重新綁定事件（使用修改後的 initMap）
+  if (startBtn) {
+    startBtn.removeEventListener("click", originalInitMap);
+    startBtn.addEventListener("click", wrappedInitMap);
   }
 }
 
@@ -2945,7 +2949,12 @@ async function init() {
   applyI18N();
 
   // 2. 載入系統設定（會順便把跑馬燈文字載入 + showMarquee）
-  await loadSystemConfig();
+  try {
+    await loadSystemConfig();
+  } catch (e) {
+    console.error("loadSystemConfig error:", e);
+    // 即使載入失敗，也要繼續初始化
+  }
 
   // 3. 顯示預約分頁（此時 marqueeData 已經有內容）
   showPage('reservation');
