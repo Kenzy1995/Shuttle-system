@@ -8,11 +8,11 @@ const OPS_URL =
 const QR_ORIGIN = "https://booking-manager-995728097341.asia-east1.run.app";
 
 const LIVE_LOCATION_CONFIG = {
-  key: "",
-  api: "",
+  key: "AIzaSyAsWWGuZ8XRY_H5MWCuM4o4TWHsO0hYW5s",
+  api: "https://driver-api2-995728097341.asia-east1.run.app",
   trip: "",
-  fbdb: "",
-  fbkey: ""
+  fbdb: "https://forte-booking-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  fbkey: "AIzaSyBg_oMW6M90HHlTBjgfWUDZuRdFBGzMTjQ"
 };
 
 function getLiveConfig() {
