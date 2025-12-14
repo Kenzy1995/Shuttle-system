@@ -2742,7 +2742,7 @@ function initLiveLocation(mount) {
   };
 
   // 初始化地圖（點擊"查看即時位置"按鈕後）
-  const initMap = async () => {
+  let initMap = async () => {
     if (isInitialized) return;
     isInitialized = true;
     
@@ -2788,9 +2788,32 @@ function initLiveLocation(mount) {
     }
   };
   
+  // 預設每3分鐘自動刷新
+  const AUTO_REFRESH_MS = 3 * 60 * 1000;
+  let autoTimer = null;
+  
+  // 開始自動刷新（僅在初始化後）
+  const startAutoRefresh = () => {
+    if (autoTimer) clearInterval(autoTimer);
+    autoTimer = setInterval(async () => {
+      if (isInitialized) {
+        await fetchLocation();
+        if (currentTripData) {
+          await drawRoute(currentTripData);
+        }
+      }
+    }, AUTO_REFRESH_MS);
+  };
+  
+  // 包裝 initMap 以在初始化完成後開始自動刷新
+  const wrappedInitMap = async () => {
+    await initMap();
+    startAutoRefresh();
+  };
+  
   // "查看即時位置"按鈕點擊事件
   if (startBtn) {
-    startBtn.addEventListener("click", initMap);
+    startBtn.addEventListener("click", wrappedInitMap);
   }
   
   // 刷新按鈕點擊事件（手機版和電腦版）
@@ -2809,33 +2832,6 @@ function initLiveLocation(mount) {
         await drawRoute(currentTripData);
       }
     });
-  }
-  
-  // 預設每3分鐘自動刷新
-  const AUTO_REFRESH_MS = 3 * 60 * 1000;
-  let autoTimer = null;
-  
-  // 開始自動刷新（僅在初始化後）
-  const startAutoRefresh = () => {
-    if (autoTimer) clearInterval(autoTimer);
-    autoTimer = setInterval(async () => {
-      if (isInitialized) {
-        await fetchLocation();
-        if (currentTripData) {
-          await drawRoute(currentTripData);
-        }
-      }
-    }, AUTO_REFRESH_MS);
-  };
-  
-  // 監聽初始化完成後開始自動刷新
-  if (startBtn) {
-    const originalInit = initMap;
-    initMap = async () => {
-      await originalInit();
-      startAutoRefresh();
-    };
-    startBtn.addEventListener("click", initMap);
   }
 }
 
