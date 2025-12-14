@@ -704,6 +704,35 @@ app.add_middleware(
 )
 
 
+@app.get("/debug/identity")
+def debug_identity():
+    """
+    Debug 端點：顯示目前程式運行的身份與專案資訊
+    """
+    try:
+        # 1. 檢查目前使用的 Service Account
+        import google.auth
+        credentials, project = google.auth.default()
+        
+        # 2. 檢查 Firebase App 狀態
+        firebase_app_name = "Not Initialized"
+        firebase_options = {}
+        if firebase_admin._apps:
+            app = firebase_admin.get_app()
+            firebase_app_name = app.name
+            firebase_options = app.options
+
+        return {
+            "current_project": project,
+            "service_account_email": getattr(credentials, "service_account_email", "Unknown (using default/local creds)"),
+            "env_google_cloud_project": os.environ.get("GOOGLE_CLOUD_PROJECT"),
+            "env_firebase_rtdb_url": os.environ.get("FIREBASE_RTDB_URL"),
+            "firebase_app": firebase_app_name,
+            "firebase_options": firebase_options,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.get("/health")
 def health():
     return {"status": "ok", "time": _tz_now_str()}
@@ -725,7 +754,14 @@ def update_driver_location(loc: DriverLocation):
     # 寫入 Firebase Realtime Database（若環境已設定）
     try:
         if not firebase_admin._apps:
-            cred = credentials.ApplicationDefault()
+            # 1. 嘗試讀取本地 service_account.json (若使用者有上傳)
+            service_account_path = "service_account.json"
+            if os.path.exists(service_account_path):
+                cred = credentials.Certificate(service_account_path)
+            else:
+                # 2. 否則使用 Application Default Credentials (Cloud Run 預設身份)
+                cred = credentials.ApplicationDefault()
+
             db_url = os.environ.get("FIREBASE_RTDB_URL")
             if not db_url:
                  project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
@@ -756,7 +792,13 @@ def get_driver_location():
     """
     try:
         if not firebase_admin._apps:
-             cred = credentials.ApplicationDefault()
+             # 1. 嘗試讀取本地 service_account.json
+             service_account_path = "service_account.json"
+             if os.path.exists(service_account_path):
+                 cred = credentials.Certificate(service_account_path)
+             else:
+                 cred = credentials.ApplicationDefault()
+
              # 優先使用環境變數，若無則嘗試預設 URL
              db_url = os.environ.get("FIREBASE_RTDB_URL")
              if not db_url:
@@ -1227,9 +1269,101 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
             ws.update("D19", share_url)
     except Exception:
         pass
-    # 範例 stops（可改為從 Sheet/行程計算）
-    lat, lng = 25.068, 121.662
-    return GoogleTripStartResponse(trip_id=trip_id, share_url=share_url or None, stops=[{"lat": lat, "lng": lng}])
+    # 從《車次管理(櫃台)》讀取該班次停靠站，並寫入 Firebase（route/stops）
+    try:
+        try:
+            ws2 = open_ws("車次管理(櫃台)")
+        except Exception:
+            ws2 = open_ws("車次管理(備品)")
+        headers = ws2.row_values(6)
+        headers = [(h or "").strip() for h in headers]
+        def hidx(name: str) -> int:
+            try:
+                return headers.index(name)
+            except ValueError:
+                return -1
+        idx_date = hidx("日期")
+        idx_time = hidx("班次") if hidx("時間") < 0 else hidx("時間")
+        # 規範化候選日期/時間
+        target_date = dt.strftime("%Y/%m/%d")
+        alt_date = dt.strftime("%Y-%m-%d")
+        t1 = dt.strftime("%H:%M")
+        t2 = dt.strftime("%-H:%M") if hasattr(dt, "strftime") else t1
+        # 尋找目標列
+        values = ws2.get_all_values()
+        target_rowno: Optional[int] = None
+        for i in range(6, len(values)):
+            row = values[i]
+            d = (row[idx_date] if idx_date >= 0 and idx_date < len(row) else "").strip()
+            t_raw = (row[idx_time] if idx_time >= 0 and idx_time < len(row) else "").strip()
+            # Normalize HH:MM
+            try:
+                rp = t_raw.split(":")
+                t_norm = f"{str(rp[0]).zfill(2)}:{rp[1]}" if len(rp) >= 2 else t_raw
+            except Exception:
+                t_norm = t_raw
+            if (d in (target_date, alt_date)) and (t_raw in (t1, t2) or t_norm in (t1, t2)):
+                target_rowno = i + 1
+                break
+        # 站點欄位（H:K）
+        STATIONS = [
+            "福泰大飯店 Forte Hotel",
+            "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3",
+            "南港火車站 Nangang Train Station",
+            "LaLaport Shopping Park",
+            "福泰大飯店(回) Forte Hotel (Back)",
+        ]
+        station_indices = []
+        for s in STATIONS:
+            idx = hidx(s)
+            if idx < 0:
+                # 嘗試以關鍵字近似匹配
+                idx = next((i for i, h in enumerate(headers) if s.split(" ")[0] in h), -1)
+            station_indices.append(idx)
+        stops_names: List[str] = []
+        if target_rowno:
+            row = values[target_rowno - 1]
+            for s, idx in zip(STATIONS, station_indices):
+                val = (row[idx] if idx >= 0 and idx < len(row) else "").strip().lower()
+                # 表格勾選＝不停靠；未勾選＝停靠
+                is_skip = val in ("true", "t", "yes", "1")
+                if not is_skip:
+                    stops_names.append(s)
+        # 站點座標（若未提供座標，前端可用 Directions 生成路徑）
+        COORDS = {
+            "福泰大飯店 Forte Hotel": {"lat": 25.068, "lng": 121.662},
+            "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": {"lat": 25.0558, "lng": 121.6179},
+            "南港火車站 Nangang Train Station": {"lat": 25.052, "lng": 121.607},
+            "LaLaport Shopping Park": {"lat": 25.055, "lng": 121.615},
+            "福泰大飯店(回) Forte Hotel (Back)": {"lat": 25.068, "lng": 121.662},
+        }
+        stops: List[Dict[str, float]] = []
+        for name in stops_names:
+            coord = COORDS.get(name)
+            if coord:
+                stops.append({"lat": coord["lat"], "lng": coord["lng"], "name": name})  # type: ignore
+        # 將結果寫入 Firebase
+        try:
+            if not firebase_admin._apps:
+                # 使用 Application Default 或本地金鑰
+                service_account_path = "service_account.json"
+                if os.path.exists(service_account_path):
+                    cred = credentials.Certificate(service_account_path)
+                else:
+                    cred = credentials.ApplicationDefault()
+                db_url = os.environ.get("FIREBASE_RTDB_URL")
+                if not db_url:
+                    project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
+                    db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
+                firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+            ref = db.reference(f"/trip/{trip_id}/route")
+            ref.set({"stops": stops})
+        except Exception as fe:
+            print(f"Firebase route write error: {fe}")
+        return GoogleTripStartResponse(trip_id=trip_id, share_url=share_url or None, stops=stops or None)
+    except Exception as e:
+        print(f"Trip start route generation error: {e}")
+        return GoogleTripStartResponse(trip_id=trip_id, share_url=share_url or None, stops=None)
 
 @app.post("/api/driver/google/trip_complete")
 def api_driver_google_trip_complete(req: GoogleTripCompleteRequest):
