@@ -2934,7 +2934,12 @@ async function init() {
 
   // 4. 其他 UI 初始化
   handleScroll();
-  renderLiveLocationPlaceholder();
+  // 使用 try-catch 確保錯誤不會阻塞頁面
+  try {
+    await renderLiveLocationPlaceholder();
+  } catch (e) {
+    console.error("renderLiveLocationPlaceholder error:", e);
+  }
 }
 
 
