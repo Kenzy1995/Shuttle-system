@@ -109,10 +109,32 @@ def api_realtime_location():
         if not _init_firebase():
             return jsonify({"error": "Firebase initialization failed"}), 500
         
-        # 讀取 GPS 系統總開關
-        gps_system_enabled = db.reference("/gps_system_enabled").get()
+        # 讀取 GPS 系統總開關（優先從 Sheet 的「系統」E19 讀取）
+        gps_system_enabled = None
+        try:
+            # 從 Google Sheet 的「系統」分頁 E19 讀取
+            credentials, _ = default(scopes=SCOPES)
+            service = build("sheets", "v4", credentials=credentials)
+            result = (
+                service.spreadsheets()
+                .values()
+                .get(spreadsheetId=SPREADSHEET_ID, range="系統!E19")
+                .execute()
+            )
+            values = result.get("values", [])
+            if values and len(values) > 0 and len(values[0]) > 0:
+                e19_value = (values[0][0] or "").strip().lower()
+                gps_system_enabled = e19_value in ("true", "t", "yes", "1")
+        except Exception as e:
+            print(f"Read GPS system enabled from Sheet error: {e}")
+        
+        # 如果從 Sheet 讀取失敗，嘗試從 Firebase 讀取
         if gps_system_enabled is None:
-            gps_system_enabled = True  # 預設啟用
+            gps_system_enabled = db.reference("/gps_system_enabled").get()
+        
+        # 如果都沒有，預設為 False（關閉）
+        if gps_system_enabled is None:
+            gps_system_enabled = False
         
         # 讀取司機位置
         driver_location = db.reference("/driver_location").get() or {}
