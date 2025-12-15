@@ -1230,6 +1230,7 @@ def api_driver_qrinfo(req: QrInfoRequest):
 class GoogleTripStartRequest(BaseModel):
     main_datetime: str
     driver_role: Optional[str] = None
+    stops: Optional[List[str]] = None  # 新增：從APP傳遞的停靠站點列表
 
 class GoogleTripStartResponse(BaseModel):
     trip_id: Optional[str] = None
@@ -1367,30 +1368,46 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                     ws2.batch_update(update_data, value_input_option="USER_ENTERED")
             except Exception as sheet_update_error:
                 print(f"Sheet update error in trip_start: {sheet_update_error}")
-        # 站點欄位（H:K）
-        STATIONS = [
-            "福泰大飯店 Forte Hotel",
-            "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3",
-            "南港火車站 Nangang Train Station",
-            "LaLaport Shopping Park",
-            "福泰大飯店(回) Forte Hotel (Back)",
-        ]
-        station_indices = []
-        for s in STATIONS:
-            idx = hidx(s)
-            if idx < 0:
-                # 嘗試以關鍵字近似匹配
-                idx = next((i for i, h in enumerate(headers) if s.split(" ")[0] in h), -1)
-            station_indices.append(idx)
+        # 優先使用APP傳遞的停靠站點列表（根據乘客資料計算）
         stops_names: List[str] = []
-        if target_rowno:
-            row = values[target_rowno - 1]
-            for s, idx in zip(STATIONS, station_indices):
-                val = (row[idx] if idx >= 0 and idx < len(row) else "").strip().lower()
-                # 表格勾選＝不停靠；未勾選＝停靠
-                is_skip = val in ("true", "t", "yes", "1")
-                if not is_skip:
-                    stops_names.append(s)
+        if req.stops and len(req.stops) > 0:
+            # APP已傳遞停靠站點列表，直接使用
+            # 需要將APP的站點名稱映射到後端的站點名稱
+            STATION_MAP = {
+                "1. 福泰大飯店 (去)": "福泰大飯店 Forte Hotel",
+                "2. 南港捷運站": "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3",
+                "3. 南港火車站": "南港火車站 Nangang Train Station",
+                "4. LaLaport 購物中心": "LaLaport Shopping Park",
+                "5. 福泰大飯店 (回)": "福泰大飯店(回) Forte Hotel (Back)",
+            }
+            for app_station in req.stops:
+                mapped = STATION_MAP.get(app_station, app_station)
+                if mapped:
+                    stops_names.append(mapped)
+        else:
+            # 如果APP沒有傳遞，則從Sheet讀取（向後兼容）
+            STATIONS = [
+                "福泰大飯店 Forte Hotel",
+                "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3",
+                "南港火車站 Nangang Train Station",
+                "LaLaport Shopping Park",
+                "福泰大飯店(回) Forte Hotel (Back)",
+            ]
+            station_indices = []
+            for s in STATIONS:
+                idx = hidx(s)
+                if idx < 0:
+                    # 嘗試以關鍵字近似匹配
+                    idx = next((i for i, h in enumerate(headers) if s.split(" ")[0] in h), -1)
+                station_indices.append(idx)
+            if target_rowno:
+                row = values[target_rowno - 1]
+                for s, idx in zip(STATIONS, station_indices):
+                    val = (row[idx] if idx >= 0 and idx < len(row) else "").strip().lower()
+                    # 表格勾選＝不停靠；未勾選＝停靠
+                    is_skip = val in ("true", "t", "yes", "1")
+                    if not is_skip:
+                        stops_names.append(s)
         # 站點座標（精確座標）
         COORDS = {
             "福泰大飯店 Forte Hotel": {"lat": 25.055550556928008, "lng": 121.63210245291367},
@@ -1623,3 +1640,30 @@ def api_driver_set_system_status(req: SystemStatusRequest):
     except Exception as e:
         print(f"System status write error: {e}")
         raise HTTPException(status_code=500, detail=f"寫入失敗: {str(e)}")
+
+class UpdateStationRequest(BaseModel):
+    trip_id: str
+    current_station: str
+
+@app.post("/api/driver/update_station")
+def api_driver_update_station(req: UpdateStationRequest):
+    """?�新?��??��??��?點到Firebase"""
+    if not req.trip_id or not req.current_station:
+        raise HTTPException(status_code=400, detail="缺�? trip_id ??current_station")
+    try:
+        if not firebase_admin._apps:
+            service_account_path = "service_account.json"
+            if os.path.exists(service_account_path):
+                cred = credentials.Certificate(service_account_path)
+            else:
+                cred = credentials.ApplicationDefault()
+            db_url = os.environ.get("FIREBASE_RTDB_URL")
+            if not db_url:
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
+                db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
+            firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+        db.reference("/current_trip_station").set(req.current_station)
+        return {"status": "success", "current_station": req.current_station}
+    except Exception as e:
+        print(f"Firebase update station error: {e}")
+        raise HTTPException(status_code=500, detail=f"?�新站�?失�?: {str(e)}")
