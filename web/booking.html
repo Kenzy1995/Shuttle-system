@@ -837,10 +837,15 @@
           </div>
         </section>
 
-        <!-- 查詢班次 - 即時位置（保留區塊 @ 停靠站點頁） -->
-        <!-- ✅ 這裡就不要再 wizard-fixed 了，避免巢狀寬度怪怪的 -->
-        <section id="realtimeSection" class="card" data-feature="liveLocation" style="display:none">
-          <div id="realtimeMount" class="realtime-box" aria-live="polite"></div>
+        <!-- 查詢班次 - 即時位置（可收合，預設打開） -->
+        <section id="realtimeSection" class="card collapsible" data-feature="liveLocation" style="display:none">
+          <div class="collapsible-header" onclick="toggleCollapse('realtimeSection')">
+            <h2>即時位置</h2>
+            <span class="toggle-icon">▾</span>
+          </div>
+          <div class="collapsible-content" style="display:block;">
+            <div id="realtimeMount" class="realtime-box" aria-live="polite"></div>
+          </div>
         </section>
       </div>
     </div>

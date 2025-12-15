@@ -2226,15 +2226,14 @@ const stationCoords = {
   "南港火車站 Nangang Train Station": { lat: 25.052822671279454, lng: 121.60771823129633 },
   "4. LaLaport 購物中心": { lat: 25.05629820919232, lng: 121.61700981622211 },
   "LaLaport Shopping Park": { lat: 25.05629820919232, lng: 121.61700981622211 },
-  "5. 福泰大飯店 (回)": { lat: 25.055550556928008, lng: 121.63210245291367 },
-  "福泰大飯店(回) Forte Hotel (Back)": { lat: 25.055550556928008, lng: 121.63210245291367 }  // 回程終點
+  "5. 福泰大飯店 (回)": { lat: 25.054800375417987, lng: 121.63117576557792 },
+  "福泰大飯店(回) Forte Hotel (Back)": { lat: 25.054800375417987, lng: 121.63117576557792 }  // 回程終點
 };
 
 function initLiveLocation(mount) {
   const cfg = getLiveConfig();
-  // 即時位置區塊：標題在容器內，手機版將狀態、班次、即將抵達、按鈕放在標題下；電腦版維持覆蓋在地圖上
+  // 即時位置區塊：標題已在上一層父容器，手機版將狀態、班次、即將抵達、按鈕放在標題下；電腦版維持覆蓋在地圖上
   mount.innerHTML = `
-    <h2 style="margin:0 0 12px 0;font-size:24px;font-weight:800;color:var(--primary);">即時位置</h2>
     <!-- 手機版：資訊放在標題下（使用媒體查詢控制顯示） -->
     <div id="rt-info-mobile" style="margin-bottom:12px;padding:12px;background:#f9f9f9;border-radius:8px;display:none;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
