@@ -124,6 +124,8 @@ def api_realtime_location():
         current_trip_route = db.reference("/current_trip_route").get() or {}
         current_trip_stations = db.reference("/current_trip_stations").get() or {}
         current_trip_station = db.reference("/current_trip_station").get() or ""  # 即將前往的站點
+        current_trip_start_time = db.reference("/current_trip_start_time").get() or 0  # 發車時間戳（毫秒）
+        current_trip_completed_stops = db.reference("/current_trip_completed_stops").get() or []  # 已到達站點列表
         last_trip_datetime = db.reference("/last_trip_datetime").get() or ""
         
         return jsonify({
@@ -135,6 +137,8 @@ def api_realtime_location():
             "current_trip_route": current_trip_route,
             "current_trip_stations": current_trip_stations,
             "current_trip_station": current_trip_station,  # 即將前往的站點
+            "current_trip_start_time": int(current_trip_start_time) if current_trip_start_time else 0,  # 發車時間戳
+            "current_trip_completed_stops": current_trip_completed_stops,  # 已到達站點列表
             "last_trip_datetime": last_trip_datetime
         }), 200
     except Exception as e:
