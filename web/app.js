@@ -2212,21 +2212,30 @@ async function renderLiveLocationPlaceholder() {
   const mount = document.getElementById("realtimeMount");
   if (!mount) return;
 
-  // 檢查 GPS 系統總開關（從 booking-api 讀取）
+  // 檢查 GPS 系統總開關（從 booking-api 讀取，該 API 會從 Sheet 的「系統」E19 讀取）
   try {
     const apiUrl = "https://booking-api-995728097341.asia-east1.run.app/api/realtime/location";
     const r = await fetch(apiUrl);
     if (r.ok) {
       const data = await r.json();
+      // 如果 gps_system_enabled 不是 true，隱藏整個即時位置區塊
       if (!data.gps_system_enabled) {
-        // GPS 系統總開關關閉，隱藏整個區塊
         sec.style.display = "none";
         mount.innerHTML = "";
         return;
       }
+    } else {
+      // API 請求失敗，為了安全起見，隱藏區塊
+      sec.style.display = "none";
+      mount.innerHTML = "";
+      return;
     }
   } catch (e) {
     console.error("Check GPS system status error:", e);
+    // 發生錯誤時，為了安全起見，隱藏區塊
+    sec.style.display = "none";
+    mount.innerHTML = "";
+    return;
   }
 
   // GPS 系統啟用，顯示並初始化
@@ -3390,4 +3399,4 @@ function isExpiredByCarDateTime(carDateTime) {
     const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
     return tripTime < Date.now();
   } catch (e) { return true; }
-      }
+}
