@@ -2393,8 +2393,35 @@ function initLiveLocation(mount) {
   // 更新下一站的輔助函數（同時更新手機版和電腦版）
   const updateNextStop = (stopName) => {
     const displayText = stopName || "未知";
-    if (nextStopNameEl) nextStopNameEl.textContent = displayText;
-    if (nextStopNameElDesktop) nextStopNameElDesktop.textContent = displayText;
+    const nextStopEl = mount.querySelector("#rt-next-stop");
+    const nextStopElDesktop = mount.querySelector("#rt-next-stop-desktop");
+    
+    // 如果是"即將發車中"，顯示整個區塊為"即將發車中"
+    if (displayText === "即將發車中") {
+      if (nextStopEl) {
+        nextStopEl.textContent = "即將發車中";
+      }
+      if (nextStopElDesktop) {
+        nextStopElDesktop.textContent = "即將發車中";
+      }
+    } else {
+      // 否則顯示"即將抵達: [站點名稱]"
+      // 確保父元素結構正確
+      if (nextStopEl) {
+        if (!nextStopEl.querySelector("#rt-next-stop-name")) {
+          nextStopEl.innerHTML = `即將抵達: <span id="rt-next-stop-name"></span>`;
+        }
+        const nameEl = nextStopEl.querySelector("#rt-next-stop-name");
+        if (nameEl) nameEl.textContent = displayText;
+      }
+      if (nextStopElDesktop) {
+        if (!nextStopElDesktop.querySelector("#rt-next-stop-name-desktop")) {
+          nextStopElDesktop.innerHTML = `即將抵達: <span id="rt-next-stop-name-desktop"></span>`;
+        }
+        const nameElDesktop = nextStopElDesktop.querySelector("#rt-next-stop-name-desktop");
+        if (nameElDesktop) nameElDesktop.textContent = displayText;
+      }
+    }
   };
   
   // 更新已走過的路線（基於已到達站點列表或司機位置）
@@ -2452,15 +2479,54 @@ function initLiveLocation(mount) {
     }
     
     // 繪製已走過的路線（到最後一個已到達站點）
+    const walkedPath = path.slice(0, Math.max(1, lastCompletedIndex + 1));
+    
+    // 清除舊的路線
     if (walkedPolyline) walkedPolyline.setMap(null);
+    if (walkedPolylineGlow) walkedPolylineGlow.setMap(null);
+    
+    // 清除舊的動畫計時器
+    if (glowAnimationTimer) {
+      clearInterval(glowAnimationTimer);
+      glowAnimationTimer = null;
+    }
+    
+    // 繪製主路線（綠色）
     walkedPolyline = new google.maps.Polyline({ 
-      path: path.slice(0, Math.max(1, lastCompletedIndex + 1)), 
+      path: walkedPath, 
       strokeColor: "#28a745", // 綠色（走過的路線）
       strokeOpacity: 1, 
       strokeWeight: 8, 
       map,
       zIndex: 2
     });
+    
+    // 繪製外層光暈（用於閃爍效果）
+    walkedPolylineGlow = new google.maps.Polyline({ 
+      path: walkedPath, 
+      strokeColor: "#28a745", // 綠色光暈
+      strokeOpacity: 0.4, // 初始透明度
+      strokeWeight: 16, // 更粗，作為外層光暈
+      map,
+      zIndex: 1 // 在主路線下方
+    });
+    
+    // 啟動閃爍動畫（稍微閃爍，不刺眼）
+    let glowOpacity = 0.3;
+    let glowDirection = 1; // 1為增加，-1為減少
+    glowAnimationTimer = setInterval(() => {
+      glowOpacity += glowDirection * 0.05; // 每次變化0.05
+      if (glowOpacity >= 0.5) {
+        glowOpacity = 0.5;
+        glowDirection = -1; // 開始減少
+      } else if (glowOpacity <= 0.2) {
+        glowOpacity = 0.2;
+        glowDirection = 1; // 開始增加
+      }
+      if (walkedPolylineGlow) {
+        walkedPolylineGlow.setOptions({ strokeOpacity: glowOpacity });
+      }
+    }, 100); // 每100毫秒更新一次，實現平滑閃爍
   };
   const endedOverlay = mount.querySelector("#rt-ended-overlay");
   const endedTextEl = mount.querySelector("#rt-ended-text");
@@ -2482,10 +2548,11 @@ function initLiveLocation(mount) {
       document.head.appendChild(s);
     });
 
-  let map, marker, mainPolyline, walkedPolyline, stationMarkers = [];
+  let map, marker, mainPolyline, walkedPolyline, walkedPolylineGlow, stationMarkers = [];
   let currentTripData = null;
   let isInitialized = false;
   let markerCircle = null; // 司機位置圓形外圈
+  let glowAnimationTimer = null; // 光暈閃爍動畫計時器
   
   // 光子動畫已移除
   const ensureFirebase = async () => {
@@ -2924,9 +2991,9 @@ function initLiveLocation(mount) {
             const tripTime = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute || 0));
             const now = new Date();
             
-            // 如果還沒到發車時間，顯示"準備發車中"
+            // 如果還沒到發車時間，顯示"即將發車中"
             if (now < tripTime) {
-              updateNextStop("準備發車中");
+              updateNextStop("即將發車中");
             } else if (nextStationFromFirebase) {
               // 優先使用Firebase中的current_trip_station（由後端站點到達檢測更新）
               updateNextStop(nextStationFromFirebase);
@@ -3323,4 +3390,4 @@ function isExpiredByCarDateTime(carDateTime) {
     const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
     return tripTime < Date.now();
   } catch (e) { return true; }
-    }
+      }
