@@ -2356,7 +2356,6 @@ function initLiveLocation(mount) {
     new Promise((resolve, reject) => {
       if (!cfg.key) { 
         if (startBtn) startBtn.textContent = "缺少地圖 key";
-        reject(new Error("缺少地圖 key"));
         return; 
       }
       const s = document.createElement("script");
@@ -2915,27 +2914,3 @@ document.addEventListener("DOMContentLoaded", () => {
 
 window.addEventListener("scroll", handleScroll, { passive: true });
 window.addEventListener("resize", handleScroll, { passive: true });
-
-/* ====== 解析/過期判斷 (查詢頁用) ====== */
-function getDateFromCarDateTime(carDateTime) {
-  if (!carDateTime) return "";
-  const parts = String(carDateTime).split(' ');
-  if (parts.length < 1) return "";
-  const datePart = parts[0];
-  return datePart.replace(/\//g, '-');
-}
-function getTimeFromCarDateTime(carDateTime) {
-  if (!carDateTime) return "00:00";
-  const parts = String(carDateTime).split(' ');
-  return parts.length > 1 ? parts[1] : "00:00";
-}
-function isExpiredByCarDateTime(carDateTime) {
-  if (!carDateTime) return true;
-  try {
-    const [datePart, timePart] = String(carDateTime).split(' ');
-    const [year, month, day] = datePart.split('/').map(Number);
-    const [hour, minute] = timePart.split(':').map(Number);
-    const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
-    return tripTime < Date.now();
-  } catch (e) { return true; }
-}
