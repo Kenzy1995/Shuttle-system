@@ -2218,16 +2218,16 @@ async function renderLiveLocationPlaceholder() {
 
 // 站點座標映射（全局定義，供多處使用）
 const stationCoords = {
-  "1. 福泰大飯店 (去)": { lat: 25.054964953523683, lng: 121.63077275881052 },
-  "福泰大飯店 Forte Hotel": { lat: 25.054964953523683, lng: 121.63077275881052 },  // 去程起點
+  "1. 福泰大飯店 (去)": { lat: 25.055550556928008, lng: 121.63210245291367 },
+  "福泰大飯店 Forte Hotel": { lat: 25.055550556928008, lng: 121.63210245291367 },  // 去程起點
   "2. 南港捷運站": { lat: 25.055017007293404, lng: 121.61818547695053 },
   "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": { lat: 25.055017007293404, lng: 121.61818547695053 },
   "3. 南港火車站": { lat: 25.052822671279454, lng: 121.60771823129633 },
   "南港火車站 Nangang Train Station": { lat: 25.052822671279454, lng: 121.60771823129633 },
   "4. LaLaport 購物中心": { lat: 25.05629820919232, lng: 121.61700981622211 },
   "LaLaport Shopping Park": { lat: 25.05629820919232, lng: 121.61700981622211 },
-  "5. 福泰大飯店 (回)": { lat: 25.054800375417987, lng: 121.63117576557792 },
-  "福泰大飯店(回) Forte Hotel (Back)": { lat: 25.054800375417987, lng: 121.63117576557792 }  // 回程終點
+  "5. 福泰大飯店 (回)": { lat: 25.054885236140684, lng: 121.63108564609658 },
+  "福泰大飯店(回) Forte Hotel (Back)": { lat: 25.054885236140684, lng: 121.63108564609658 }  // 回程終點
 };
 
 function initLiveLocation(mount) {
@@ -2369,6 +2369,95 @@ function initLiveLocation(mount) {
   let map, marker, mainPolyline, walkedPolyline, stationMarkers = [];
   let currentTripData = null;
   let isInitialized = false;
+  let pulseMarker = null; // 光子動畫標記
+  let pulseAnimation = null; // 光子動畫定時器
+  let markerCircle = null; // 司機位置圓形外圈
+  
+  // 光子動畫函數：沿著路線移動
+  const animatePulseAlongPath = (path) => {
+    if (!path || path.length < 2) {
+      if (pulseMarker) {
+        pulseMarker.setMap(null);
+        pulseMarker = null;
+      }
+      return;
+    }
+    
+    // 清除舊的動畫
+    if (pulseAnimation) {
+      clearInterval(pulseAnimation);
+      pulseAnimation = null;
+    }
+    
+    let currentIndex = 0;
+    const totalDistance = path.length - 1;
+    const duration = 3000; // 3秒完成一次循環
+    const interval = 50; // 每50ms更新一次
+    const steps = duration / interval;
+    
+    // 創建光子標記（如果不存在）
+    if (!pulseMarker) {
+      pulseMarker = new google.maps.Marker({
+        map: map,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: "#FFD700",
+          fillOpacity: 1,
+          strokeColor: "#FFFFFF",
+          strokeWeight: 2
+        },
+        zIndex: 100
+      });
+    }
+    
+    // 計算兩點間距離
+    const getDistance = (p1, p2) => {
+      const lat1 = typeof p1.lat === 'function' ? p1.lat() : p1.lat;
+      const lng1 = typeof p1.lng === 'function' ? p1.lng() : p1.lng;
+      const lat2 = typeof p2.lat === 'function' ? p2.lat() : p2.lat;
+      const lng2 = typeof p2.lng === 'function' ? p2.lng() : p2.lng;
+      return Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2));
+    };
+    
+    // 在兩點間插值
+    const interpolate = (p1, p2, fraction) => {
+      const lat1 = typeof p1.lat === 'function' ? p1.lat() : p1.lat;
+      const lng1 = typeof p1.lng === 'function' ? p1.lng() : p1.lng;
+      const lat2 = typeof p2.lat === 'function' ? p2.lat() : p2.lat;
+      const lng2 = typeof p2.lng === 'function' ? p2.lng() : p2.lng;
+      return {
+        lat: lat1 + (lat2 - lat1) * fraction,
+        lng: lng1 + (lng2 - lng1) * fraction
+      };
+    };
+    
+    let step = 0;
+    pulseAnimation = setInterval(() => {
+      if (currentIndex >= path.length - 1) {
+        currentIndex = 0;
+        step = 0;
+      }
+      
+      const p1 = path[currentIndex];
+      const p2 = path[currentIndex + 1];
+      const fraction = step / steps;
+      
+      if (fraction >= 1) {
+        currentIndex++;
+        step = 0;
+        if (currentIndex >= path.length - 1) {
+          currentIndex = 0;
+        }
+      } else {
+        const position = interpolate(p1, p2, fraction);
+        if (pulseMarker) {
+          pulseMarker.setPosition(position);
+        }
+        step++;
+      }
+    }, interval);
+  };
   const ensureFirebase = async () => {
     if (!cfg.fbdb || !cfg.fbkey) return false;
     // 動態載入 Firebase SDK
@@ -2442,10 +2531,11 @@ function initLiveLocation(mount) {
           if (mainPolyline) mainPolyline.setMap(null);
           mainPolyline = new google.maps.Polyline({ 
             path: path, 
-            strokeColor: "#999", 
-            strokeOpacity: 0.6, 
+            strokeColor: "#666", 
+            strokeOpacity: 0.8, 
             strokeWeight: 6, 
-            map: mapInstance
+            map: mapInstance,
+            zIndex: 1
           });
           
           // 調整地圖視圖以包含所有站點
@@ -2557,10 +2647,11 @@ function initLiveLocation(mount) {
         if (mainPolyline) mainPolyline.setMap(null);
         mainPolyline = new google.maps.Polyline({ 
           path: gPath, 
-          strokeColor: "#999", 
-          strokeOpacity: 0.6, 
+          strokeColor: "#666", 
+          strokeOpacity: 0.8, 
           strokeWeight: 6, 
-          map 
+          map,
+          zIndex: 1
         });
         const bounds = new google.maps.LatLngBounds();
         gPath.forEach(pt => bounds.extend(pt));
@@ -2634,11 +2725,15 @@ function initLiveLocation(mount) {
       if (driverLoc && typeof driverLoc.lat === "number" && typeof driverLoc.lng === "number") {
         const pos = { lat: driverLoc.lat, lng: driverLoc.lng };
         if (marker) {
-        marker.setPosition(pos);
-        map.panTo(pos);
+          marker.setPosition(pos);
+          map.panTo(pos);
+        }
+        // 更新圓形外圈位置
+        if (markerCircle) {
+          markerCircle.setCenter(pos);
         }
         
-        // 更新已走過的路線
+        // 更新已走過的路線（橘色）
         if (mainPolyline) {
           const path = mainPolyline.getPath().getArray();
           let nearestIdx = 0, best = Infinity;
@@ -2650,11 +2745,24 @@ function initLiveLocation(mount) {
           if (walkedPolyline) walkedPolyline.setMap(null);
           walkedPolyline = new google.maps.Polyline({ 
             path: path.slice(0, Math.max(1, nearestIdx + 1)), 
-            strokeColor: "#0b63ce", 
+            strokeColor: "#FF6B35", 
             strokeOpacity: 1, 
             strokeWeight: 8, 
-            map 
+            map,
+            zIndex: 2
           });
+          
+          // 光子動畫：沿著未走過的路線移動
+          if (nearestIdx < path.length - 1) {
+            const remainingPath = path.slice(nearestIdx);
+            animatePulseAlongPath(remainingPath);
+          } else {
+            // 路線已完成，移除光子
+            if (pulseMarker) {
+              pulseMarker.setMap(null);
+              pulseMarker = null;
+            }
+          }
         }
         
         updateStatus("#28a745", "良好");
@@ -2767,6 +2875,40 @@ function initLiveLocation(mount) {
     
     await loadMaps();
     
+    // 灰白黑色地圖樣式
+    const mapStyles = [
+      {
+        featureType: "all",
+        elementType: "geometry",
+        stylers: [{ color: "#f5f5f5" }]
+      },
+      {
+        featureType: "all",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#666666" }]
+      },
+      {
+        featureType: "all",
+        elementType: "labels.text.stroke",
+        stylers: [{ color: "#ffffff" }]
+      },
+      {
+        featureType: "road",
+        elementType: "geometry",
+        stylers: [{ color: "#e0e0e0" }]
+      },
+      {
+        featureType: "water",
+        elementType: "geometry",
+        stylers: [{ color: "#d0d0d0" }]
+      },
+      {
+        featureType: "poi",
+        elementType: "geometry",
+        stylers: [{ color: "#e8e8e8" }]
+      }
+    ];
+    
     // 初始化地圖
     map = new google.maps.Map(mapEl, { 
       center: { lat: 25.055550556928008, lng: 121.63210245291367 }, 
@@ -2774,22 +2916,35 @@ function initLiveLocation(mount) {
       disableDefaultUI: false, 
       zoomControl: true, 
       mapTypeControl: false, 
-      streetViewControl: false 
+      streetViewControl: false,
+      styles: mapStyles
     });
     
-    // 創建司機位置標記
+    // 創建司機位置標記（使用接駁車圖示，圓形顯示）
+    const busIcon = {
+      url: '/images/接駁車圖示.png',
+      scaledSize: new google.maps.Size(40, 40),
+      anchor: new google.maps.Point(20, 20)
+    };
+    
     marker = new google.maps.Marker({ 
       position: { lat: 25.055550556928008, lng: 121.63210245291367 }, 
       map, 
-      title: "司機位置", 
-      icon: { 
-        path: google.maps.SymbolPath.CIRCLE, 
-        scale: 12, 
-        fillColor: "#4285F4", 
-        fillOpacity: 1, 
-        strokeColor: "white", 
-        strokeWeight: 3 
-      } 
+      title: "司機位置",
+      icon: busIcon,
+      zIndex: 10
+    });
+    
+    // 添加圓形外圈效果
+    markerCircle = new google.maps.Circle({
+      strokeColor: "#4285F4",
+      strokeOpacity: 0.6,
+      strokeWeight: 2,
+      fillColor: "#4285F4",
+      fillOpacity: 0.2,
+      map: map,
+      center: { lat: 25.055550556928008, lng: 121.63210245291367 },
+      radius: 30
     });
     
     // 隱藏遮罩，顯示資訊
