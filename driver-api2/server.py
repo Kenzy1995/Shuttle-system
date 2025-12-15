@@ -1410,7 +1410,8 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                         stops_names.append(s)
         # 站點座標（精確座標）
         COORDS = {
-            "福泰大飯店 Forte Hotel": {"lat": 25.055550556928008, "lng": 121.63210245291367},
+            "福泰大飯店 Forte Hotel": {"lat": 25.054964953523683, "lng": 121.63077275881052},  # 去程起點
+            "福泰大飯店(回) Forte Hotel (Back)": {"lat": 25.055550556928008, "lng": 121.63210245291367},  # 回程終點
             "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": {"lat": 25.055017007293404, "lng": 121.61818547695053},
             "南港火車站 Nangang Train Station": {"lat": 25.052822671279454, "lng": 121.60771823129633},
             "LaLaport Shopping Park": {"lat": 25.05629820919232, "lng": 121.61700981622211},
