@@ -2569,6 +2569,7 @@ function initLiveLocation(mount) {
       
       // 確保路線終點固定為飯店（寫死邏輯）
       let displayStops = [...stops];
+      let routeNeedsRegeneration = false; // 標記是否需要重新生成路線
       const hotelBackCoord = stationCoords["福泰大飯店(回) Forte Hotel (Back)"];
       if (hotelBackCoord) {
         // 檢查最後一站是否已經是飯店
@@ -2586,13 +2587,19 @@ function initLiveLocation(mount) {
             lat: hotelBackCoord.lat, 
             lng: hotelBackCoord.lng 
           });
+          routeNeedsRegeneration = true; // 需要重新生成路線
         } else if (displayStops.length > 0) {
           // 如果最後一站是飯店，確保座標正確
-          displayStops[displayStops.length - 1] = { 
-            name: "福泰大飯店(回) Forte Hotel (Back)", 
-            lat: hotelBackCoord.lat, 
-            lng: hotelBackCoord.lng 
-          };
+          const currentLastStop = displayStops[displayStops.length - 1];
+          if (typeof currentLastStop === "object" && 
+              (currentLastStop.lat !== hotelBackCoord.lat || currentLastStop.lng !== hotelBackCoord.lng)) {
+            displayStops[displayStops.length - 1] = { 
+              name: "福泰大飯店(回) Forte Hotel (Back)", 
+              lat: hotelBackCoord.lat, 
+              lng: hotelBackCoord.lng 
+            };
+            routeNeedsRegeneration = true; // 座標改變，需要重新生成路線
+          }
         }
       }
       
@@ -2648,7 +2655,7 @@ function initLiveLocation(mount) {
       // 獲取站點顯示標籤的輔助函數
       const getStationDisplayLabel = (stop, idx, totalStops) => {
         if (idx === 0) {
-          return "福泰大飯店 Forte Hotel";
+          return "起點";
         } else if (idx === totalStops - 1) {
           return "終站";
         } else {
@@ -2699,7 +2706,12 @@ function initLiveLocation(mount) {
       });
       
       // 繪製路線
-      if (path && Array.isArray(path) && path.length > 1) {
+      // 如果路線需要重新生成（因為添加了終點站），使用 Google Directions API 重新生成
+      if (routeNeedsRegeneration && displayStops.length >= 2) {
+        // 重新生成路線（包含終點站）
+        await drawRouteFromStops(displayStops, map);
+      } else if (path && Array.isArray(path) && path.length > 1) {
+        // 使用現有的路線數據
         const gPath = path.map(p => new google.maps.LatLng(p.lat, p.lng));
         if (mainPolyline) mainPolyline.setMap(null);
         mainPolyline = new google.maps.Polyline({ 
@@ -3262,4 +3274,4 @@ function isExpiredByCarDateTime(carDateTime) {
     const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
     return tripTime < Date.now();
   } catch (e) { return true; }
-}
+        }
