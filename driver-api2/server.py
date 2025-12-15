@@ -1246,18 +1246,11 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
     if not dt:
         raise HTTPException(status_code=400, detail="主班次時間格式錯誤")
     trip_id = dt.strftime("%Y/%m/%d %H:%M")
-    # 系統啟用旗標：系統!E19 為 TRUE 才啟用追蹤
-    try:
-        ws = open_ws(SHEET_NAME_SYSTEM)
-        e19 = (ws.acell("E19").value or "").strip().lower()
-        enabled = e19 in ("true", "t", "yes", "1")
-    except Exception:
-        enabled = True  # 若讀取失敗，預設啟用（可依需求改為 False）
-    if not enabled:
-        return GoogleTripStartResponse(trip_id=None, share_url=None, stops=None)
-    # 不再自動生成乘客地圖分享連結；由前端固定網址負責
-    share_url = ""
-    # 從《車次管理(櫃台)》讀取該班次停靠站，並寫入 Firebase（route/stops）
+    
+    # 不論 GPS 是否開啟，都要更新 Sheet 的出車狀態和最後更新時間
+    # 先打開 Sheet 並找到目標行
+    ws2 = None
+    target_rowno: Optional[int] = None
     try:
         try:
             ws2 = open_ws("車次管理(櫃台)")
@@ -1272,14 +1265,17 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                 return -1
         idx_date = hidx("日期")
         idx_time = hidx("班次") if hidx("時間") < 0 else hidx("時間")
+        idx_status = hidx("出車狀態")
+        idx_last = hidx("最後更新")
+        
         # 規範化候選日期/時間
         target_date = dt.strftime("%Y/%m/%d")
         alt_date = dt.strftime("%Y-%m-%d")
         t1 = dt.strftime("%H:%M")
         t2 = dt.strftime("%-H:%M") if hasattr(dt, "strftime") else t1
+        
         # 尋找目標列
         values = ws2.get_all_values()
-        target_rowno: Optional[int] = None
         for i in range(6, len(values)):
             row = values[i]
             d = (row[idx_date] if idx_date >= 0 and idx_date < len(row) else "").strip()
@@ -1293,6 +1289,68 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
             if (d in (target_date, alt_date)) and (t_raw in (t1, t2) or t_norm in (t1, t2)):
                 target_rowno = i + 1
                 break
+        
+        # 更新 Sheet 的出車狀態和最後更新時間（不論 GPS 是否開啟）
+        if target_rowno and idx_status >= 0 and idx_last >= 0:
+            from gspread.utils import rowcol_to_a1
+            now_text = _tz_now().strftime("%Y/%m/%d %H:%M")
+            update_data = [
+                {"range": rowcol_to_a1(target_rowno, idx_status + 1), "values": [["已發車"]]},
+                {"range": rowcol_to_a1(target_rowno, idx_last + 1), "values": [[now_text]]},
+            ]
+            ws2.batch_update(update_data, value_input_option="USER_ENTERED")
+    except Exception as sheet_update_error:
+        print(f"Sheet update error in trip_start: {sheet_update_error}")
+    
+    # 系統啟用旗標：系統!E19 為 TRUE 才啟用追蹤（僅影響 Firebase 寫入，不影響 Sheet 更新）
+    try:
+        ws = open_ws(SHEET_NAME_SYSTEM)
+        e19 = (ws.acell("E19").value or "").strip().lower()
+        enabled = e19 in ("true", "t", "yes", "1")
+    except Exception:
+        enabled = True  # 若讀取失敗，預設啟用（可依需求改為 False）
+    if not enabled:
+        return GoogleTripStartResponse(trip_id=trip_id, share_url=None, stops=None)
+    # 不再自動生成乘客地圖分享連結；由前端固定網址負責
+    share_url = ""
+    # 從《車次管理(櫃台)》讀取該班次停靠站，並寫入 Firebase（route/stops）
+    try:
+        # 如果上面已經打開了 ws2，重複使用；否則重新打開
+        if ws2 is None:
+            try:
+                ws2 = open_ws("車次管理(櫃台)")
+            except Exception:
+                ws2 = open_ws("車次管理(備品)")
+            headers = ws2.row_values(6)
+            headers = [(h or "").strip() for h in headers]
+            def hidx(name: str) -> int:
+                try:
+                    return headers.index(name)
+                except ValueError:
+                    return -1
+            idx_date = hidx("日期")
+            idx_time = hidx("班次") if hidx("時間") < 0 else hidx("時間")
+            # 規範化候選日期/時間
+            target_date = dt.strftime("%Y/%m/%d")
+            alt_date = dt.strftime("%Y-%m-%d")
+            t1 = dt.strftime("%H:%M")
+            t2 = dt.strftime("%-H:%M") if hasattr(dt, "strftime") else t1
+            # 尋找目標列
+            values = ws2.get_all_values()
+            target_rowno = None
+            for i in range(6, len(values)):
+                row = values[i]
+                d = (row[idx_date] if idx_date >= 0 and idx_date < len(row) else "").strip()
+                t_raw = (row[idx_time] if idx_time >= 0 and idx_time < len(row) else "").strip()
+                # Normalize HH:MM
+                try:
+                    rp = t_raw.split(":")
+                    t_norm = f"{str(rp[0]).zfill(2)}:{rp[1]}" if len(rp) >= 2 else t_raw
+                except Exception:
+                    t_norm = t_raw
+                if (d in (target_date, alt_date)) and (t_raw in (t1, t2) or t_norm in (t1, t2)):
+                    target_rowno = i + 1
+                    break
         
         # 不論 GPS 是否開啟，都要更新 Sheet 的出車狀態和最後更新時間
         if target_rowno:
