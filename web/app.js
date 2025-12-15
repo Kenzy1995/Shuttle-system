@@ -2218,11 +2218,16 @@ async function renderLiveLocationPlaceholder() {
 
 // 站點座標映射（全局定義，供多處使用）
 const stationCoords = {
-  "福泰大飯店 Forte Hotel": { lat: 25.055550556928008, lng: 121.63210245291367 },
+  "1. 福泰大飯店 (去)": { lat: 25.054964953523683, lng: 121.63077275881052 },
+  "福泰大飯店 Forte Hotel": { lat: 25.054964953523683, lng: 121.63077275881052 },  // 去程起點
+  "2. 南港捷運站": { lat: 25.055017007293404, lng: 121.61818547695053 },
   "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": { lat: 25.055017007293404, lng: 121.61818547695053 },
+  "3. 南港火車站": { lat: 25.052822671279454, lng: 121.60771823129633 },
   "南港火車站 Nangang Train Station": { lat: 25.052822671279454, lng: 121.60771823129633 },
+  "4. LaLaport 購物中心": { lat: 25.05629820919232, lng: 121.61700981622211 },
   "LaLaport Shopping Park": { lat: 25.05629820919232, lng: 121.61700981622211 },
-  "福泰大飯店(回) Forte Hotel (Back)": { lat: 25.055550556928008, lng: 121.63210245291367 }
+  "5. 福泰大飯店 (回)": { lat: 25.055550556928008, lng: 121.63210245291367 },
+  "福泰大飯店(回) Forte Hotel (Back)": { lat: 25.055550556928008, lng: 121.63210245291367 }  // 回程終點
 };
 
 function initLiveLocation(mount) {
@@ -2676,6 +2681,9 @@ function initLiveLocation(mount) {
             // 如果還沒到發車時間，顯示"準備發車中"
             if (now < tripTime) {
               updateNextStop("準備發車中");
+            } else if (nextStationFromFirebase) {
+              // 優先使用Firebase中的current_trip_station（司機按了下一站後更新的）
+              updateNextStop(nextStationFromFirebase);
             } else if (stations.length > 0 && driverLoc && typeof driverLoc.lat === "number" && route && route.stops && route.stops.length > 0) {
               // 已發車，根據司機位置判斷下一站
               const routeStops = route.stops;
@@ -2710,6 +2718,9 @@ function initLiveLocation(mount) {
                 nextStopName = found ? found[0] : "未知";
               }
               updateNextStop(nextStopName);
+            } else if (nextStationFromFirebase) {
+              // 優先使用Firebase中的current_trip_station
+              updateNextStop(nextStationFromFirebase);
             } else if (stations.length > 0) {
               // 沒有司機位置或路線數據，但已發車，顯示第二站（第一站是飯店）
               const nextStop = stations.length > 1 ? stations[1] : stations[0];
@@ -2724,9 +2735,17 @@ function initLiveLocation(mount) {
               updateNextStop("未知");
             }
           } else {
-            const nextStopName = stations.length > 0 ? (typeof stations[0] === "object" && stations[0].name ? stations[0].name : stations[0] || "未知") : "未知";
-            updateNextStop(nextStopName);
+            // 優先使用Firebase中的current_trip_station
+            if (nextStationFromFirebase) {
+              updateNextStop(nextStationFromFirebase);
+            } else {
+              const nextStopName = stations.length > 0 ? (typeof stations[0] === "object" && stations[0].name ? stations[0].name : stations[0] || "未知") : "未知";
+              updateNextStop(nextStopName);
+            }
           }
+        } else if (nextStationFromFirebase) {
+          // 優先使用Firebase中的current_trip_station
+          updateNextStop(nextStationFromFirebase);
         } else if (stations.length > 0) {
           const nextStopName = typeof stations[0] === "object" && stations[0].name ? stations[0].name : (stations[0] || "未知");
           updateNextStop(nextStopName);
