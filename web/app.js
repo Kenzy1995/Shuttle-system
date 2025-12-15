@@ -2318,6 +2318,10 @@ function initLiveLocation(mount) {
   const btnRefresh = mount.querySelector("#rt-refresh");
   const btnRefreshDesktop = mount.querySelector("#rt-refresh-desktop");
   
+  // 手動刷新速率限制
+  let lastManualRefreshTime = 0;
+  const MANUAL_REFRESH_COOLDOWN = 30 * 1000; // 30秒
+  
   // 更新狀態的輔助函數（同時更新手機版和電腦版）
   const updateStatus = (color, text) => {
     if (statusLight && statusText) {
@@ -2860,18 +2864,60 @@ function initLiveLocation(mount) {
           markerCircle.setCenter(pos);
         }
         
-        // 更新已走過的路線（橘色）
-        if (mainPolyline) {
+        // 更新已走過的路線（基於已到達站點列表）
+        if (mainPolyline && data.current_trip_route && data.current_trip_route.stops) {
           const path = mainPolyline.getPath().getArray();
-          let nearestIdx = 0, best = Infinity;
-          for (let i = 0; i < path.length; i++) {
-            const dx = path[i].lat() - pos.lat, dy = path[i].lng() - pos.lng;
-            const dist = dx * dx + dy * dy;
-            if (dist < best) { best = dist; nearestIdx = i; }
+          const completedStops = data.current_trip_completed_stops || [];
+          const routeStops = data.current_trip_route.stops;
+          
+          // 找到最後一個已到達站點在路線中的位置
+          let lastCompletedIndex = 0;
+          if (completedStops.length > 0) {
+            // 找到最後一個已到達站點
+            let lastCompletedStop = null;
+            for (let i = routeStops.length - 1; i >= 0; i--) {
+              const stop = routeStops[i];
+              const stopName = typeof stop === "object" && stop.name ? stop.name : (typeof stop === "string" ? stop : "");
+              if (stopName && completedStops.includes(stopName)) {
+                lastCompletedStop = stop;
+                break;
+              }
+            }
+            
+            // 找到該站點在path中的對應位置
+            if (lastCompletedStop) {
+              const stopCoord = typeof lastCompletedStop === "object" && lastCompletedStop.lat ? 
+                { lat: lastCompletedStop.lat, lng: lastCompletedStop.lng } : 
+                stationCoords[lastCompletedStop.name || lastCompletedStop] || null;
+              
+              if (stopCoord) {
+                let best = Infinity;
+                for (let i = 0; i < path.length; i++) {
+                  const dx = path[i].lat() - stopCoord.lat;
+                  const dy = path[i].lng() - stopCoord.lng;
+                  const dist = dx * dx + dy * dy;
+                  if (dist < best) {
+                    best = dist;
+                    lastCompletedIndex = i;
+                  }
+                }
+              }
+            }
+          } else {
+            // 如果沒有已到達站點，使用司機位置作為參考
+            let nearestIdx = 0, best = Infinity;
+            for (let i = 0; i < path.length; i++) {
+              const dx = path[i].lat() - pos.lat, dy = path[i].lng() - pos.lng;
+              const dist = dx * dx + dy * dy;
+              if (dist < best) { best = dist; nearestIdx = i; }
+            }
+            lastCompletedIndex = nearestIdx;
           }
+          
+          // 繪製已走過的路線（到最後一個已到達站點）
           if (walkedPolyline) walkedPolyline.setMap(null);
           walkedPolyline = new google.maps.Polyline({ 
-            path: path.slice(0, Math.max(1, nearestIdx + 1)), 
+            path: path.slice(0, Math.max(1, lastCompletedIndex + 1)), 
             strokeColor: "#28a745", // 綠色（走過的路線）
             strokeOpacity: 1, 
             strokeWeight: 8, 
@@ -2880,8 +2926,8 @@ function initLiveLocation(mount) {
           });
           
           // 光子動畫：沿著未走過的路線移動
-          if (nearestIdx < path.length - 1) {
-            const remainingPath = path.slice(nearestIdx);
+          if (lastCompletedIndex < path.length - 1) {
+            const remainingPath = path.slice(lastCompletedIndex);
             animatePulseAlongPath(remainingPath);
           } else {
             // 路線已完成，移除光子
@@ -2903,11 +2949,25 @@ function initLiveLocation(mount) {
         updateStatus("#ffc107", "連線中");
       }
       
-      // 更新下一站信息（判斷是否在發車時間前，並根據司機位置判斷下一站）
+      // 更新下一站信息（基於已到達站點列表）
       const stations = data.current_trip_stations?.stops || [];
       const tripDateTime = data.current_trip_datetime;
       const route = data.current_trip_route;
+      const completedStops = data.current_trip_completed_stops || [];  // 已到達站點列表
       const nextStationFromFirebase = data.current_trip_station || "";  // 從Firebase讀取即將前往的站點
+      
+      // 根據已到達站點判斷下一站的輔助函數
+      const getNextStationFromCompleted = (stops, completed) => {
+        for (let i = 0; i < stops.length; i++) {
+          const stop = stops[i];
+          const stopName = typeof stop === "object" && stop.name ? stop.name : (typeof stop === "string" ? stop : "");
+          if (stopName && !completed.includes(stopName)) {
+            return stopName;
+          }
+        }
+        return null; // 所有站點都已完成
+      };
+      
       if (nextStopNameEl) {
         if (tripDateTime) {
           // 解析班次時間
@@ -2922,55 +2982,24 @@ function initLiveLocation(mount) {
             if (now < tripTime) {
               updateNextStop("準備發車中");
             } else if (nextStationFromFirebase) {
-              // 優先使用Firebase中的current_trip_station（司機按了下一站後更新的）
+              // 優先使用Firebase中的current_trip_station（由後端站點到達檢測更新）
               updateNextStop(nextStationFromFirebase);
-            } else if (stations.length > 0 && driverLoc && typeof driverLoc.lat === "number" && route && route.stops && route.stops.length > 0) {
-              // 已發車，根據司機位置判斷下一站
-              const routeStops = route.stops;
-              // 找到司機位置最接近的站點索引
-              let nearestIdx = 0;
-              let minDist = Infinity;
-              routeStops.forEach((stop, idx) => {
-                const coord = typeof stop === "object" && stop.lat ? stop : stationCoords[stop.name || stop] || stop;
-                if (coord && coord.lat && coord.lng) {
-                  const dx = coord.lat - driverLoc.lat;
-                  const dy = coord.lng - driverLoc.lng;
-                  const dist = dx * dx + dy * dy;
-                  if (dist < minDist) {
-                    minDist = dist;
-                    nearestIdx = idx;
-                  }
-                }
-              });
-              // 下一站是最近站點的下一站（如果是最後一站，下一站是第一站形成閉環）
-              const nextIdx = (nearestIdx + 1) % routeStops.length;
-              const nextStop = routeStops[nextIdx];
-              let nextStopName = "未知";
-              if (typeof nextStop === "object" && nextStop.name) {
-                nextStopName = nextStop.name;
-              } else if (typeof nextStop === "string") {
-                nextStopName = nextStop;
-              } else if (typeof nextStop === "object" && nextStop.lat) {
-                // 如果是座標對象，查找對應的站點名稱
-                const found = Object.entries(stationCoords).find(([name, coord]) => 
-                  Math.abs(coord.lat - nextStop.lat) < 0.0001 && Math.abs(coord.lng - nextStop.lng) < 0.0001
-                );
-                nextStopName = found ? found[0] : "未知";
+            } else if (route && route.stops && route.stops.length > 0) {
+              // 根據已到達站點列表判斷下一站
+              const nextStopName = getNextStationFromCompleted(route.stops, completedStops);
+              if (nextStopName) {
+                updateNextStop(nextStopName);
+              } else {
+                updateNextStop("所有站點已完成");
               }
-              updateNextStop(nextStopName);
-            } else if (nextStationFromFirebase) {
-              // 優先使用Firebase中的current_trip_station
-              updateNextStop(nextStationFromFirebase);
             } else if (stations.length > 0) {
-              // 沒有司機位置或路線數據，但已發車，顯示第二站（第一站是飯店）
-              const nextStop = stations.length > 1 ? stations[1] : stations[0];
-              let nextStopName = "未知";
-              if (typeof nextStop === "object" && nextStop.name) {
-                nextStopName = nextStop.name;
-              } else if (typeof nextStop === "string") {
-                nextStopName = nextStop;
+              // 沒有路線數據，使用站點列表
+              const nextStopName = getNextStationFromCompleted(stations, completedStops);
+              if (nextStopName) {
+                updateNextStop(nextStopName);
+              } else {
+                updateNextStop("所有站點已完成");
               }
-              updateNextStop(nextStopName);
             } else {
               updateNextStop("未知");
             }
@@ -2978,6 +3007,9 @@ function initLiveLocation(mount) {
             // 優先使用Firebase中的current_trip_station
             if (nextStationFromFirebase) {
               updateNextStop(nextStationFromFirebase);
+            } else if (route && route.stops && route.stops.length > 0) {
+              const nextStopName = getNextStationFromCompleted(route.stops, completedStops);
+              updateNextStop(nextStopName || "未知");
             } else {
               const nextStopName = stations.length > 0 ? (typeof stations[0] === "object" && stations[0].name ? stations[0].name : stations[0] || "未知") : "未知";
               updateNextStop(nextStopName);
@@ -2986,6 +3018,9 @@ function initLiveLocation(mount) {
         } else if (nextStationFromFirebase) {
           // 優先使用Firebase中的current_trip_station
           updateNextStop(nextStationFromFirebase);
+        } else if (route && route.stops && route.stops.length > 0) {
+          const nextStopName = getNextStationFromCompleted(route.stops, completedStops);
+          updateNextStop(nextStopName || "未知");
         } else if (stations.length > 0) {
           const nextStopName = typeof stations[0] === "object" && stations[0].name ? stations[0].name : (stations[0] || "未知");
           updateNextStop(nextStopName);
@@ -3161,21 +3196,27 @@ function initLiveLocation(mount) {
   }
   
   // 刷新按鈕點擊事件（手機版和電腦版）
+  const handleManualRefresh = async () => {
+    const now = Date.now();
+    if (now - lastManualRefreshTime < MANUAL_REFRESH_COOLDOWN) {
+      // 顯示提示
+      const remaining = Math.ceil((MANUAL_REFRESH_COOLDOWN - (now - lastManualRefreshTime)) / 1000);
+      if (statusText) statusText.textContent = `請稍候 ${remaining} 秒後再刷新`;
+      if (statusTextDesktop) statusTextDesktop.textContent = `請稍候 ${remaining} 秒後再刷新`;
+      return;
+    }
+    lastManualRefreshTime = now;
+    await fetchLocation();
+    if (currentTripData) {
+      await drawRoute(currentTripData);
+    }
+  };
+  
   if (btnRefresh) {
-    btnRefresh.addEventListener("click", async () => {
-      await fetchLocation();
-      if (currentTripData) {
-        await drawRoute(currentTripData);
-      }
-    });
+    btnRefresh.addEventListener("click", handleManualRefresh);
   }
   if (btnRefreshDesktop) {
-    btnRefreshDesktop.addEventListener("click", async () => {
-      await fetchLocation();
-      if (currentTripData) {
-        await drawRoute(currentTripData);
-      }
-    });
+    btnRefreshDesktop.addEventListener("click", handleManualRefresh);
   }
 }
 
@@ -3262,4 +3303,4 @@ function isExpiredByCarDateTime(carDateTime) {
     const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
     return tripTime < Date.now();
   } catch (e) { return true; }
-    }
+                                  }
