@@ -385,17 +385,22 @@ const nameRegex = /^[\u4e00-\u9fa5a-zA-Z\s]*$/;
 function validateName(input) {
   const value = input.value || "";
   const nameErr = document.getElementById("nameErr");
+  // 自動過濾非法字符（即時處理，不顯示錯誤）
   if (!nameRegex.test(value)) {
     input.value = value.replace(/[^\u4e00-\u9fa5a-zA-Z\s]/g, "");
+  }
+  // 錯誤提示只在失去焦點時顯示
+}
+
+function validateNameOnBlur(input) {
+  const value = input.value || "";
+  const nameErr = document.getElementById("nameErr");
+  if (!value.trim()) {
     nameErr.textContent = t("errName");
     nameErr.style.display = "block";
     shake(input);
     input.style.borderColor = "#b00020";
-    setTimeout(() => {
-      input.style.borderColor = "#ddd";
-      nameErr.style.display = "none";
-    }, 2000);
-  } else if (!value.trim()) {
+  } else if (!nameRegex.test(value)) {
     nameErr.textContent = t("errName");
     nameErr.style.display = "block";
     shake(input);
@@ -421,6 +426,13 @@ function validatePhone(input) {
 }
 
 function validateEmail(input) {
+  // 輸入時不驗證，只清除之前的錯誤
+  const emailErr = document.getElementById("emailErr");
+  emailErr.style.display = "none";
+  input.style.borderColor = "#ddd";
+}
+
+function validateEmailOnBlur(input) {
   const value = input.value || "";
   const emailErr = document.getElementById("emailErr");
   if (!emailRegex.test(value)) {
@@ -2320,7 +2332,31 @@ function initLiveLocation(mount) {
   
   // 手動刷新速率限制
   let lastManualRefreshTime = 0;
+  let refreshCountdownTimer = null;
   const MANUAL_REFRESH_COOLDOWN = 30 * 1000; // 30秒
+  
+  // 更新刷新按鈕狀態的函數
+  const updateRefreshButton = (enabled, countdown = 0) => {
+    const updateButton = (btn, text) => {
+      if (btn) {
+        if (enabled) {
+          btn.disabled = false;
+          btn.style.opacity = "1";
+          btn.style.cursor = "pointer";
+          btn.style.background = "#fff";
+          btn.textContent = text || "刷新";
+        } else {
+          btn.disabled = true;
+          btn.style.opacity = "0.5";
+          btn.style.cursor = "not-allowed";
+          btn.style.background = "#f0f0f0";
+          btn.textContent = countdown > 0 ? `刷新 (${countdown}秒)` : "刷新";
+        }
+      }
+    };
+    updateButton(btnRefresh, countdown > 0 ? `刷新 (${countdown}秒)` : "刷新");
+    updateButton(btnRefreshDesktop, countdown > 0 ? `刷新 (${countdown}秒)` : "刷新");
+  };
   
   // 更新狀態的輔助函數（同時更新手機版和電腦版）
   const updateStatus = (color, text) => {
@@ -2373,149 +2409,9 @@ function initLiveLocation(mount) {
   let map, marker, mainPolyline, walkedPolyline, stationMarkers = [];
   let currentTripData = null;
   let isInitialized = false;
-  let pulseMarker = null; // 光子動畫標記（主標記）
-  let pulseMarkerLayers = []; // 光子動畫多層標記陣列
-  let pulseAnimation = null; // 光子動畫定時器
   let markerCircle = null; // 司機位置圓形外圈
   
-  // 光子動畫函數：沿著路線移動
-  const animatePulseAlongPath = (path) => {
-    if (!path || path.length < 2) {
-      // 清除所有層的標記
-      if (pulseMarker) {
-        pulseMarker.setMap(null);
-        pulseMarker = null;
-      }
-      pulseMarkerLayers.forEach(layer => {
-        if (layer) layer.setMap(null);
-      });
-      pulseMarkerLayers = [];
-      return;
-    }
-    
-    // 清除舊的動畫
-    if (pulseAnimation) {
-      clearInterval(pulseAnimation);
-      pulseAnimation = null;
-    }
-    
-    let currentIndex = 0;
-    const totalDistance = path.length - 1;
-    const duration = 1200; // 1.2秒完成一次循環（加快速度）
-    const interval = 30; // 每30ms更新一次（更流暢）
-    const steps = duration / interval;
-    
-    // 創建光子標記（如果不存在）- 泛白光、光芒效果
-    if (!pulseMarker || pulseMarkerLayers.length === 0) {
-      // 清除舊的標記
-      if (pulseMarker) {
-        pulseMarker.setMap(null);
-      }
-      pulseMarkerLayers.forEach(layer => {
-        if (layer) layer.setMap(null);
-      });
-      pulseMarkerLayers = [];
-      
-      // 創建外層圓形（光芒效果）
-      pulseMarker = new google.maps.Marker({
-        map: map,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 12, // 外層大圓（光芒效果）
-          fillColor: "#FFFFFF",
-          fillOpacity: 0.4, // 外層低透明度
-          strokeColor: "#FFFFFF",
-          strokeWeight: 3,
-          strokeOpacity: 0.6
-        },
-        zIndex: 100
-      });
-      
-      // 創建中層圓形（增強光芒效果）
-      const pulseMarkerMiddle = new google.maps.Marker({
-        map: map,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 8, // 中層圓
-          fillColor: "#FFFFFF",
-          fillOpacity: 0.7,
-          strokeColor: "#FFFFFF",
-          strokeWeight: 2,
-          strokeOpacity: 0.8
-        },
-        zIndex: 101
-      });
-      
-      // 創建內層圓形（核心）
-      const pulseMarkerInner = new google.maps.Marker({
-        map: map,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 5, // 內層小圓
-          fillColor: "#FFFFFF",
-          fillOpacity: 1.0,
-          strokeColor: "#FFFFFF",
-          strokeWeight: 1,
-          strokeOpacity: 1.0
-        },
-        zIndex: 102
-      });
-      
-      // 將多層標記存儲到陣列
-      pulseMarkerLayers = [pulseMarkerMiddle, pulseMarkerInner];
-    }
-    
-    // 計算兩點間距離
-    const getDistance = (p1, p2) => {
-      const lat1 = typeof p1.lat === 'function' ? p1.lat() : p1.lat;
-      const lng1 = typeof p1.lng === 'function' ? p1.lng() : p1.lng;
-      const lat2 = typeof p2.lat === 'function' ? p2.lat() : p2.lat;
-      const lng2 = typeof p2.lng === 'function' ? p2.lng() : p2.lng;
-      return Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2));
-    };
-    
-    // 在兩點間插值
-    const interpolate = (p1, p2, fraction) => {
-      const lat1 = typeof p1.lat === 'function' ? p1.lat() : p1.lat;
-      const lng1 = typeof p1.lng === 'function' ? p1.lng() : p1.lng;
-      const lat2 = typeof p2.lat === 'function' ? p2.lat() : p2.lat;
-      const lng2 = typeof p2.lng === 'function' ? p2.lng() : p2.lng;
-      return {
-        lat: lat1 + (lat2 - lat1) * fraction,
-        lng: lng1 + (lng2 - lng1) * fraction
-      };
-    };
-    
-    let step = 0;
-    pulseAnimation = setInterval(() => {
-      if (currentIndex >= path.length - 1) {
-        currentIndex = 0;
-        step = 0;
-      }
-      
-      const p1 = path[currentIndex];
-      const p2 = path[currentIndex + 1];
-      const fraction = step / steps;
-      
-      if (fraction >= 1) {
-        currentIndex++;
-        step = 0;
-        if (currentIndex >= path.length - 1) {
-          currentIndex = 0;
-        }
-      } else {
-        const position = interpolate(p1, p2, fraction);
-        // 更新所有層的位置
-        if (pulseMarker) {
-          pulseMarker.setPosition(position);
-        }
-        pulseMarkerLayers.forEach(layer => {
-          if (layer) layer.setPosition(position);
-        });
-        step++;
-      }
-    }, interval);
-  };
+  // 光子動畫已移除
   const ensureFirebase = async () => {
     if (!cfg.fbdb || !cfg.fbkey) return false;
     // 動態載入 Firebase SDK
@@ -2631,12 +2527,29 @@ function initLiveLocation(mount) {
           if (displayStops.length > 0) {
             const hotelBackCoord = stationCoords["福泰大飯店(回) Forte Hotel (Back)"];
             if (hotelBackCoord) {
-              // 強制將最後一站設為回程飯店
-              displayStops[displayStops.length - 1] = { 
-                name: "福泰大飯店(回) Forte Hotel (Back)", 
-                lat: hotelBackCoord.lat, 
-                lng: hotelBackCoord.lng 
-              };
+              // 檢查最後一站是否已經是飯店
+              const lastStop = displayStops[displayStops.length - 1];
+              const isLastStopHotel = lastStop && (
+                (typeof lastStop === "object" && lastStop.lat === hotelBackCoord.lat && lastStop.lng === hotelBackCoord.lng) ||
+                (typeof lastStop === "string" && (lastStop.includes("福泰") || lastStop.includes("Forte Hotel"))) ||
+                (typeof lastStop === "object" && lastStop.name && (lastStop.name.includes("福泰") || lastStop.name.includes("Forte Hotel")))
+              );
+              
+              // 如果最後一站不是飯店，強制添加飯店作為最後一站
+              if (!isLastStopHotel) {
+                displayStops.push({ 
+                  name: "福泰大飯店(回) Forte Hotel (Back)", 
+                  lat: hotelBackCoord.lat, 
+                  lng: hotelBackCoord.lng 
+                });
+              } else {
+                // 如果最後一站是飯店，確保座標正確
+                displayStops[displayStops.length - 1] = { 
+                  name: "福泰大飯店(回) Forte Hotel (Back)", 
+                  lat: hotelBackCoord.lat, 
+                  lng: hotelBackCoord.lng 
+                };
+              }
             }
             
             // 使用 Google Directions API 生成路線
@@ -2657,13 +2570,30 @@ function initLiveLocation(mount) {
       // 確保路線終點固定為飯店（寫死邏輯）
       let displayStops = [...stops];
       const hotelBackCoord = stationCoords["福泰大飯店(回) Forte Hotel (Back)"];
-      if (hotelBackCoord && displayStops.length > 0) {
-        // 強制將最後一站設為回程飯店
-        displayStops[displayStops.length - 1] = { 
-          name: "福泰大飯店(回) Forte Hotel (Back)", 
-          lat: hotelBackCoord.lat, 
-          lng: hotelBackCoord.lng 
-        };
+      if (hotelBackCoord) {
+        // 檢查最後一站是否已經是飯店
+        const lastStop = displayStops.length > 0 ? displayStops[displayStops.length - 1] : null;
+        const isLastStopHotel = lastStop && (
+          (typeof lastStop === "object" && lastStop.lat === hotelBackCoord.lat && lastStop.lng === hotelBackCoord.lng) ||
+          (typeof lastStop === "string" && (lastStop.includes("福泰") || lastStop.includes("Forte Hotel"))) ||
+          (typeof lastStop === "object" && lastStop.name && (lastStop.name.includes("福泰") || lastStop.name.includes("Forte Hotel")))
+        );
+        
+        // 如果最後一站不是飯店，強制添加飯店作為最後一站
+        if (!isLastStopHotel) {
+          displayStops.push({ 
+            name: "福泰大飯店(回) Forte Hotel (Back)", 
+            lat: hotelBackCoord.lat, 
+            lng: hotelBackCoord.lng 
+          });
+        } else if (displayStops.length > 0) {
+          // 如果最後一站是飯店，確保座標正確
+          displayStops[displayStops.length - 1] = { 
+            name: "福泰大飯店(回) Forte Hotel (Back)", 
+            lat: hotelBackCoord.lat, 
+            lng: hotelBackCoord.lng 
+          };
+        }
       }
       
       // 將站點名稱轉換為座標對象
@@ -2855,10 +2785,6 @@ function initLiveLocation(mount) {
           marker.setPosition(pos);
           map.panTo(pos);
         }
-        // 更新接駁車圖示標記位置
-        if (busIconMarker) {
-          busIconMarker.setPosition(pos);
-        }
         // 更新圓形外圈位置
         if (markerCircle) {
           markerCircle.setCenter(pos);
@@ -2925,23 +2851,7 @@ function initLiveLocation(mount) {
             zIndex: 2
           });
           
-          // 光子動畫：沿著未走過的路線移動
-          if (lastCompletedIndex < path.length - 1) {
-            const remainingPath = path.slice(lastCompletedIndex);
-            animatePulseAlongPath(remainingPath);
-          } else {
-            // 路線已完成，移除光子
-            if (pulseMarker) {
-              pulseMarker.setMap(null);
-              pulseMarker = null;
-            }
-            if (pulseMarkerLayers && pulseMarkerLayers.length > 0) {
-              pulseMarkerLayers.forEach(layer => {
-                if (layer) layer.setMap(null);
-              });
-              pulseMarkerLayers = [];
-            }
-          }
+          // 光子動畫已移除，不再顯示
         }
         
         updateStatus("#28a745", "良好");
@@ -3108,36 +3018,66 @@ function initLiveLocation(mount) {
       styles: mapStyles
     });
     
-    // 創建司機位置標記（圓形顯示）
-    // 使用圓形標記作為背景
+    // 創建司機位置標記（圓形logo，使用Canvas裁切成圓形）
+    // 創建圓形裁切的圖示
+    const createCircularIcon = () => {
+      return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 40;
+        canvas.height = 40;
+        const ctx = canvas.getContext('2d');
+        
+        // 創建圓形裁剪路徑
+        ctx.beginPath();
+        ctx.arc(20, 20, 20, 0, 2 * Math.PI);
+        ctx.clip();
+        
+        // 載入圖片並繪製到圓形區域
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          // 繪製圖片到圓形區域
+          ctx.drawImage(img, 0, 0, 40, 40);
+          // 繪製圓形邊框
+          ctx.beginPath();
+          ctx.arc(20, 20, 20, 0, 2 * Math.PI);
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 3;
+          ctx.stroke();
+          
+          const dataUrl = canvas.toDataURL();
+          resolve({
+            url: dataUrl,
+            scaledSize: new google.maps.Size(40, 40),
+            anchor: new google.maps.Point(20, 20)
+          });
+        };
+        img.onerror = () => {
+          // 如果圖片載入失敗，使用默認圓形標記
+          ctx.fillStyle = '#4285F4';
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 3;
+          ctx.stroke();
+          const dataUrl = canvas.toDataURL();
+          resolve({
+            url: dataUrl,
+            scaledSize: new google.maps.Size(40, 40),
+            anchor: new google.maps.Point(20, 20)
+          });
+        };
+        img.src = '/images/接駁車圖示.png';
+      });
+    };
+    
+    // 創建圓形裁切的接駁車圖示
+    const circularIcon = await createCircularIcon();
     marker = new google.maps.Marker({ 
       position: { lat: 25.055550556928008, lng: 121.63210245291367 }, 
       map, 
       title: "司機位置",
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 20,
-        fillColor: "#4285F4",
-        fillOpacity: 1,
-        strokeColor: "#fff",
-        strokeWeight: 3
-      },
+      icon: circularIcon,
       zIndex: 10
-    });
-    
-    // 在圓形標記上方疊加接駁車圖示
-    const busImageIcon = {
-      url: '/images/接駁車圖示.png',
-      scaledSize: new google.maps.Size(28, 28),
-      anchor: new google.maps.Point(14, 14)
-    };
-    
-    busIconMarker = new google.maps.Marker({
-      position: { lat: 25.055550556928008, lng: 121.63210245291367 },
-      map,
-      icon: busImageIcon,
-      zIndex: 11,
-      optimized: false
     });
     
     // 添加圓形外圈效果
@@ -3199,13 +3139,32 @@ function initLiveLocation(mount) {
   const handleManualRefresh = async () => {
     const now = Date.now();
     if (now - lastManualRefreshTime < MANUAL_REFRESH_COOLDOWN) {
-      // 顯示提示
-      const remaining = Math.ceil((MANUAL_REFRESH_COOLDOWN - (now - lastManualRefreshTime)) / 1000);
-      if (statusText) statusText.textContent = `請稍候 ${remaining} 秒後再刷新`;
-      if (statusTextDesktop) statusTextDesktop.textContent = `請稍候 ${remaining} 秒後再刷新`;
-      return;
+      return; // 按鈕已禁用，不會觸發
     }
+    
+    // 禁用按鈕並開始倒數
     lastManualRefreshTime = now;
+    updateRefreshButton(false, 30);
+    
+    // 清除舊的倒數計時器
+    if (refreshCountdownTimer) {
+      clearInterval(refreshCountdownTimer);
+    }
+    
+    // 開始倒數
+    let countdown = 30;
+    refreshCountdownTimer = setInterval(() => {
+      countdown--;
+      if (countdown > 0) {
+        updateRefreshButton(false, countdown);
+      } else {
+        clearInterval(refreshCountdownTimer);
+        refreshCountdownTimer = null;
+        updateRefreshButton(true);
+      }
+    }, 1000);
+    
+    // 執行刷新
     await fetchLocation();
     if (currentTripData) {
       await drawRoute(currentTripData);
@@ -3303,4 +3262,4 @@ function isExpiredByCarDateTime(carDateTime) {
     const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
     return tripTime < Date.now();
   } catch (e) { return true; }
-                                  }
+}
