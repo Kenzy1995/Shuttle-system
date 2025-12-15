@@ -552,7 +552,7 @@
 
       <div class="field">
         <label class="label" data-i18n="labelName">貴賓姓名<span style="color:#b00020">*</span></label>
-        <input id="guestName" type="text" class="input" oninput="validateName(this)" />
+        <input id="guestName" type="text" class="input" oninput="validateName(this)" onblur="validateNameOnBlur(this)" />
         <div id="nameErr" class="error" data-i18n="errName">限填中文或英文姓名</div>
       </div>
       <div class="field">
@@ -563,7 +563,7 @@
       </div>
       <div class="field">
         <label class="label" data-i18n="labelEmail">信箱<span style="color:#b00020">*</span></label>
-        <input id="guestEmail" type="email" class="input" placeholder="name@example.com" oninput="validateEmail(this)" />
+        <input id="guestEmail" type="email" class="input" placeholder="name@example.com" oninput="validateEmail(this)" onblur="validateEmailOnBlur(this)" />
         <div id="emailErr" class="error" data-i18n="errEmail">請填寫正確的郵箱</div>
       </div>
 
