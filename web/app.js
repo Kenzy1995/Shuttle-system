@@ -3043,10 +3043,10 @@ function initLiveLocation(mount) {
       }
     ];
     
-    // 計算地圖顯示範圍限制（方圓5公里）
+    // 計算地圖顯示範圍限制（方圓1.5公里）
     const centerLat = 25.054933909333368;
     const centerLng = 121.61876667836735;
-    const radiusKm = 5; // 5公里
+    const radiusKm = 1.5; // 1.5公里
     
     // 計算邊界（近似值：1度緯度約111公里，經度根據緯度調整）
     const latDelta = radiusKm / 111; // 緯度變化（約0.045度）
@@ -3159,7 +3159,12 @@ function initLiveLocation(mount) {
     if (currentTripData) {
       await drawRoute(currentTripData);
       // 繪製路線完成後，立即繪製已走過的路線（如果有）
-      await updateWalkedRoute(currentTripData);
+      // 從 currentTripData 中獲取司機位置
+      const driverLoc = currentTripData.driver_location;
+      const driverPos = driverLoc && typeof driverLoc.lat === "number" && typeof driverLoc.lng === "number"
+        ? { lat: driverLoc.lat, lng: driverLoc.lng }
+        : null;
+      await updateWalkedRoute(currentTripData, driverPos);
     }
   };
   
@@ -3318,4 +3323,4 @@ function isExpiredByCarDateTime(carDateTime) {
     const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
     return tripTime < Date.now();
   } catch (e) { return true; }
-}
+    }
