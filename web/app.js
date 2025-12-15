@@ -232,6 +232,17 @@ function restartMarqueeAnimation() {
   marqueeContent.style.animation = null;
 }
 
+
+function restartMarqueeAnimation() {
+  const marqueeContent = document.getElementById("marqueeContent");
+  if (!marqueeContent) return;
+
+  marqueeContent.style.animation = "none";
+  // 強迫 reflow
+  void marqueeContent.offsetHeight;
+  marqueeContent.style.animation = null;
+}
+
 /* ====== 對話框（卡片） ====== */
 function sanitize(s) {
   return String(s || "").replace(/[<>&]/g, (c) => ({
@@ -2345,6 +2356,7 @@ function initLiveLocation(mount) {
     new Promise((resolve, reject) => {
       if (!cfg.key) { 
         if (startBtn) startBtn.textContent = "缺少地圖 key";
+        reject(new Error("缺少地圖 key"));
         return; 
       }
       const s = document.createElement("script");
