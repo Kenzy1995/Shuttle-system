@@ -1293,6 +1293,22 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
             if (d in (target_date, alt_date)) and (t_raw in (t1, t2) or t_norm in (t1, t2)):
                 target_rowno = i + 1
                 break
+        
+        # 不論 GPS 是否開啟，都要更新 Sheet 的出車狀態和最後更新時間
+        if target_rowno:
+            try:
+                idx_status = hidx("出車狀態")
+                idx_last = hidx("最後更新")
+                if idx_status >= 0 and idx_last >= 0:
+                    from gspread.utils import rowcol_to_a1
+                    now_text = _tz_now().strftime("%Y/%m/%d %H:%M")
+                    update_data = [
+                        {"range": rowcol_to_a1(target_rowno, idx_status + 1), "values": [["已發車"]]},
+                        {"range": rowcol_to_a1(target_rowno, idx_last + 1), "values": [[now_text]]},
+                    ]
+                    ws2.batch_update(update_data, value_input_option="USER_ENTERED")
+            except Exception as sheet_update_error:
+                print(f"Sheet update error in trip_start: {sheet_update_error}")
         # 站點欄位（H:K）
         STATIONS = [
             "福泰大飯店 Forte Hotel",
