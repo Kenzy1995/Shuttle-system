@@ -3043,10 +3043,10 @@ function initLiveLocation(mount) {
       }
     ];
     
-    // 計算地圖顯示範圍限制（方圓1.5公里）
+    // 計算地圖顯示範圍限制（方圓4公里）
     const centerLat = 25.054933909333368;
     const centerLng = 121.61876667836735;
-    const radiusKm = 1.5; // 1.5公里
+    const radiusKm = 4; // 4公里
     
     // 計算邊界（近似值：1度緯度約111公里，經度根據緯度調整）
     const latDelta = radiusKm / 111; // 緯度變化（約0.045度）
