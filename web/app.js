@@ -2356,7 +2356,6 @@ function initLiveLocation(mount) {
     new Promise((resolve, reject) => {
       if (!cfg.key) { 
         if (startBtn) startBtn.textContent = "缺少地圖 key";
-        reject(new Error("缺少地圖 key"));
         return; 
       }
       const s = document.createElement("script");
