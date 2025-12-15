@@ -2662,6 +2662,7 @@ function initLiveLocation(mount) {
       const stations = data.current_trip_stations?.stops || [];
       const tripDateTime = data.current_trip_datetime;
       const route = data.current_trip_route;
+      const nextStationFromFirebase = data.current_trip_station || "";  // 從Firebase讀取即將前往的站點
       if (nextStopNameEl) {
         if (tripDateTime) {
           // 解析班次時間
