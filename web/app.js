@@ -383,32 +383,42 @@ const roomRegex =
 const nameRegex = /^[\u4e00-\u9fa5a-zA-Z\s]*$/;
 
 function validateName(input) {
-  const value = input.value || "";
+  // 輸入時只清除錯誤提示，允許輸入任何文字，不過濾字符
   const nameErr = document.getElementById("nameErr");
-  // 自動過濾非法字符（即時處理，不顯示錯誤）
-  if (!nameRegex.test(value)) {
-    input.value = value.replace(/[^\u4e00-\u9fa5a-zA-Z\s]/g, "");
+  if (nameErr) {
+    nameErr.style.display = "none";
   }
-  // 錯誤提示只在失去焦點時顯示
+  // 恢復邊框顏色（如果之前有錯誤）
+  if (input.style.borderColor === "#b00020") {
+    input.style.borderColor = "#ddd";
+  }
 }
 
 function validateNameOnBlur(input) {
   const value = input.value || "";
   const nameErr = document.getElementById("nameErr");
+  
+  // 檢查是否為空
   if (!value.trim()) {
     nameErr.textContent = t("errName");
     nameErr.style.display = "block";
     shake(input);
     input.style.borderColor = "#b00020";
-  } else if (!nameRegex.test(value)) {
+    return;
+  }
+  
+  // 檢查是否符合規則（只允許中文、英文、空格）
+  if (!nameRegex.test(value)) {
     nameErr.textContent = t("errName");
     nameErr.style.display = "block";
     shake(input);
     input.style.borderColor = "#b00020";
-  } else {
-    nameErr.style.display = "none";
-    input.style.borderColor = "#ddd";
+    return;
   }
+  
+  // 驗證通過，清除錯誤
+  nameErr.style.display = "none";
+  input.style.borderColor = "#ddd";
 }
 
 function validatePhone(input) {
@@ -2386,6 +2396,72 @@ function initLiveLocation(mount) {
     if (nextStopNameEl) nextStopNameEl.textContent = displayText;
     if (nextStopNameElDesktop) nextStopNameElDesktop.textContent = displayText;
   };
+  
+  // 更新已走過的路線（基於已到達站點列表或司機位置）
+  const updateWalkedRoute = async (data, driverPos = null) => {
+    if (!mainPolyline || !data.current_trip_route || !data.current_trip_route.stops) {
+      return;
+    }
+    
+    const path = mainPolyline.getPath().getArray();
+    const completedStops = data.current_trip_completed_stops || [];
+    const routeStops = data.current_trip_route.stops;
+    
+    // 找到最後一個已到達站點在路線中的位置
+    let lastCompletedIndex = 0;
+    if (completedStops.length > 0) {
+      // 找到最後一個已到達站點
+      let lastCompletedStop = null;
+      for (let i = routeStops.length - 1; i >= 0; i--) {
+        const stop = routeStops[i];
+        const stopName = typeof stop === "object" && stop.name ? stop.name : (typeof stop === "string" ? stop : "");
+        if (stopName && completedStops.includes(stopName)) {
+          lastCompletedStop = stop;
+          break;
+        }
+      }
+      
+      // 找到該站點在path中的對應位置
+      if (lastCompletedStop) {
+        const stopCoord = typeof lastCompletedStop === "object" && lastCompletedStop.lat ? 
+          { lat: lastCompletedStop.lat, lng: lastCompletedStop.lng } : 
+          stationCoords[lastCompletedStop.name || lastCompletedStop] || null;
+        
+        if (stopCoord) {
+          let best = Infinity;
+          for (let i = 0; i < path.length; i++) {
+            const dx = path[i].lat() - stopCoord.lat;
+            const dy = path[i].lng() - stopCoord.lng;
+            const dist = dx * dx + dy * dy;
+            if (dist < best) {
+              best = dist;
+              lastCompletedIndex = i;
+            }
+          }
+        }
+      }
+    } else if (driverPos) {
+      // 如果沒有已到達站點，使用司機位置作為參考
+      let nearestIdx = 0, best = Infinity;
+      for (let i = 0; i < path.length; i++) {
+        const dx = path[i].lat() - driverPos.lat, dy = path[i].lng() - driverPos.lng;
+        const dist = dx * dx + dy * dy;
+        if (dist < best) { best = dist; nearestIdx = i; }
+      }
+      lastCompletedIndex = nearestIdx;
+    }
+    
+    // 繪製已走過的路線（到最後一個已到達站點）
+    if (walkedPolyline) walkedPolyline.setMap(null);
+    walkedPolyline = new google.maps.Polyline({ 
+      path: path.slice(0, Math.max(1, lastCompletedIndex + 1)), 
+      strokeColor: "#28a745", // 綠色（走過的路線）
+      strokeOpacity: 1, 
+      strokeWeight: 8, 
+      map,
+      zIndex: 2
+    });
+  };
   const endedOverlay = mount.querySelector("#rt-ended-overlay");
   const endedTextEl = mount.querySelector("#rt-ended-text");
   const endedDatetimeEl = mount.querySelector("#rt-ended-datetime");
@@ -2737,6 +2813,15 @@ function initLiveLocation(mount) {
         // 如果沒有 polyline，使用 Google Directions API 生成路線
         await drawRouteFromStops(displayStops, map);
       }
+      
+      // 路線繪製完成後，立即更新已走過的路線（如果有數據）
+      if (currentTripData) {
+        const driverLoc = currentTripData.driver_location;
+        const pos = driverLoc && typeof driverLoc.lat === "number" && typeof driverLoc.lng === "number" 
+          ? { lat: driverLoc.lat, lng: driverLoc.lng } 
+          : null;
+        await updateWalkedRoute(currentTripData, pos);
+      }
     } catch (e) {
       console.error("Draw route error:", e);
     }
@@ -2803,68 +2888,7 @@ function initLiveLocation(mount) {
         }
         
         // 更新已走過的路線（基於已到達站點列表）
-        if (mainPolyline && data.current_trip_route && data.current_trip_route.stops) {
-          const path = mainPolyline.getPath().getArray();
-          const completedStops = data.current_trip_completed_stops || [];
-          const routeStops = data.current_trip_route.stops;
-          
-          // 找到最後一個已到達站點在路線中的位置
-          let lastCompletedIndex = 0;
-          if (completedStops.length > 0) {
-            // 找到最後一個已到達站點
-            let lastCompletedStop = null;
-            for (let i = routeStops.length - 1; i >= 0; i--) {
-              const stop = routeStops[i];
-              const stopName = typeof stop === "object" && stop.name ? stop.name : (typeof stop === "string" ? stop : "");
-              if (stopName && completedStops.includes(stopName)) {
-                lastCompletedStop = stop;
-                break;
-              }
-            }
-            
-            // 找到該站點在path中的對應位置
-            if (lastCompletedStop) {
-              const stopCoord = typeof lastCompletedStop === "object" && lastCompletedStop.lat ? 
-                { lat: lastCompletedStop.lat, lng: lastCompletedStop.lng } : 
-                stationCoords[lastCompletedStop.name || lastCompletedStop] || null;
-              
-              if (stopCoord) {
-                let best = Infinity;
-                for (let i = 0; i < path.length; i++) {
-                  const dx = path[i].lat() - stopCoord.lat;
-                  const dy = path[i].lng() - stopCoord.lng;
-                  const dist = dx * dx + dy * dy;
-                  if (dist < best) {
-                    best = dist;
-                    lastCompletedIndex = i;
-                  }
-                }
-              }
-            }
-          } else {
-            // 如果沒有已到達站點，使用司機位置作為參考
-            let nearestIdx = 0, best = Infinity;
-            for (let i = 0; i < path.length; i++) {
-              const dx = path[i].lat() - pos.lat, dy = path[i].lng() - pos.lng;
-              const dist = dx * dx + dy * dy;
-              if (dist < best) { best = dist; nearestIdx = i; }
-            }
-            lastCompletedIndex = nearestIdx;
-          }
-          
-          // 繪製已走過的路線（到最後一個已到達站點）
-          if (walkedPolyline) walkedPolyline.setMap(null);
-          walkedPolyline = new google.maps.Polyline({ 
-            path: path.slice(0, Math.max(1, lastCompletedIndex + 1)), 
-            strokeColor: "#28a745", // 綠色（走過的路線）
-            strokeOpacity: 1, 
-            strokeWeight: 8, 
-            map,
-            zIndex: 2
-          });
-          
-          // 光子動畫已移除，不再顯示
-        }
+        await updateWalkedRoute(data, pos);
         
         updateStatus("#28a745", "良好");
       } else {
@@ -3019,6 +3043,20 @@ function initLiveLocation(mount) {
       }
     ];
     
+    // 計算地圖顯示範圍限制（方圓5公里）
+    const centerLat = 25.054933909333368;
+    const centerLng = 121.61876667836735;
+    const radiusKm = 5; // 5公里
+    
+    // 計算邊界（近似值：1度緯度約111公里，經度根據緯度調整）
+    const latDelta = radiusKm / 111; // 緯度變化（約0.045度）
+    const lngDelta = radiusKm / (111 * Math.cos(centerLat * Math.PI / 180)); // 經度變化（考慮緯度）
+    
+    const restrictionBounds = new google.maps.LatLngBounds(
+      { lat: centerLat - latDelta, lng: centerLng - lngDelta }, // 西南角
+      { lat: centerLat + latDelta, lng: centerLng + lngDelta }   // 東北角
+    );
+    
     // 初始化地圖
     map = new google.maps.Map(mapEl, { 
       center: { lat: 25.055550556928008, lng: 121.63210245291367 }, 
@@ -3027,7 +3065,11 @@ function initLiveLocation(mount) {
       zoomControl: true, 
       mapTypeControl: false, 
       streetViewControl: false,
-      styles: mapStyles
+      styles: mapStyles,
+      restriction: {
+        latLngBounds: restrictionBounds,
+        strictBounds: true // 嚴格限制，不允許拖動到邊界外
+      }
     });
     
     // 創建司機位置標記（圓形logo，使用Canvas裁切成圓形）
@@ -3116,6 +3158,8 @@ function initLiveLocation(mount) {
     await fetchLocation();
     if (currentTripData) {
       await drawRoute(currentTripData);
+      // 繪製路線完成後，立即繪製已走過的路線（如果有）
+      await updateWalkedRoute(currentTripData);
     }
   };
   
@@ -3274,4 +3318,4 @@ function isExpiredByCarDateTime(carDateTime) {
     const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
     return tripTime < Date.now();
   } catch (e) { return true; }
-        }
+}
