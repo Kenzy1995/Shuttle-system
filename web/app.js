@@ -232,6 +232,17 @@ function restartMarqueeAnimation() {
   marqueeContent.style.animation = null;
 }
 
+
+function restartMarqueeAnimation() {
+  const marqueeContent = document.getElementById("marqueeContent");
+  if (!marqueeContent) return;
+
+  marqueeContent.style.animation = "none";
+  // 強迫 reflow
+  void marqueeContent.offsetHeight;
+  marqueeContent.style.animation = null;
+}
+
 /* ====== 對話框（卡片） ====== */
 function sanitize(s) {
   return String(s || "").replace(/[<>&]/g, (c) => ({
@@ -2903,27 +2914,3 @@ document.addEventListener("DOMContentLoaded", () => {
 
 window.addEventListener("scroll", handleScroll, { passive: true });
 window.addEventListener("resize", handleScroll, { passive: true });
-
-/* ====== 解析/過期判斷 (查詢頁用) ====== */
-function getDateFromCarDateTime(carDateTime) {
-  if (!carDateTime) return "";
-  const parts = String(carDateTime).split(' ');
-  if (parts.length < 1) return "";
-  const datePart = parts[0];
-  return datePart.replace(/\//g, '-');
-}
-function getTimeFromCarDateTime(carDateTime) {
-  if (!carDateTime) return "00:00";
-  const parts = String(carDateTime).split(' ');
-  return parts.length > 1 ? parts[1] : "00:00";
-}
-function isExpiredByCarDateTime(carDateTime) {
-  if (!carDateTime) return true;
-  try {
-    const [datePart, timePart] = String(carDateTime).split(' ');
-    const [year, month, day] = datePart.split('/').map(Number);
-    const [hour, minute] = timePart.split(':').map(Number);
-    const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
-    return tripTime < Date.now();
-  } catch (e) { return true; }
-}
