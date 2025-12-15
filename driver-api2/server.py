@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import os
 import time
 from datetime import datetime, timedelta
@@ -782,9 +783,97 @@ def update_driver_location(loc: DriverLocation):
                 location_data["trip_id"] = loc.trip_id
             ref.set(location_data)
             # print(f"Firebase write success: {loc.lat}, {loc.lng}")
+            
+            # 站點到達檢測：當司機距離站點 < 50公尺時，自動標記為已到達
+            if loc.trip_id:
+                try:
+                    check_station_arrival(loc.lat, loc.lng, loc.trip_id)
+                except Exception as arrival_error:
+                    print(f"Station arrival check error: {arrival_error}")
     except Exception as e:
         print(f"Firebase write error: {e}")
     return {"status": "ok", "received": loc}
+
+
+def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """
+    計算兩點之間的距離（公尺），使用 Haversine 公式
+    """
+    import math
+    R = 6371000  # 地球半徑（公尺）
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+    
+    a = math.sin(delta_phi / 2) ** 2 + \
+        math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    
+    return R * c
+
+
+def check_station_arrival(lat: float, lng: float, trip_id: str):
+    """
+    檢查司機是否到達某個站點，如果距離 < 50公尺，自動標記為已到達
+    """
+    if not firebase_admin._apps:
+        return
+    
+    try:
+        # 從Firebase讀取路線和已到達站點
+        route_ref = db.reference(f"/trip/{trip_id}/route")
+        route_data = route_ref.get()
+        if not route_data or "stops" not in route_data:
+            return
+        
+        completed_stops_ref = db.reference("/current_trip_completed_stops")
+        completed_stops = completed_stops_ref.get() or []
+        
+        stops = route_data["stops"]
+        STATION_ARRIVAL_DISTANCE = 50  # 50公尺
+        
+        # 檢查每個未到達的站點
+        for stop in stops:
+            stop_name = stop.get("name", "")
+            # 跳過已到達的站點
+            if stop_name in completed_stops:
+                continue
+            
+            stop_lat = stop.get("lat")
+            stop_lng = stop.get("lng")
+            if stop_lat is None or stop_lng is None:
+                continue
+            
+            # 計算距離
+            distance = haversine_distance(lat, lng, stop_lat, stop_lng)
+            
+            if distance < STATION_ARRIVAL_DISTANCE:
+                # 標記為已到達
+                if stop_name not in completed_stops:
+                    completed_stops.append(stop_name)
+                    completed_stops_ref.set(completed_stops)
+                    print(f"Station arrived: {stop_name} (distance: {distance:.1f}m)")
+                
+                # 更新下一站
+                next_stop = get_next_station(stops, completed_stops)
+                if next_stop:
+                    db.reference("/current_trip_station").set(next_stop)
+                
+                break  # 一次只標記一個站點
+    except Exception as e:
+        print(f"Station arrival check error: {e}")
+
+
+def get_next_station(stops: list, completed_stops: list) -> str:
+    """
+    根據已到達站點列表，返回下一個未到達的站點
+    """
+    for stop in stops:
+        stop_name = stop.get("name", "")
+        if stop_name and stop_name not in completed_stops:
+            return stop_name
+    return ""  # 所有站點都已完成
 
 
 @app.get("/api/driver/location")
@@ -1303,6 +1392,10 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
     except Exception as sheet_update_error:
         print(f"Sheet update error in trip_start: {sheet_update_error}")
     
+    # 檢查是否為櫃台人員：櫃台人員只更新Sheet，不寫入Firebase
+    if req.driver_role == 'desk':
+        return GoogleTripStartResponse(trip_id=trip_id, share_url=None, stops=None)
+    
     # 系統啟用旗標：系統!E19 為 TRUE 才啟用追蹤（僅影響 Firebase 寫入，不影響 Sheet 更新）
     try:
         ws = open_ws(SHEET_NAME_SYSTEM)
@@ -1509,10 +1602,17 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
             ref.set(payload)
             # 寫入目前班次 ID、狀態、日期時間、路線和站點信息，供乘客端直接讀取
             try:
+                import time
                 db.reference("/current_trip_id").set(trip_id)
                 db.reference("/current_trip_status").set("active")
                 db.reference("/current_trip_datetime").set(req.main_datetime)
                 db.reference("/current_trip_route").set(payload)
+                # 寫入GPS系統總開關狀態
+                db.reference("/gps_system_enabled").set(enabled)
+                # 寫入發車時間戳（毫秒）
+                db.reference("/current_trip_start_time").set(int(time.time() * 1000))
+                # 初始化已到達站點列表
+                db.reference("/current_trip_completed_stops").set([])
                 # 寫入站點信息（哪些站點會停靠）
                 stations_info = {
                     "stops": stops_names,
@@ -1704,9 +1804,9 @@ class UpdateStationRequest(BaseModel):
 
 @app.post("/api/driver/update_station")
 def api_driver_update_station(req: UpdateStationRequest):
-    """?�新?��??��??��?點到Firebase"""
+    """? 新?  ??  ??  ?點到Firebase"""
     if not req.trip_id or not req.current_station:
-        raise HTTPException(status_code=400, detail="缺�? trip_id ??current_station")
+        raise HTTPException(status_code=400, detail="缺 ? trip_id ??current_station")
     try:
         if not firebase_admin._apps:
             service_account_path = "service_account.json"
@@ -1723,4 +1823,4 @@ def api_driver_update_station(req: UpdateStationRequest):
         return {"status": "success", "current_station": req.current_station}
     except Exception as e:
         print(f"Firebase update station error: {e}")
-        raise HTTPException(status_code=500, detail=f"?�新站�?失�?: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"? 新站 ?失 ?: {str(e)}")
