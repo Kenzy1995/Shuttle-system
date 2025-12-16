@@ -2598,13 +2598,13 @@ function initLiveLocation(mount) {
     await new Promise((resolve, reject) => {
       if (window.firebase && firebase.app) { resolve(); return; }
       const s = document.createElement("script");
-      s.src = "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+      s.src = "https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";
       s.onload = resolve; s.onerror = reject; document.head.appendChild(s);
     });
     await new Promise((resolve, reject) => {
       if (window.firebase && firebase.database) { resolve(); return; }
       const s = document.createElement("script");
-      s.src = "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+      s.src = "https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js";
       s.onload = resolve; s.onerror = reject; document.head.appendChild(s);
     });
     try {
