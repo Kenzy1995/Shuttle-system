@@ -816,34 +816,50 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 def check_station_arrival(lat: float, lng: float, trip_id: str):
     """
     檢查司機是否到達某個站點，如果距離 < 50公尺，自動標記為已到達
+    只檢查該班次實際會停靠的站點（從 current_trip_stations 讀取）
     """
     if not firebase_admin._apps:
         return
     
     try:
-        # 從Firebase讀取路線和已到達站點
-        route_ref = db.reference(f"/trip/{trip_id}/route")
-        route_data = route_ref.get()
-        if not route_data or "stops" not in route_data:
+        # 從Firebase讀取實際會停靠的站點列表（只包含有乘客的站點）
+        stations_info_ref = db.reference("/current_trip_stations")
+        stations_info = stations_info_ref.get()
+        if not stations_info or "stops" not in stations_info:
             return
+        
+        # 獲取實際會停靠的站點名稱列表
+        actual_stops_names = stations_info.get("stops", [])
+        if not actual_stops_names:
+            return
+        
+        # 站點座標映射（與 trip_start 中的 COORDS 一致）
+        STATION_COORDS = {
+            "福泰大飯店 Forte Hotel": {"lat": 25.054964953523683, "lng": 121.63077275881052},
+            "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": {"lat": 25.055017007293404, "lng": 121.61818547695053},
+            "南港火車站 Nangang Train Station": {"lat": 25.052822671279454, "lng": 121.60771823129633},
+            "LaLaport Shopping Park": {"lat": 25.05629820919232, "lng": 121.61700981622211},
+            "福泰大飯店(回) Forte Hotel (Back)": {"lat": 25.054800375417987, "lng": 121.63117576557792},
+        }
         
         completed_stops_ref = db.reference("/current_trip_completed_stops")
         completed_stops = completed_stops_ref.get() or []
         
-        stops = route_data["stops"]
         STATION_ARRIVAL_DISTANCE = 50  # 50公尺
         
-        # 檢查每個未到達的站點
-        for stop in stops:
-            stop_name = stop.get("name", "")
+        # 只檢查實際會停靠的站點
+        for stop_name in actual_stops_names:
             # 跳過已到達的站點
             if stop_name in completed_stops:
                 continue
             
-            stop_lat = stop.get("lat")
-            stop_lng = stop.get("lng")
-            if stop_lat is None or stop_lng is None:
+            # 獲取站點座標
+            stop_coord = STATION_COORDS.get(stop_name)
+            if not stop_coord:
                 continue
+            
+            stop_lat = stop_coord["lat"]
+            stop_lng = stop_coord["lng"]
             
             # 計算距離
             distance = haversine_distance(lat, lng, stop_lat, stop_lng)
@@ -855,8 +871,8 @@ def check_station_arrival(lat: float, lng: float, trip_id: str):
                     completed_stops_ref.set(completed_stops)
                     print(f"Station arrived: {stop_name} (distance: {distance:.1f}m)")
                 
-                # 更新下一站
-                next_stop = get_next_station(stops, completed_stops)
+                # 更新下一站（只從實際會停靠的站點中選擇）
+                next_stop = get_next_station(actual_stops_names, completed_stops)
                 if next_stop:
                     db.reference("/current_trip_station").set(next_stop)
                 
@@ -868,9 +884,12 @@ def check_station_arrival(lat: float, lng: float, trip_id: str):
 def get_next_station(stops: list, completed_stops: list) -> str:
     """
     根據已到達站點列表，返回下一個未到達的站點
+    stops: 站點名稱列表（字符串列表）或站點對象列表
+    completed_stops: 已到達的站點名稱列表
     """
     for stop in stops:
-        stop_name = stop.get("name", "")
+        # 處理字符串列表或對象列表
+        stop_name = stop if isinstance(stop, str) else stop.get("name", "")
         if stop_name and stop_name not in completed_stops:
             return stop_name
     return ""  # 所有站點都已完成
