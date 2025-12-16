@@ -1194,7 +1194,12 @@ function isExpiredByCarDateTime(carDateTime) {
     const [year, month, day] = datePart.split("/").map(Number);
     const [hour, minute] = timePart.split(":").map(Number);
     const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
-    return tripTime < Date.now();
+    const now = Date.now();
+    const ONE_HOUR_MS = 60 * 60 * 1000; // 一小時的毫秒數
+    // 只有當班次時間超過一小時才標記為已過期
+    // 邏輯：tripTime < (now - ONE_HOUR_MS) 表示班次時間早於（現在時間 - 1小時）
+    // 也就是說，班次時間已經超過1小時了
+    return tripTime < (now - ONE_HOUR_MS);
   } catch (e) {
     return true;
   }
@@ -3565,6 +3570,11 @@ function isExpiredByCarDateTime(carDateTime) {
     const [year, month, day] = datePart.split('/').map(Number);
     const [hour, minute] = timePart.split(':').map(Number);
     const tripTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
-    return tripTime < Date.now();
+    const now = Date.now();
+    const ONE_HOUR_MS = 60 * 60 * 1000; // 一小時的毫秒數
+    // 只有當班次時間超過一小時才標記為已過期
+    // 邏輯：tripTime < (now - ONE_HOUR_MS) 表示班次時間早於（現在時間 - 1小時）
+    // 也就是說，班次時間已經超過1小時了
+    return tripTime < (now - ONE_HOUR_MS);
   } catch (e) { return true; }
 }
