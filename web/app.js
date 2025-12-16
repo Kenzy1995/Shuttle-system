@@ -2593,7 +2593,7 @@ function initLiveLocation(mount) {
         return;
       }
       const s = document.createElement("script");
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(cfg.key)}&libraries=places`;
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(cfg.key)}&libraries=places&loading=async`;
       s.async = true;
       s.onload = resolve;
       s.onerror = reject;
@@ -3626,4 +3626,4 @@ function isExpiredByCarDateTime(carDateTime) {
     // 也就是說，班次時間已經超過1小時了
     return tripTime < (now - ONE_HOUR_MS);
   } catch (e) { return true; }
-          }
+}
