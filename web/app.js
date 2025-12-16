@@ -3100,6 +3100,22 @@ function initLiveLocation(mount) {
     
     await loadMaps();
     
+    // 確保 Google Maps API 已完全載入和初始化
+    if (!window.google || !window.google.maps) {
+      throw new Error("Google Maps API 載入失敗");
+    }
+    
+    // 等待 Google Maps API 完全初始化（額外檢查）
+    let retries = 0;
+    while ((!window.google.maps.LatLngBounds || !window.google.maps.Map) && retries < 50) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      retries++;
+    }
+    
+    if (!window.google.maps.LatLngBounds || !window.google.maps.Map) {
+      throw new Error("Google Maps API 初始化超時");
+    }
+    
     // 灰白黑色地圖樣式
     const mapStyles = [
       {
@@ -3162,6 +3178,11 @@ function initLiveLocation(mount) {
     // 計算邊界（近似值：1度緯度約111公里，經度根據緯度調整）
     const latDelta = radiusKm / 111; // 緯度變化（約0.045度）
     const lngDelta = radiusKm / (111 * Math.cos(centerLat * Math.PI / 180)); // 經度變化（考慮緯度）
+    
+    // 確保 Google Maps API 已完全載入
+    if (!google || !google.maps || !google.maps.LatLngBounds) {
+      throw new Error("Google Maps API 尚未完全載入");
+    }
     
     const restrictionBounds = new google.maps.LatLngBounds(
       { lat: centerLat - latDelta, lng: centerLng - lngDelta }, // 西南角
@@ -3626,4 +3647,4 @@ function isExpiredByCarDateTime(carDateTime) {
     // 也就是說，班次時間已經超過1小時了
     return tripTime < (now - ONE_HOUR_MS);
   } catch (e) { return true; }
-}
+        }
