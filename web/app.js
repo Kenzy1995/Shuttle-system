@@ -2562,6 +2562,9 @@ function initLiveLocation(mount) {
   let isInitialized = false;
   let markerCircle = null; // 司機位置圓形外圈
   let glowAnimationTimer = null; // 光暈閃爍動畫計時器
+  let firebaseListeners = []; // Firebase 監聽器引用，用於清理
+  let firebaseConnected = false; // Firebase 連接狀態
+  let fallbackTimer = null; // 備用定時輪詢計時器
   
   // 光子動畫已移除
   const ensureFirebase = async () => {
@@ -2902,16 +2905,21 @@ function initLiveLocation(mount) {
       console.error("Draw route error:", e);
     }
   };
-  const fetchLocation = async () => {
+  // 從 Firebase 資料更新前端（用於監聽器回調）
+  const updateLocationFromFirebase = async (firebaseData) => {
+    if (!isInitialized || !map) return;
+    
     try {
-      // 從 booking-api 讀取即時位置資料
-      const apiUrl = "https://booking-api-995728097341.asia-east1.run.app/api/realtime/location";
-      const r = await fetch(apiUrl);
-      if (!r.ok) {
-        updateStatus("#dc3545", "連線失敗");
-        return;
-      }
-      const data = await r.json();
+      // 直接使用傳入的資料結構（已在監聽器中構建）
+      await processLocationData(firebaseData);
+    } catch (e) {
+      console.error("Update location from Firebase error:", e);
+      updateStatus("#dc3545", "更新失敗");
+    }
+  };
+  
+  // 處理位置資料的共用函數（從 fetchLocation 和 updateLocationFromFirebase 調用）
+  const processLocationData = async (data) => {
       
       // 檢查 GPS 系統總開關
       if (!data.gps_system_enabled) {
@@ -3052,6 +3060,19 @@ function initLiveLocation(mount) {
       }
       
       currentTripData = data;
+  };
+  
+  const fetchLocation = async () => {
+    try {
+      // 從 booking-api 讀取即時位置資料（作為備用方案）
+      const apiUrl = "https://booking-api-995728097341.asia-east1.run.app/api/realtime/location";
+      const r = await fetch(apiUrl);
+      if (!r.ok) {
+        updateStatus("#dc3545", "連線失敗");
+        return;
+      }
+      const data = await r.json();
+      await processLocationData(data);
     } catch (e) {
       console.error("Fetch location error:", e);
       updateStatus("#dc3545", "錯誤");
@@ -3244,15 +3265,98 @@ function initLiveLocation(mount) {
     }
   };
   
-  // 預設每3分鐘自動刷新
-  const AUTO_REFRESH_MS = 3 * 60 * 1000;
-  let autoTimer = null;
+  // 設置 Firebase 監聽器（主要更新機制）
+  const setupFirebaseListeners = async () => {
+    if (!await ensureFirebase()) {
+      console.error("Firebase initialization failed, using fallback polling");
+      startFallbackPolling();
+      return;
+    }
+    
+    try {
+      const db = firebase.database();
+      
+      // 清理舊的監聽器
+      firebaseListeners.forEach(ref => ref.off());
+      firebaseListeners = [];
+      
+      // 監聽所有相關路徑的變化
+      const paths = [
+        'driver_location',
+        'current_trip_status',
+        'current_trip_station',
+        'current_trip_completed_stops',
+        'current_trip_datetime',
+        'current_trip_route',
+        'current_trip_stations',
+        'gps_system_enabled',
+        'current_trip_start_time',
+        'last_trip_datetime'
+      ];
+      
+      // 使用單一監聽器監聽根路徑，當任何子路徑變化時觸發
+      const rootRef = db.ref('/');
+      const listener = rootRef.on('value', async (snapshot) => {
+        if (!isInitialized || !map) return;
+        
+        const data = snapshot.val();
+        if (data) {
+          // 構建完整的資料結構（與 booking-api 返回的格式一致）
+          const firebaseData = {
+            gps_system_enabled: data.gps_system_enabled !== undefined ? data.gps_system_enabled : true,
+            driver_location: data.driver_location || null,
+            current_trip_status: data.current_trip_status || "",
+            current_trip_datetime: data.current_trip_datetime || "",
+            current_trip_route: data.current_trip_route || {},
+            current_trip_stations: data.current_trip_stations || {},
+            current_trip_station: data.current_trip_station || "",
+            current_trip_start_time: data.current_trip_start_time || 0,
+            current_trip_completed_stops: data.current_trip_completed_stops || [],
+            last_trip_datetime: data.last_trip_datetime || "",
+            current_trip_id: data.current_trip_id || ""
+          };
+          
+          // 更新位置資料
+          await updateLocationFromFirebase(firebaseData);
+          
+          // 如果路線資料更新且與當前路線不同，重新繪製路線
+          if (firebaseData.current_trip_route && Object.keys(firebaseData.current_trip_route).length > 0) {
+            const needsRouteUpdate = !currentTripData || 
+              JSON.stringify(currentTripData.current_trip_route) !== JSON.stringify(firebaseData.current_trip_route);
+            
+            if (needsRouteUpdate) {
+              await drawRoute(firebaseData);
+            }
+          }
+        }
+      }, (error) => {
+        console.error("Firebase listener error:", error);
+        firebaseConnected = false;
+        updateStatus("#dc3545", "連線失敗");
+        // Firebase 連接失敗時，啟動備用輪詢機制
+        startFallbackPolling();
+      });
+      
+      firebaseListeners.push(rootRef);
+      firebaseConnected = true;
+      updateStatus("#28a745", "良好");
+      
+      // 停止備用輪詢（如果正在運行）
+      stopFallbackPolling();
+    } catch (e) {
+      console.error("Setup Firebase listeners error:", e);
+      firebaseConnected = false;
+      startFallbackPolling();
+    }
+  };
   
-  // 開始自動刷新（僅在初始化後）
-  const startAutoRefresh = () => {
-    if (autoTimer) clearInterval(autoTimer);
-    autoTimer = setInterval(async () => {
-      if (isInitialized) {
+  // 備用定時輪詢機制（當 Firebase 連接失敗時使用）
+  const AUTO_REFRESH_MS = 3 * 60 * 1000; // 3分鐘
+  const startFallbackPolling = () => {
+    if (fallbackTimer) return; // 已經在運行
+    console.log("Starting fallback polling mechanism");
+    fallbackTimer = setInterval(async () => {
+      if (isInitialized && !firebaseConnected) {
         await fetchLocation();
         if (currentTripData) {
           await drawRoute(currentTripData);
@@ -3261,10 +3365,19 @@ function initLiveLocation(mount) {
     }, AUTO_REFRESH_MS);
   };
   
-  // 包裝 initMap 以在初始化完成後開始自動刷新
+  const stopFallbackPolling = () => {
+    if (fallbackTimer) {
+      clearInterval(fallbackTimer);
+      fallbackTimer = null;
+      console.log("Stopped fallback polling mechanism");
+    }
+  };
+  
+  // 包裝 initMap 以在初始化完成後設置 Firebase 監聽器
   const wrappedInitMap = async () => {
     await initMap();
-    startAutoRefresh();
+    // 設置 Firebase 監聽器（主要機制）
+    await setupFirebaseListeners();
   };
   
   // "查看即時位置"按鈕點擊事件
