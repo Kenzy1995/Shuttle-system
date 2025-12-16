@@ -784,12 +784,38 @@ def update_driver_location(loc: DriverLocation):
             ref.set(location_data)
             # print(f"Firebase write success: {loc.lat}, {loc.lng}")
             
-            # 站點到達檢測：當司機距離站點 < 50公尺時，自動標記為已到達
+            # 優化：站點到達檢測（方式 A：自動更新）
+            # 當司機距離站點 < 50公尺時，自動標記為已到達並更新下一站
+            # 這是主要的更新機制，確保前端能即時顯示正確的下一站
             if loc.trip_id:
                 try:
                     check_station_arrival(loc.lat, loc.lng, loc.trip_id)
                 except Exception as arrival_error:
                     print(f"Station arrival check error: {arrival_error}")
+            
+            # 方案 1：自動檢查過期班次（基於發車時間）
+            # 每次收到 GPS 位置時檢查，如果發車時間超過 40 分鐘，自動結束班次
+            try:
+                trip_status = db.reference("/current_trip_status").get()
+                trip_start_time = db.reference("/current_trip_start_time").get()
+                trip_datetime = db.reference("/current_trip_datetime").get()
+                trip_id_ref = db.reference("/current_trip_id").get()
+                
+                # 如果班次狀態為 "active" 且有發車時間
+                if trip_status == "active" and trip_start_time:
+                    now_ms = int(time.time() * 1000)
+                    elapsed_ms = now_ms - int(trip_start_time)
+                    AUTO_SHUTDOWN_MS = 40 * 60 * 1000  # 40分鐘
+                    
+                    # 如果超過 40 分鐘，自動結束
+                    if elapsed_ms >= AUTO_SHUTDOWN_MS:
+                        print(f"Auto-completing trip: {trip_id_ref} (elapsed: {elapsed_ms/1000/60:.1f} minutes)")
+                        auto_complete_trip(
+                            trip_id=trip_id_ref or "",
+                            main_datetime=trip_datetime or ""
+                        )
+            except Exception as auto_complete_error:
+                print(f"Auto-complete check error: {auto_complete_error}")
     except Exception as e:
         print(f"Firebase write error: {e}")
     return {"status": "ok", "received": loc}
@@ -817,6 +843,12 @@ def check_station_arrival(lat: float, lng: float, trip_id: str):
     """
     檢查司機是否到達某個站點，如果距離 < 50公尺，自動標記為已到達
     只檢查該班次實際會停靠的站點（從 current_trip_stations 讀取）
+    
+    優化：這是主要的自動更新機制（方式 A）
+    - 每次 GPS 更新時自動檢查（每 3 分鐘）
+    - 自動標記已到達站點
+    - 自動更新下一站到 Firebase 的 /current_trip_station
+    - 前端會優先讀取這個值來顯示"即將抵達"
     """
     if not firebase_admin._apps:
         return
@@ -870,11 +902,17 @@ def check_station_arrival(lat: float, lng: float, trip_id: str):
                     completed_stops.append(stop_name)
                     completed_stops_ref.set(completed_stops)
                     print(f"Station arrived: {stop_name} (distance: {distance:.1f}m)")
-                
-                # 更新下一站（只從實際會停靠的站點中選擇）
-                next_stop = get_next_station(actual_stops_names, completed_stops)
-                if next_stop:
-                    db.reference("/current_trip_station").set(next_stop)
+                    
+                    # 優化：更新下一站（只從實際會停靠的站點中選擇）
+                    # 只有在成功標記為已到達時才更新下一站，避免重複更新
+                    next_stop = get_next_station(actual_stops_names, completed_stops)
+                    if next_stop:
+                        db.reference("/current_trip_station").set(next_stop)
+                        print(f"Updated next station to: {next_stop}")
+                    else:
+                        # 所有站點都已完成
+                        db.reference("/current_trip_station").set("所有站點已完成")
+                        print("All stations completed")
                 
                 break  # 一次只標記一個站點
     except Exception as e:
@@ -1638,6 +1676,16 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                     "all_stations": STATIONS
                 }
                 db.reference("/current_trip_stations").set(stations_info)
+                # 優化：初始化即將前往的站點（設置為第一個站點）
+                if stops_names and len(stops_names) > 0:
+                    first_stop = stops_names[0]
+                    db.reference("/current_trip_station").set(first_stop)
+                    print(f"Initialized current_trip_station to first stop: {first_stop}")
+                # 優化：初始化即將前往的站點（設置為第一個站點）
+                if stops_names and len(stops_names) > 0:
+                    first_stop = stops_names[0]
+                    db.reference("/current_trip_station").set(first_stop)
+                    print(f"Initialized current_trip_station to first stop: {first_stop}")
             except Exception as e2:
                 print(f"Write current_trip metadata error: {e2}")
         except Exception as fe:
@@ -1647,13 +1695,15 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
         print(f"Trip start route generation error: {e}")
         return GoogleTripStartResponse(trip_id=trip_id, share_url=None, stops=None)
 
-@app.post("/api/driver/google/trip_complete")
-def api_driver_google_trip_complete(req: GoogleTripCompleteRequest):
-    if not req.trip_id:
-        raise HTTPException(status_code=400, detail="缺少 trip_id")
+def auto_complete_trip(trip_id: str = None, main_datetime: str = None):
+    """
+    自動結束班次的共用函數
+    用於：手動結束、自動超時結束
+    """
+    if not trip_id and not main_datetime:
+        return False
     
-    # 更新 Google Sheet 的出車狀態和最後更新時間（不論 GPS 是否開啟）
-    main_dt_str = req.main_datetime or req.trip_id
+    main_dt_str = main_datetime or trip_id
     dt = _parse_main_dt(main_dt_str)
     if dt:
         ws2 = None
@@ -1722,6 +1772,24 @@ def api_driver_google_trip_complete(req: GoogleTripCompleteRequest):
                 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+        
+        # 優化：清理歷史路線資料，節省 Firebase 儲存空間
+        # 在班次結束時，刪除 /trip/{trip_id}/route，避免累積歷史資料
+        try:
+            # 獲取當前班次 ID（如果沒有傳入 trip_id）
+            current_trip_id_to_clean = trip_id
+            if not current_trip_id_to_clean:
+                current_trip_id_to_clean = db.reference("/current_trip_id").get()
+            
+            # 如果有班次 ID，刪除歷史路線資料
+            if current_trip_id_to_clean:
+                history_route_ref = db.reference(f"/trip/{current_trip_id_to_clean}/route")
+                history_route_ref.delete()
+                print(f"Cleaned up historical route data for trip: {current_trip_id_to_clean}")
+        except Exception as cleanup_error:
+            # 清理失敗不影響班次結束流程
+            print(f"Historical route cleanup error (non-critical): {cleanup_error}")
+        
         # 清除目前班次標記，並設置結束狀態
         db.reference("/current_trip_id").set("")
         db.reference("/current_trip_route").set({})
@@ -1737,7 +1805,20 @@ def api_driver_google_trip_complete(req: GoogleTripCompleteRequest):
         db.reference("/current_trip_stations").set({})
     except Exception as e:
         print(f"Trip complete cleanup error: {e}")
-    return {"status": "success"}
+    return True
+
+
+@app.post("/api/driver/google/trip_complete")
+def api_driver_google_trip_complete(req: GoogleTripCompleteRequest):
+    if not req.trip_id:
+        raise HTTPException(status_code=400, detail="缺少 trip_id")
+    
+    # 使用共用函數結束班次
+    success = auto_complete_trip(trip_id=req.trip_id, main_datetime=req.main_datetime)
+    if success:
+        return {"status": "success"}
+    else:
+        raise HTTPException(status_code=500, detail="結束班次失敗")
 
 @app.get("/api/driver/route")
 def api_driver_route(trip_id: str = Query(..., description="主班次時間，例如 2025/12/14 14:30")):
