@@ -2572,7 +2572,25 @@ function initLiveLocation(mount) {
     new Promise((resolve, reject) => {
       if (!cfg.key) { 
         if (startBtn) startBtn.textContent = "缺少地圖 key";
+        reject(new Error("缺少地圖 key"));
         return; 
+      }
+      // 檢查 Google Maps API 是否已經載入
+      if (window.google && window.google.maps) {
+        resolve();
+        return;
+      }
+      // 檢查是否已經有載入中的 script 標籤
+      const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+      if (existingScript) {
+        // 如果已有 script 標籤，等待它載入完成
+        if (window.google && window.google.maps) {
+          resolve();
+        } else {
+          existingScript.addEventListener('load', resolve);
+          existingScript.addEventListener('error', reject);
+        }
+        return;
       }
       const s = document.createElement("script");
       s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(cfg.key)}&libraries=places`;
@@ -2681,7 +2699,14 @@ function initLiveLocation(mount) {
               bounds.extend({ lat: coord.lat, lng: coord.lng });
             }
           });
-          mapInstance.fitBounds(bounds);
+          // 確保地圖實例已正確初始化
+          if (mapInstance && mapInstance instanceof google.maps.Map && bounds.getNorthEast && bounds.getSouthWest) {
+            try {
+              mapInstance.fitBounds(bounds);
+            } catch (e) {
+              console.error("fitBounds 錯誤:", e);
+            }
+          }
         }
         resolve();
       });
@@ -2912,7 +2937,14 @@ function initLiveLocation(mount) {
             }
           });
         }
-        map.fitBounds(bounds);
+        // 確保地圖實例已正確初始化
+        if (map && map instanceof google.maps.Map && bounds.getNorthEast && bounds.getSouthWest) {
+          try {
+            map.fitBounds(bounds);
+          } catch (e) {
+            console.error("fitBounds 錯誤:", e);
+          }
+        }
       } else if (displayStops.length >= 2) {
         // 如果沒有 polyline，使用 Google Directions API 生成路線
         await drawRouteFromStops(displayStops, map);
@@ -3400,10 +3432,27 @@ function initLiveLocation(mount) {
   };
   
   // 包裝 initMap 以在初始化完成後設置 Firebase 監聽器
+  let isInitializing = false;
   const wrappedInitMap = async () => {
-    await initMap();
-    // 設置 Firebase 監聽器（主要機制）
-    await setupFirebaseListeners();
+    if (isInitializing) {
+      console.log("地圖正在初始化中，請稍候...");
+      return;
+    }
+    if (isInitialized) {
+      console.log("地圖已經初始化完成");
+      return;
+    }
+    try {
+      isInitializing = true;
+      await initMap();
+      // 設置 Firebase 監聽器（主要機制）
+      await setupFirebaseListeners();
+    } catch (e) {
+      console.error("初始化地圖錯誤:", e);
+      isInitialized = false; // 允許重試
+    } finally {
+      isInitializing = false;
+    }
   };
   
   // "查看即時位置"按鈕點擊事件
@@ -3577,4 +3626,4 @@ function isExpiredByCarDateTime(carDateTime) {
     // 也就是說，班次時間已經超過1小時了
     return tripTime < (now - ONE_HOUR_MS);
   } catch (e) { return true; }
-}
+          }
