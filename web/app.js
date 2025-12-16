@@ -2324,7 +2324,6 @@ function initLiveLocation(mount) {
         <button id="rt-refresh" style="margin-left:auto;padding:6px 12px;background:#fff;border:1px solid #ddd;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.1);">刷新</button>
       </div>
       <div id="rt-trip-info" style="font-size:15px;color:#333;margin:4px 0;font-weight:600;">班次: <span id="rt-trip-datetime"></span></div>
-      <div id="rt-next-stop" style="font-size:15px;color:#333;margin:4px 0;font-weight:600;">即將抵達: <span id="rt-next-stop-name"></span></div>
     </div>
     <div id="rt-map-wrapper" style="position:relative;width:100%;height:500px;min-height:500px;border-radius:12px;overflow:hidden;">
       <div id="rt-map" style="width:100%;height:100%;"></div>
@@ -2340,7 +2339,6 @@ function initLiveLocation(mount) {
           <button id="rt-refresh-desktop" style="margin-left:auto;padding:6px 12px;background:#fff;border:1px solid #ddd;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.1);pointer-events:auto;">刷新</button>
         </div>
         <div id="rt-trip-info-desktop" style="font-size:15px;color:#333;margin:4px 0;font-weight:600;">班次: <span id="rt-trip-datetime-desktop"></span></div>
-        <div id="rt-next-stop-desktop" style="font-size:15px;color:#333;margin:4px 0;font-weight:600;">即將抵達: <span id="rt-next-stop-name-desktop"></span></div>
       </div>
       <!-- 班次結束提示 -->
       <div id="rt-ended-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:15;pointer-events:none;">
@@ -2450,38 +2448,9 @@ function initLiveLocation(mount) {
     if (tripDatetimeElDesktop) tripDatetimeElDesktop.textContent = datetime || "";
   };
   
-  // 更新下一站的輔助函數（同時更新手機版和電腦版）
+  // 更新下一站的輔助函數（已移除，不再顯示"即將抵達"資訊）
   const updateNextStop = (stopName) => {
-    const displayText = stopName || "未知";
-    const nextStopEl = mount.querySelector("#rt-next-stop");
-    const nextStopElDesktop = mount.querySelector("#rt-next-stop-desktop");
-    
-    // 如果是"即將發車中"，顯示整個區塊為"即將發車中"
-    if (displayText === "即將發車中") {
-      if (nextStopEl) {
-        nextStopEl.textContent = "即將發車中";
-      }
-      if (nextStopElDesktop) {
-        nextStopElDesktop.textContent = "即將發車中";
-      }
-    } else {
-      // 否則顯示"即將抵達: [站點名稱]"
-      // 確保父元素結構正確
-      if (nextStopEl) {
-        if (!nextStopEl.querySelector("#rt-next-stop-name")) {
-          nextStopEl.innerHTML = `即將抵達: <span id="rt-next-stop-name"></span>`;
-        }
-        const nameEl = nextStopEl.querySelector("#rt-next-stop-name");
-        if (nameEl) nameEl.textContent = displayText;
-      }
-      if (nextStopElDesktop) {
-        if (!nextStopElDesktop.querySelector("#rt-next-stop-name-desktop")) {
-          nextStopElDesktop.innerHTML = `即將抵達: <span id="rt-next-stop-name-desktop"></span>`;
-        }
-        const nameElDesktop = nextStopElDesktop.querySelector("#rt-next-stop-name-desktop");
-        if (nameElDesktop) nameElDesktop.textContent = displayText;
-      }
-    }
+    // 不再更新任何內容
   };
   
   // 更新已走過的路線（基於已到達站點列表或司機位置）
@@ -3051,9 +3020,9 @@ function initLiveLocation(mount) {
       const tripDateTime = data.current_trip_datetime;
       const route = data.current_trip_route;
       const completedStops = data.current_trip_completed_stops || [];  // 已到達站點列表
-      const nextStationFromFirebase = data.current_trip_station || "";  // 從Firebase讀取即將前往的站點
+      // 不再使用 current_trip_station（已移除"即將抵達"顯示功能）
       
-      // 根據已到達站點判斷下一站的輔助函數
+      // 根據已到達站點判斷下一站的輔助函數（已不再使用，保留以備將來需要）
       const getNextStationFromCompleted = (stops, completed) => {
         for (let i = 0; i < stops.length; i++) {
           const stop = stops[i];
@@ -3065,66 +3034,7 @@ function initLiveLocation(mount) {
         return null; // 所有站點都已完成
       };
       
-      if (nextStopNameEl) {
-        if (tripDateTime) {
-          // 解析班次時間
-          const [datePart, timePart] = tripDateTime.split(" ");
-          if (datePart && timePart) {
-            const [year, month, day] = datePart.split(/[\/\-]/);
-            const [hour, minute] = timePart.split(":");
-            const tripTime = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute || 0));
-            const now = new Date();
-            
-            // 如果還沒到發車時間，顯示"即將發車中"
-            if (now < tripTime) {
-              updateNextStop("即將發車中");
-            } else if (nextStationFromFirebase) {
-              // 優先使用Firebase中的current_trip_station（由後端站點到達檢測更新）
-              updateNextStop(nextStationFromFirebase);
-            } else if (route && route.stops && route.stops.length > 0) {
-              // 根據已到達站點列表判斷下一站
-              const nextStopName = getNextStationFromCompleted(route.stops, completedStops);
-              if (nextStopName) {
-                updateNextStop(nextStopName);
-              } else {
-                updateNextStop("所有站點已完成");
-              }
-            } else if (stations.length > 0) {
-              // 沒有路線數據，使用站點列表
-              const nextStopName = getNextStationFromCompleted(stations, completedStops);
-              if (nextStopName) {
-                updateNextStop(nextStopName);
-              } else {
-                updateNextStop("所有站點已完成");
-              }
-            } else {
-              updateNextStop("未知");
-            }
-          } else {
-            // 優先使用Firebase中的current_trip_station
-            if (nextStationFromFirebase) {
-              updateNextStop(nextStationFromFirebase);
-            } else if (route && route.stops && route.stops.length > 0) {
-              const nextStopName = getNextStationFromCompleted(route.stops, completedStops);
-              updateNextStop(nextStopName || "未知");
-            } else {
-              const nextStopName = stations.length > 0 ? (typeof stations[0] === "object" && stations[0].name ? stations[0].name : stations[0] || "未知") : "未知";
-              updateNextStop(nextStopName);
-            }
-          }
-        } else if (nextStationFromFirebase) {
-          // 優先使用Firebase中的current_trip_station
-          updateNextStop(nextStationFromFirebase);
-        } else if (route && route.stops && route.stops.length > 0) {
-          const nextStopName = getNextStationFromCompleted(route.stops, completedStops);
-          updateNextStop(nextStopName || "未知");
-        } else if (stations.length > 0) {
-          const nextStopName = typeof stations[0] === "object" && stations[0].name ? stations[0].name : (stations[0] || "未知");
-          updateNextStop(nextStopName);
-        } else {
-          updateNextStop("未知");
-        }
-      }
+      // 不再更新下一站信息（已移除"即將抵達"顯示功能）
       
       currentTripData = data;
   };
@@ -3352,7 +3262,6 @@ function initLiveLocation(mount) {
       const pathsToWatch = [
         'driver_location',
         'current_trip_status',
-        'current_trip_station',
         'current_trip_completed_stops',
         'current_trip_datetime',
         'current_trip_route',
@@ -3371,7 +3280,6 @@ function initLiveLocation(mount) {
         current_trip_datetime: "",
         current_trip_route: {},
         current_trip_stations: {},
-        current_trip_station: "",
         current_trip_start_time: 0,
         current_trip_completed_stops: [],
         last_trip_datetime: "",
@@ -3412,8 +3320,6 @@ function initLiveLocation(mount) {
             firebaseDataCache.current_trip_route = value || {};
           } else if (path === 'current_trip_stations') {
             firebaseDataCache.current_trip_stations = value || {};
-          } else if (path === 'current_trip_station') {
-            firebaseDataCache.current_trip_station = value || "";
           } else if (path === 'current_trip_start_time') {
             firebaseDataCache.current_trip_start_time = value || 0;
           } else if (path === 'current_trip_completed_stops') {
