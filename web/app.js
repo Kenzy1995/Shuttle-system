@@ -128,6 +128,8 @@ function showPage(id) {
   }
 
   if (id === "schedule") {
+    // 優化：切換到班次查詢頁面時，清除快取以確保資料最新
+    clearScheduleCache();
     loadScheduleData();
   }
   if (id === "station") {
@@ -1920,9 +1922,36 @@ let scheduleData = {
   selectedStation: null
 };
 
+// 優化：班次資料快取
+const SCHEDULE_CACHE_KEY = 'schedule_data_cache';
+const SCHEDULE_CACHE_TTL = 5 * 60 * 1000; // 5 分鐘
+
+// 優化：班次資料快取 - 在本地快取班次資料，減少 API 調用
 async function loadScheduleData() {
   const resultsEl = document.getElementById("scheduleResults");
   if (!resultsEl) return;
+
+  // 檢查快取
+  try {
+    const cached = localStorage.getItem(SCHEDULE_CACHE_KEY);
+    if (cached) {
+      const cacheData = JSON.parse(cached);
+      const now = Date.now();
+      if (cacheData.timestamp && (now - cacheData.timestamp) < SCHEDULE_CACHE_TTL) {
+        // 使用快取資料
+        scheduleData.rows = cacheData.rows || [];
+        scheduleData.directions = new Set(cacheData.directions || []);
+        scheduleData.dates = new Set(cacheData.dates || []);
+        scheduleData.stations = new Set(cacheData.stations || []);
+        
+        renderScheduleFilters();
+        renderScheduleResults();
+        return; // 直接返回，不發送 API 請求
+      }
+    }
+  } catch (e) {
+    console.warn("Schedule cache read error:", e);
+  }
 
   resultsEl.innerHTML = `<div class="loading-text">${t("loading")}</div>`;
   try {
@@ -1954,12 +1983,34 @@ async function loadScheduleData() {
     scheduleData.dates = new Set(scheduleData.rows.map((r) => r.date));
     scheduleData.stations = new Set(scheduleData.rows.map((r) => r.station));
 
+    // 更新快取
+    try {
+      localStorage.setItem(SCHEDULE_CACHE_KEY, JSON.stringify({
+        timestamp: Date.now(),
+        rows: scheduleData.rows,
+        directions: Array.from(scheduleData.directions),
+        dates: Array.from(scheduleData.dates),
+        stations: Array.from(scheduleData.stations)
+      }));
+    } catch (e) {
+      console.warn("Schedule cache write error:", e);
+    }
+
     renderScheduleFilters();
     renderScheduleResults();
   } catch (error) {
     resultsEl.innerHTML = `<div class="empty-state">${t(
       "queryFailedPrefix"
     )}${sanitize(error.message)}</div>`;
+  }
+}
+
+// 清除班次快取的函數（可在手動刷新時調用）
+function clearScheduleCache() {
+  try {
+    localStorage.removeItem(SCHEDULE_CACHE_KEY);
+  } catch (e) {
+    console.warn("Clear schedule cache error:", e);
   }
 }
 
@@ -2933,7 +2984,23 @@ function initLiveLocation(mount) {
       }
       
       // 檢查班次狀態
+      // 方案 3：前端過期檢查（額外保障）
+      // 即使狀態不是 "ended"，如果發車時間超過 40 分鐘，也顯示結束畫面
+      let shouldShowEnded = false;
       if (data.current_trip_status === "ended") {
+        shouldShowEnded = true;
+      } else if (data.current_trip_start_time && data.current_trip_start_time > 0) {
+        // 檢查是否超過 40 分鐘
+        const now = Date.now();
+        const elapsed = now - data.current_trip_start_time;
+        const AUTO_SHUTDOWN_MS = 40 * 60 * 1000; // 40分鐘
+        if (elapsed >= AUTO_SHUTDOWN_MS) {
+          shouldShowEnded = true;
+          console.log("Trip expired (frontend check): elapsed " + (elapsed/1000/60).toFixed(1) + " minutes");
+        }
+      }
+      
+      if (shouldShowEnded) {
         if (endedOverlay) {
           endedOverlay.style.display = "flex";
           endedDatetimeEl.textContent = data.last_trip_datetime || data.current_trip_datetime || "";
@@ -3266,6 +3333,7 @@ function initLiveLocation(mount) {
   };
   
   // 設置 Firebase 監聽器（主要更新機制）
+  // 優化：Firebase 監聽器優化 - 只監聽需要的特定路徑，減少資料傳輸
   const setupFirebaseListeners = async () => {
     if (!await ensureFirebase()) {
       console.error("Firebase initialization failed, using fallback polling");
@@ -3280,8 +3348,8 @@ function initLiveLocation(mount) {
       firebaseListeners.forEach(ref => ref.off());
       firebaseListeners = [];
       
-      // 監聽所有相關路徑的變化
-      const paths = [
+      // 需要監聽的路徑列表
+      const pathsToWatch = [
         'driver_location',
         'current_trip_status',
         'current_trip_station',
@@ -3291,61 +3359,108 @@ function initLiveLocation(mount) {
         'current_trip_stations',
         'gps_system_enabled',
         'current_trip_start_time',
-        'last_trip_datetime'
+        'last_trip_datetime',
+        'current_trip_id'
       ];
       
-      // 使用單一監聽器監聽根路徑，當任何子路徑變化時觸發
-      const rootRef = db.ref('/');
-      const listener = rootRef.on('value', async (snapshot) => {
-        if (!isInitialized || !map) return;
-        
-        const data = snapshot.val();
-        if (data) {
-          // 構建完整的資料結構（與 booking-api 返回的格式一致）
-          const firebaseData = {
-            gps_system_enabled: data.gps_system_enabled !== undefined ? data.gps_system_enabled : true,
-            driver_location: data.driver_location || null,
-            current_trip_status: data.current_trip_status || "",
-            current_trip_datetime: data.current_trip_datetime || "",
-            current_trip_route: data.current_trip_route || {},
-            current_trip_stations: data.current_trip_stations || {},
-            current_trip_station: data.current_trip_station || "",
-            current_trip_start_time: data.current_trip_start_time || 0,
-            current_trip_completed_stops: data.current_trip_completed_stops || [],
-            last_trip_datetime: data.last_trip_datetime || "",
-            current_trip_id: data.current_trip_id || ""
-          };
+      // 用於構建完整資料結構的快取
+      let firebaseDataCache = {
+        gps_system_enabled: true,
+        driver_location: null,
+        current_trip_status: "",
+        current_trip_datetime: "",
+        current_trip_route: {},
+        current_trip_stations: {},
+        current_trip_station: "",
+        current_trip_start_time: 0,
+        current_trip_completed_stops: [],
+        last_trip_datetime: "",
+        current_trip_id: ""
+      };
+      
+      // 優化：防抖機制，避免短時間內多次更新
+      let updateDebounceTimer = null;
+      const UPDATE_DEBOUNCE_MS = 300; // 300 毫秒防抖
+      
+      const debouncedUpdate = async () => {
+        if (updateDebounceTimer) {
+          clearTimeout(updateDebounceTimer);
+        }
+        updateDebounceTimer = setTimeout(async () => {
+          if (!isInitialized || !map) return;
+          // 更新位置資料（使用快取的完整資料）
+          await updateLocationFromFirebase(firebaseDataCache);
+        }, UPDATE_DEBOUNCE_MS);
+      };
+      
+      // 優化：為每個路徑創建單獨的監聽器，只接收該路徑的變化
+      pathsToWatch.forEach(path => {
+        const ref = db.ref(`/${path}`);
+        const listener = ref.on('value', async (snapshot) => {
+          if (!isInitialized || !map) return;
           
-          // 更新位置資料
-          await updateLocationFromFirebase(firebaseData);
+          const value = snapshot.val();
           
-          // 如果路線資料更新且與當前路線不同，重新繪製路線
-          if (firebaseData.current_trip_route && Object.keys(firebaseData.current_trip_route).length > 0) {
+          // 更新快取
+          if (path === 'driver_location') {
+            firebaseDataCache.driver_location = value;
+          } else if (path === 'current_trip_status') {
+            firebaseDataCache.current_trip_status = value || "";
+          } else if (path === 'current_trip_datetime') {
+            firebaseDataCache.current_trip_datetime = value || "";
+          } else if (path === 'current_trip_route') {
+            firebaseDataCache.current_trip_route = value || {};
+          } else if (path === 'current_trip_stations') {
+            firebaseDataCache.current_trip_stations = value || {};
+          } else if (path === 'current_trip_station') {
+            firebaseDataCache.current_trip_station = value || "";
+          } else if (path === 'current_trip_start_time') {
+            firebaseDataCache.current_trip_start_time = value || 0;
+          } else if (path === 'current_trip_completed_stops') {
+            firebaseDataCache.current_trip_completed_stops = value || [];
+          } else if (path === 'gps_system_enabled') {
+            firebaseDataCache.gps_system_enabled = value !== undefined ? value : true;
+          } else if (path === 'last_trip_datetime') {
+            firebaseDataCache.last_trip_datetime = value || "";
+          } else if (path === 'current_trip_id') {
+            firebaseDataCache.current_trip_id = value || "";
+          }
+          
+          // 使用防抖機制更新位置資料
+          await debouncedUpdate();
+          
+          // 如果路線資料更新且與當前路線不同，重新繪製路線（立即執行，不防抖）
+          if (path === 'current_trip_route' && firebaseDataCache.current_trip_route && Object.keys(firebaseDataCache.current_trip_route).length > 0) {
             const needsRouteUpdate = !currentTripData || 
-              JSON.stringify(currentTripData.current_trip_route) !== JSON.stringify(firebaseData.current_trip_route);
+              JSON.stringify(currentTripData.current_trip_route) !== JSON.stringify(firebaseDataCache.current_trip_route);
             
             if (needsRouteUpdate) {
-              await drawRoute(firebaseData);
+              await drawRoute(firebaseDataCache);
             }
           }
-        }
-      }, (error) => {
-        console.error("Firebase listener error:", error);
-        firebaseConnected = false;
-        updateStatus("#dc3545", "連線失敗");
-        // Firebase 連接失敗時，啟動備用輪詢機制
-        startFallbackPolling();
+        }, (error) => {
+          console.error(`Firebase listener error for ${path}:`, error);
+          firebaseConnected = false;
+          updateStatus("#dc3545", "連線失敗");
+          updateRefreshButtonVisibility();
+          startFallbackPolling();
+        });
+        
+        firebaseListeners.push(ref);
       });
       
-      firebaseListeners.push(rootRef);
       firebaseConnected = true;
       updateStatus("#28a745", "良好");
+      
+      // 更新刷新按鈕顯示狀態
+      updateRefreshButtonVisibility();
       
       // 停止備用輪詢（如果正在運行）
       stopFallbackPolling();
     } catch (e) {
       console.error("Setup Firebase listeners error:", e);
       firebaseConnected = false;
+      updateRefreshButtonVisibility();
       startFallbackPolling();
     }
   };
@@ -3385,11 +3500,21 @@ function initLiveLocation(mount) {
     startBtn.addEventListener("click", wrappedInitMap);
   }
   
-  // 刷新按鈕點擊事件（手機版和電腦版）
+  // 優化：刷新按鈕點擊事件（手機版和電腦版）
+  // 只在 Firebase 連接失敗時才真正需要手動刷新
   const handleManualRefresh = async () => {
     const now = Date.now();
     if (now - lastManualRefreshTime < MANUAL_REFRESH_COOLDOWN) {
       return; // 按鈕已禁用，不會觸發
+    }
+    
+    // 優化：如果 Firebase 正常連接，提示用戶資料已自動更新
+    if (firebaseConnected) {
+      updateStatus("#28a745", "資料已自動更新");
+      setTimeout(() => {
+        updateStatus("#28a745", "良好");
+      }, 2000);
+      return; // Firebase 正常時，不需要手動刷新
     }
     
     // 禁用按鈕並開始倒數
@@ -3414,10 +3539,34 @@ function initLiveLocation(mount) {
       }
     }, 1000);
     
-    // 執行刷新
+    // 執行刷新（只在 Firebase 連接失敗時執行）
     await fetchLocation();
     if (currentTripData) {
       await drawRoute(currentTripData);
+    }
+  };
+  
+  // 優化：根據 Firebase 連接狀態更新刷新按鈕的顯示
+  const updateRefreshButtonVisibility = () => {
+    // 如果 Firebase 正常連接，可以隱藏或禁用刷新按鈕（可選）
+    // 目前保留按鈕，但添加視覺提示
+    if (btnRefresh) {
+      if (firebaseConnected) {
+        btnRefresh.title = "資料已自動更新，無需手動刷新";
+        btnRefresh.style.opacity = "0.6";
+      } else {
+        btnRefresh.title = "點擊手動刷新";
+        btnRefresh.style.opacity = "1";
+      }
+    }
+    if (btnRefreshDesktop) {
+      if (firebaseConnected) {
+        btnRefreshDesktop.title = "資料已自動更新，無需手動刷新";
+        btnRefreshDesktop.style.opacity = "0.6";
+      } else {
+        btnRefreshDesktop.title = "點擊手動刷新";
+        btnRefreshDesktop.style.opacity = "1";
+      }
     }
   };
   
