@@ -10,10 +10,14 @@ from datetime import datetime
 from threading import Lock
 
 app = Flask(__name__)
-CORS(app, origins=[
-    "https://hotel-web-3addcbkbgq-de.a.run.app",
-    "https://hotel-web-995728097341.asia-east1.run.app",
-])
+CORS(app, 
+     origins=[
+         "https://hotel-web-3addcbkbgq-de.a.run.app",
+         "https://hotel-web-995728097341.asia-east1.run.app",
+     ],
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 # Scopes and spreadsheet ID for Google Sheets
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
@@ -208,7 +212,8 @@ def api_realtime_location():
                 if cached_gps_enabled and len(cached_gps_enabled) > 0 and len(cached_gps_enabled[0]) > 0:
                     e19_value = (cached_gps_enabled[0][0] or "").strip().lower()
                     gps_system_enabled = e19_value in ("true", "t", "yes", "1")
-        except Exception as e:
+        except Exception:
+            pass
         
         # 如果從 Sheet 讀取失敗，嘗試從 Firebase 讀取
         if gps_system_enabled is None:
@@ -314,7 +319,8 @@ def api_realtime_location():
             if current_trip_id:
                 path_history_ref = db.reference("/current_trip_path_history")
                 current_trip_path_history = path_history_ref.get() or []
-        except Exception as path_history_error:
+        except Exception:
+            pass
         
         return jsonify({
             "gps_system_enabled": bool(gps_system_enabled),
