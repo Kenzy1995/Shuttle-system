@@ -2664,7 +2664,8 @@ function initLiveLocation(mount) {
   
   // 改進：更新已走過的路線（基於GPS位置歷史，使用時間戳判斷）
   const updateWalkedRoute = async (data, driverPos = null) => {
-    if (!mainPolyline || !data.current_trip_route) {
+    // 檢查 Google Maps API 是否已載入
+    if (!window.google || !window.google.maps || !mainPolyline || !data.current_trip_route) {
       return;
     }
     
@@ -2786,7 +2787,8 @@ function initLiveLocation(mount) {
   // 從站點列表繪製路線的輔助函數
   const drawRouteFromStops = async (stops, mapInstance) => {
     return new Promise((resolve) => {
-      if (!mapInstance || !google.maps) {
+      // 檢查 Google Maps API 是否已載入
+      if (!window.google || !window.google.maps || !mapInstance) {
         resolve();
         return;
       }
@@ -3218,21 +3220,22 @@ function initLiveLocation(mount) {
         if (infoPanel) infoPanel.style.display = "block";
       }
       
-      // 更新司機位置
+      // 更新司機位置（只有在 Google Maps API 已載入且地圖已初始化時才執行）
       const driverLoc = data.driver_location;
       let driverPos = null;
       if (driverLoc && typeof driverLoc.lat === "number" && typeof driverLoc.lng === "number") {
         driverPos = { lat: driverLoc.lat, lng: driverLoc.lng };
-        if (marker) {
+        // 只有在 Google Maps API 已載入且地圖已初始化時才更新地圖
+        if (window.google && window.google.maps && map && marker) {
           marker.setPosition(driverPos);
           map.panTo(driverPos);
         }
         // 更新圓形外圈位置
-        if (markerCircle) {
+        if (window.google && window.google.maps && markerCircle) {
           markerCircle.setCenter(driverPos);
         }
         
-        // 更新已走過的路線
+        // 更新已走過的路線（updateWalkedRoute 內部會檢查 Google Maps API）
         await updateWalkedRoute(data, driverPos);
         
         updateStatus("#28a745", "良好");
@@ -3339,7 +3342,7 @@ function initLiveLocation(mount) {
     const lngDelta = radiusKm / (111 * Math.cos(centerLat * Math.PI / 180)); // 經度變化（考慮緯度）
     
     // 確保 Google Maps API 已完全載入
-    if (!google || !google.maps || !google.maps.LatLngBounds) {
+    if (!window.google || !window.google.maps || !window.google.maps.LatLngBounds) {
       throw new Error("Google Maps API 尚未完全載入");
     }
     
