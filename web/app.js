@@ -2426,9 +2426,72 @@ function initLiveLocation(mount) {
       const stopCoord = typeof stop === "object" && stop.lat ? { lat: stop.lat, lng: stop.lng } : stationCoords[stopName] || null;
       const isCompleted = completedStops.includes(stopName);
       
-      // 判斷站點是否已經過了（根據路線順序）
-      // 如果已完成站點數量 > 當前站點索引，表示已經過了這個站點
-      const isPassed = completedStops.length > index;
+      // 判斷站點是否已經過了（根據司機位置和路線）
+      let isPassed = false;
+      if (driverLocation && stopCoord && data.current_trip_route && data.current_trip_route.path) {
+        // 獲取路線路徑
+        const routePath = data.current_trip_route.path || [];
+        if (routePath.length > 0) {
+          // 找到站點在路線上的最近點索引
+          let stationNearestIdx = 0;
+          let stationBestDist = Infinity;
+          for (let i = 0; i < routePath.length; i++) {
+            const point = routePath[i];
+            const dx = point.lat - stopCoord.lat;
+            const dy = point.lng - stopCoord.lng;
+            const dist = dx * dx + dy * dy;
+            if (dist < stationBestDist) {
+              stationBestDist = dist;
+              stationNearestIdx = i;
+            }
+          }
+          
+          // 找到司機當前位置在路線上的最近點索引
+          let driverNearestIdx = 0;
+          let driverBestDist = Infinity;
+          for (let i = 0; i < routePath.length; i++) {
+            const point = routePath[i];
+            const dx = point.lat - driverLocation.lat;
+            const dy = point.lng - driverLocation.lng;
+            const dist = dx * dx + dy * dy;
+            if (dist < driverBestDist) {
+              driverBestDist = dist;
+              driverNearestIdx = i;
+            }
+          }
+          
+          // 如果司機位置在路線上的索引 > 站點在路線上的索引，表示已經過了這個站點
+          // 或者如果有GPS歷史，檢查歷史中是否有點在站點之後
+          if (driverNearestIdx > stationNearestIdx) {
+            isPassed = true;
+          } else if (data.current_trip_path_history && Array.isArray(data.current_trip_path_history) && data.current_trip_path_history.length > 0) {
+            // 檢查GPS歷史中是否有點在站點之後
+            for (const historyPoint of data.current_trip_path_history) {
+              let historyNearestIdx = 0;
+              let historyBestDist = Infinity;
+              for (let i = 0; i < routePath.length; i++) {
+                const point = routePath[i];
+                const dx = point.lat - historyPoint.lat;
+                const dy = point.lng - historyPoint.lng;
+                const dist = dx * dx + dy * dy;
+                if (dist < historyBestDist) {
+                  historyBestDist = dist;
+                  historyNearestIdx = i;
+                }
+              }
+              if (historyNearestIdx > stationNearestIdx) {
+                isPassed = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+      
+      // 如果已完成站點數量 > 當前站點索引，也表示已經過了這個站點（備用判斷）
+      if (!isPassed && completedStops.length > index) {
+        isPassed = true;
+      }
       
       const isCurrent = index === stops.findIndex((s, i) => {
         const sName = typeof s === "object" && s.name ? s.name : (typeof s === "string" ? s : "");
