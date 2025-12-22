@@ -2431,23 +2431,38 @@ function initLiveLocation(mount) {
       });
       
       // 計算預計抵達時間
-      let etaText = "--";
+      let timeLabel = "";
+      let timeText = "--";
       let etaTime = null;
       
       if (index === 0 && mainTripTime) {
-        // 第一站顯示主班次時間
+        // 第一站顯示發車時間（格式：發車時間:2025/12/23 10:00）
         etaTime = mainTripTime;
-        etaText = formatTimeShort(mainTripTime);
+        const year = mainTripTime.getFullYear();
+        const month = String(mainTripTime.getMonth() + 1).padStart(2, '0');
+        const day = String(mainTripTime.getDate()).padStart(2, '0');
+        const hours = String(mainTripTime.getHours()).padStart(2, '0');
+        const minutes = String(mainTripTime.getMinutes()).padStart(2, '0');
+        timeLabel = "發車時間";
+        timeText = `${year}/${month}/${day} ${hours}:${minutes}`;
       } else if (driverLocation && stopCoord && !isCompleted) {
-        // 計算ETA
+        // 其他站點計算ETA
         const eta = calculateETA(driverLocation.lat, driverLocation.lng, stopCoord.lat, stopCoord.lng);
         if (eta) {
           const now = new Date();
           etaTime = new Date(now.getTime() + eta.minutes * 60 * 1000);
-          etaText = formatTimeShort(etaTime);
+          const hours = String(etaTime.getHours()).padStart(2, '0');
+          const minutes = String(etaTime.getMinutes()).padStart(2, '0');
+          timeLabel = "預計抵達";
+          timeText = `${hours}:${minutes}`;
+        } else {
+          timeLabel = "預計抵達";
         }
       } else if (isCompleted) {
-        etaText = "已抵達";
+        timeLabel = "狀態";
+        timeText = "已抵達";
+      } else {
+        timeLabel = "預計抵達";
       }
       
       // 站點樣式
@@ -2465,7 +2480,7 @@ function initLiveLocation(mount) {
         <div style="${stationStyle}">
           <div style="flex: 1;">
             <div style="font-size:15px;color:#333;font-weight:${isCurrent ? '600' : '500'};margin-bottom:4px;">${stopName}</div>
-            <div style="font-size:13px;color:#666;">預計抵達: ${etaText}</div>
+            <div style="font-size:13px;color:#666;">${timeLabel}: ${timeText}</div>
           </div>
           ${isCompleted ? '<div style="color:#28a745;font-size:20px;">✓</div>' : ''}
         </div>
