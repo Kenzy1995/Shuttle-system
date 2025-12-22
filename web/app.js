@@ -2744,7 +2744,7 @@ function initLiveLocation(mount) {
         return;
       }
       const s = document.createElement("script");
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(cfg.key)}&libraries=places,marker&loading=async`;
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(cfg.key)}&libraries=places&loading=async`;
       s.async = true;
       s.onload = resolve;
       s.onerror = reject;
@@ -3024,29 +3024,48 @@ function initLiveLocation(mount) {
           const fullName = getStationFullName(stop, idx, displayStops.length);
           const displayLabel = getStationDisplayLabel(stop, idx, displayStops.length);
           
-          const pinElement = document.createElement('div');
-          pinElement.style.width = idx === 0 || idx === displayStops.length - 1 ? '28px' : '24px';
-          pinElement.style.height = idx === 0 || idx === displayStops.length - 1 ? '28px' : '24px';
-          pinElement.style.borderRadius = '50%';
-          pinElement.style.backgroundColor = '#0b63ce';
-          pinElement.style.border = '2px solid #fff';
-          pinElement.style.display = 'flex';
-          pinElement.style.alignItems = 'center';
-          pinElement.style.justifyContent = 'center';
-          pinElement.style.color = '#fff';
-          pinElement.style.fontSize = idx === 0 || idx === displayStops.length - 1 ? '11px' : '14px';
-          pinElement.style.fontWeight = idx === 0 || idx === displayStops.length - 1 ? 'bold' : 'normal';
-          pinElement.textContent = displayLabel;
-          pinElement.title = fullName;
+          // 創建站點標記（使用舊的 Marker API，將 DOM 元素轉換為圖標）
+          const createStationIcon = (label, isStartOrEnd) => {
+            const size = isStartOrEnd ? 28 : 24;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // 繪製圓形背景
+            ctx.beginPath();
+            ctx.arc(size / 2, size / 2, size / 2 - 1, 0, 2 * Math.PI);
+            ctx.fillStyle = '#0b63ce';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // 繪製文字
+            ctx.fillStyle = '#fff';
+            ctx.font = `${isStartOrEnd ? 'bold 11px' : '14px'} Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, size / 2, size / 2);
+            
+            return {
+              url: canvas.toDataURL(),
+              scaledSize: new google.maps.Size(size, size),
+              anchor: new google.maps.Point(size / 2, size / 2)
+            };
+          };
           
-          const marker = new google.maps.marker.AdvancedMarkerElement({
+          const isStartOrEnd = idx === 0 || idx === displayStops.length - 1;
+          const icon = createStationIcon(displayLabel, isStartOrEnd);
+          
+          const marker = new google.maps.Marker({
             position: { lat: coord.lat, lng: coord.lng },
             map: map,
-            content: pinElement,
+            icon: icon,
             title: fullName
           });
           
-          pinElement.addEventListener('click', () => {
+          marker.addListener('click', () => {
             const infoWindow = new google.maps.InfoWindow({
               content: `<div style="padding: 8px; font-weight: 600; font-size: 14px;">${fullName}</div>`
             });
@@ -3203,7 +3222,7 @@ function initLiveLocation(mount) {
       if (driverLoc && typeof driverLoc.lat === "number" && typeof driverLoc.lng === "number") {
         driverPos = { lat: driverLoc.lat, lng: driverLoc.lng };
         if (marker) {
-          marker.position = driverPos;
+          marker.setPosition(driverPos);
           map.panTo(driverPos);
         }
         // 更新圓形外圈位置
@@ -3357,7 +3376,7 @@ function initLiveLocation(mount) {
       { lat: centerLat + latDelta, lng: centerLng + lngDelta }   // 東北角
     );
     
-    // 初始化地圖（需要 mapId 以支援 AdvancedMarkerElement）
+    // 初始化地圖（使用 styles 設置灰色地圖，不使用 mapId）
     // 隱藏所有不必要的 UI 元素，讓畫面乾淨
     map = new google.maps.Map(mapEl, { 
       center: { lat: 25.055550556928008, lng: 121.63210245291367 }, 
@@ -3368,27 +3387,25 @@ function initLiveLocation(mount) {
       streetViewControl: false,
       fullscreenControl: false,
       styles: mapStyles,
-      mapId: "FORTE_SHUTTLE_MAP", // 地圖 ID，用於支援 AdvancedMarkerElement
       restriction: {
         latLngBounds: restrictionBounds,
         strictBounds: true // 嚴格限制，不允許拖動到邊界外
       }
     });
     
-    // 創建司機位置標記（綠色點）
-    const driverPinElement = document.createElement('div');
-    driverPinElement.style.width = '16px';
-    driverPinElement.style.height = '16px';
-    driverPinElement.style.borderRadius = '50%';
-    driverPinElement.style.backgroundColor = '#28a745';
-    driverPinElement.style.border = '2px solid #ffffff';
-    driverPinElement.style.boxShadow = '0 0 4px rgba(40, 167, 69, 0.6)';
-    
-    marker = new google.maps.marker.AdvancedMarkerElement({ 
+    // 創建司機位置標記（綠色點，使用舊的 Marker API）
+    marker = new google.maps.Marker({ 
       position: { lat: 25.055550556928008, lng: 121.63210245291367 }, 
-      map, 
+      map: map, 
       title: "司機位置",
-      content: driverPinElement,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 8,
+        fillColor: "#28a745",
+        fillOpacity: 1,
+        strokeColor: "#ffffff",
+        strokeWeight: 2,
+      },
       zIndex: 10
     });
     
