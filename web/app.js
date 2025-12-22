@@ -1,3 +1,5 @@
+
+
 /* ====== 常數（API） ====== */
 const API_URL =
   "https://booking-api-995728097341.asia-east1.run.app/api/sheet";
@@ -2334,14 +2336,58 @@ function initLiveLocation(mount) {
       <div id="rt-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10;">
         <button id="rt-start-btn" class="button" style="padding:16px 32px;font-size:18px;font-weight:700;background:var(--primary);color:#fff;border:none;border-radius:12px;cursor:pointer;">查看即時位置</button>
       </div>
-      <!-- 電腦版：左上角資訊覆蓋層（狀態燈、班次、即將抵達、刷新按鈕） -->
-      <div id="rt-info-overlay" style="position:absolute;top:0;left:0;z-index:5;pointer-events:none;display:none;padding:12px;background:linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(255,255,255,0.85));border-radius:0 0 12px 0;max-width:320px;">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          <div id="rt-status-light-desktop" style="width:12px;height:12px;border-radius:50%;background:#28a745;box-shadow:0 0 8px rgba(40,167,69,0.6);"></div>
-          <span id="rt-status-text-desktop" style="font-size:14px;color:#28a745;font-weight:700;">良好</span>
-          <button id="rt-refresh-desktop" style="margin-left:auto;padding:6px 12px;background:#fff;border:1px solid #ddd;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.1);pointer-events:auto;">刷新</button>
+      <!-- 電腦版：左上角資訊覆蓋層（模仿圖片中的 UI 設計） -->
+      <div id="rt-info-overlay" style="position:absolute;top:16px;left:16px;z-index:5;pointer-events:none;display:none;width:340px;max-width:calc(100vw - 32px);background:#ffffff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.2);padding:24px;max-height:calc(100vh - 32px);overflow-y:auto;">
+        <div style="font-size:20px;font-weight:600;color:#333;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e0e0e0;">即時位置</div>
+        
+        <!-- 司機狀態 -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px;">
+          <div id="rt-status-light-desktop" style="width:12px;height:12px;border-radius:50%;background:#28a745;box-shadow:0 0 0 2px rgba(40,167,69,0.2);"></div>
+          <span id="rt-status-text-desktop" style="font-size:15px;color:#333;font-weight:500;">良好</span>
         </div>
-        <div id="rt-trip-info-desktop" style="font-size:15px;color:#333;margin:4px 0;font-weight:600;">班次: <span id="rt-trip-datetime-desktop"></span></div>
+        
+        <!-- 司機距離 -->
+        <div id="rt-driver-distance-desktop" style="font-size:14px;color:#666;margin-bottom:28px;padding:0;">
+          <div style="font-size:13px;color:#999;margin-bottom:6px;">司機距離</div>
+          <div id="rt-eta-info-desktop" style="font-size:16px;color:#333;font-weight:600;margin-top:4px;">計算中...</div>
+        </div>
+        
+        <!-- 訂單時間線 -->
+        <div id="rt-timeline-desktop" style="position:relative;padding-left:24px;">
+          <div style="position:absolute;left:7px;top:0;bottom:0;width:2px;background:#e0e0e0;"></div>
+          
+          <!-- 訂單開始 -->
+          <div style="position:relative;margin-bottom:28px;">
+            <div style="position:absolute;left:-20px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid #28a745;display:flex;align-items:center;justify-content:center;z-index:1;">
+              <span style="font-size:12px;">🚩</span>
+            </div>
+            <div style="margin-left:0;">
+              <div style="font-size:13px;color:#999;margin-bottom:6px;font-weight:500;">訂單開始</div>
+              <div id="rt-order-start-time-desktop" style="font-size:13px;color:#666;margin-top:4px;">--</div>
+            </div>
+          </div>
+          
+          <!-- 目的地站點 -->
+          <div style="position:relative;margin-bottom:28px;">
+            <div id="rt-destination-marker-desktop" style="position:absolute;left:-20px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid #e0e0e0;display:flex;align-items:center;justify-content:center;z-index:1;"></div>
+            <div style="margin-left:0;">
+              <div id="rt-destination-station-desktop" style="font-size:16px;color:#333;font-weight:600;margin-bottom:6px;line-height:1.4;">--</div>
+              <div id="rt-destination-eta-desktop" style="font-size:14px;color:#28a745;margin-top:6px;font-weight:500;">--</div>
+              <div id="rt-eta-detail-desktop" style="font-size:13px;color:#28a745;margin-top:4px;font-weight:500;">--</div>
+            </div>
+          </div>
+          
+          <!-- 訂單尚未完成 -->
+          <div style="position:relative;margin-bottom:28px;">
+            <div id="rt-complete-marker-desktop" style="position:absolute;left:-20px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid #e0e0e0;display:flex;align-items:center;justify-content:center;z-index:1;"></div>
+            <div style="margin-left:0;">
+              <div style="font-size:13px;color:#999;margin-bottom:6px;font-weight:500;">訂單尚未完成</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 刷新按鈕 -->
+        <button id="rt-refresh-desktop" style="margin-top:16px;padding:8px 16px;background:#fff;border:1px solid #ddd;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.1);pointer-events:auto;width:100%;">刷新</button>
       </div>
       <!-- 班次結束提示 -->
       <div id="rt-ended-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:15;pointer-events:none;">
@@ -2451,114 +2497,162 @@ function initLiveLocation(mount) {
     if (tripDatetimeElDesktop) tripDatetimeElDesktop.textContent = datetime || "";
   };
   
+  // 計算兩點間距離（公尺）
+  const haversineDistance = (lat1, lng1, lat2, lng2) => {
+    const R = 6371000; // 地球半徑（公尺）
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // 計算預計抵達時間（ETA）
+  const calculateETA = (driverLat, driverLng, destinationLat, destinationLng) => {
+    if (!driverLat || !driverLng || !destinationLat || !destinationLng) {
+      return null;
+    }
+    
+    const distance = haversineDistance(driverLat, driverLng, destinationLat, destinationLng);
+    // 假設平均車速為 40 km/h (約 11.11 m/s)
+    const avgSpeed = 11.11; // 公尺/秒
+    const timeSeconds = distance / avgSpeed;
+    const timeMinutes = Math.round(timeSeconds / 60);
+    
+    return {
+      distance: distance,
+      minutes: timeMinutes,
+      formatted: timeMinutes > 60 ? `${Math.floor(timeMinutes / 60)} 小時 ${timeMinutes % 60} 分鐘` : `${timeMinutes} 分鐘`
+    };
+  };
+
+  // 格式化時間（簡短版，用於 ETA）
+  const formatTimeShort = (timestamp) => {
+    if (!timestamp) return '--';
+    const date = new Date(timestamp);
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  // 格式化時間（完整版）
+  const formatTime = (timestamp) => {
+    if (!timestamp) return '--';
+    const date = new Date(timestamp);
+    const days = ['日', '一', '二', '三', '四', '五', '六'];
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const dayName = days[date.getDay()];
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes} ${month}/${day} 週${dayName}`;
+  };
+
+  // 計算提前/延遲時間
+  const calculateTimeDifference = (estimatedTime, scheduledTime) => {
+    if (!estimatedTime || !scheduledTime) return null;
+    
+    const estimated = new Date(estimatedTime);
+    const scheduled = new Date(scheduledTime);
+    const diffMs = estimated.getTime() - scheduled.getTime();
+    const diffMinutes = Math.round(diffMs / (1000 * 60));
+    
+    if (Math.abs(diffMinutes) < 1) {
+      return { text: '準時', isEarly: true, minutes: 0 };
+    }
+    
+    const hours = Math.floor(Math.abs(diffMinutes) / 60);
+    const minutes = Math.abs(diffMinutes) % 60;
+    
+    if (diffMinutes < 0) {
+      // 提前
+      if (hours > 0) {
+        return { 
+          text: `提前 ${hours} 小時 ${minutes} 分鐘`, 
+          isEarly: true, 
+          minutes: Math.abs(diffMinutes) 
+        };
+      } else {
+        return { 
+          text: `提前 ${minutes} 分鐘`, 
+          isEarly: true, 
+          minutes: Math.abs(diffMinutes) 
+        };
+      }
+    } else {
+      // 延遲
+      if (hours > 0) {
+        return { 
+          text: `延遲 ${hours} 小時 ${minutes} 分鐘`, 
+          isEarly: false, 
+          minutes: diffMinutes 
+        };
+      } else {
+        return { 
+          text: `延遲 ${minutes} 分鐘`, 
+          isEarly: false, 
+          minutes: diffMinutes 
+        };
+      }
+    }
+  };
+  
   // 更新下一站的輔助函數（已移除，不再顯示"即將抵達"資訊）
   const updateNextStop = (stopName) => {
     // 不再更新任何內容
   };
   
-  // 更新已走過的路線（基於已到達站點列表或司機位置）
+  // 改進：更新已走過的路線（基於GPS位置歷史，使用時間戳判斷）
   const updateWalkedRoute = async (data, driverPos = null) => {
-    if (!mainPolyline || !data.current_trip_route || !data.current_trip_route.stops) {
+    if (!mainPolyline || !data.current_trip_route) {
       return;
     }
     
     const path = mainPolyline.getPath().getArray();
-    const completedStops = data.current_trip_completed_stops || [];
-    const routeStops = data.current_trip_route.stops;
     
-    // 找到最後一個已到達站點在路線中的位置
-    let lastCompletedIndex = 0;
-    if (completedStops.length > 0) {
-      // 找到最後一個已到達站點
-      let lastCompletedStop = null;
-      for (let i = routeStops.length - 1; i >= 0; i--) {
-        const stop = routeStops[i];
-        const stopName = typeof stop === "object" && stop.name ? stop.name : (typeof stop === "string" ? stop : "");
-        if (stopName && completedStops.includes(stopName)) {
-          lastCompletedStop = stop;
-          break;
-        }
-      }
-      
-      // 找到該站點在path中的對應位置
-      if (lastCompletedStop) {
-        const stopCoord = typeof lastCompletedStop === "object" && lastCompletedStop.lat ? 
-          { lat: lastCompletedStop.lat, lng: lastCompletedStop.lng } : 
-          stationCoords[lastCompletedStop.name || lastCompletedStop] || null;
-        
-        if (stopCoord) {
-          let best = Infinity;
-          for (let i = 0; i < path.length; i++) {
-            const dx = path[i].lat() - stopCoord.lat;
-            const dy = path[i].lng() - stopCoord.lng;
-            const dist = dx * dx + dy * dy;
-            if (dist < best) {
-              best = dist;
-              lastCompletedIndex = i;
-            }
-          }
-        }
-      }
+    // 改進：使用GPS位置歷史來判斷走過的路線
+    // 這樣可以準確處理折返情況，不會誤判
+    let walkedPath = [];
+    
+    // 如果有GPS位置歷史，使用歷史來繪製走過的路線
+    if (data.current_trip_path_history && Array.isArray(data.current_trip_path_history) && data.current_trip_path_history.length > 0) {
+      // 將GPS歷史位置轉換為Google Maps LatLng對象
+      walkedPath = data.current_trip_path_history.map(point => 
+        new google.maps.LatLng(point.lat, point.lng)
+      );
     } else if (driverPos) {
-      // 如果沒有已到達站點，使用司機位置作為參考
+      // 如果沒有歷史，使用當前位置和路線的最近點來判斷
+      // 找到當前位置在路線上的最近點
       let nearestIdx = 0, best = Infinity;
       for (let i = 0; i < path.length; i++) {
-        const dx = path[i].lat() - driverPos.lat, dy = path[i].lng() - driverPos.lng;
+        const dx = path[i].lat() - driverPos.lat;
+        const dy = path[i].lng() - driverPos.lng;
         const dist = dx * dx + dy * dy;
-        if (dist < best) { best = dist; nearestIdx = i; }
+        if (dist < best) {
+          best = dist;
+          nearestIdx = i;
+        }
       }
-      lastCompletedIndex = nearestIdx;
+      // 繪製從起點到最近點的路線
+      walkedPath = path.slice(0, Math.max(1, nearestIdx + 1));
     }
-    
-    // 繪製已走過的路線（到最後一個已到達站點）
-    const walkedPath = path.slice(0, Math.max(1, lastCompletedIndex + 1));
     
     // 清除舊的路線
     if (walkedPolyline) walkedPolyline.setMap(null);
-    if (walkedPolylineGlow) walkedPolylineGlow.setMap(null);
     
-    // 清除舊的動畫計時器
-    if (glowAnimationTimer) {
-      clearInterval(glowAnimationTimer);
-      glowAnimationTimer = null;
+    // 如果有走過的路線，繪製灰色路線
+    if (walkedPath.length > 1) {
+      walkedPolyline = new google.maps.Polyline({ 
+        path: walkedPath, 
+        strokeColor: "#808080", // 灰色（走過的路線）
+        strokeOpacity: 0.8, 
+        strokeWeight: 6, 
+        map,
+        zIndex: 2
+      });
     }
-    
-    // 繪製主路線（綠色）
-    walkedPolyline = new google.maps.Polyline({ 
-      path: walkedPath, 
-      strokeColor: "#28a745", // 綠色（走過的路線）
-      strokeOpacity: 1, 
-      strokeWeight: 8, 
-      map,
-      zIndex: 2
-    });
-    
-    // 繪製外層光暈（用於閃爍效果）
-    walkedPolylineGlow = new google.maps.Polyline({ 
-      path: walkedPath, 
-      strokeColor: "#28a745", // 綠色光暈
-      strokeOpacity: 0.4, // 初始透明度
-      strokeWeight: 16, // 更粗，作為外層光暈
-      map,
-      zIndex: 1 // 在主路線下方
-    });
-    
-    // 啟動閃爍動畫（稍微閃爍，不刺眼）
-    let glowOpacity = 0.3;
-    let glowDirection = 1; // 1為增加，-1為減少
-    glowAnimationTimer = setInterval(() => {
-      glowOpacity += glowDirection * 0.05; // 每次變化0.05
-      if (glowOpacity >= 0.5) {
-        glowOpacity = 0.5;
-        glowDirection = -1; // 開始減少
-      } else if (glowOpacity <= 0.2) {
-        glowOpacity = 0.2;
-        glowDirection = 1; // 開始增加
-      }
-      if (walkedPolylineGlow) {
-        walkedPolylineGlow.setOptions({ strokeOpacity: glowOpacity });
-      }
-    }, 100); // 每100毫秒更新一次，實現平滑閃爍
   };
   const endedOverlay = mount.querySelector("#rt-ended-overlay");
   const endedTextEl = mount.querySelector("#rt-ended-text");
@@ -2598,11 +2692,11 @@ function initLiveLocation(mount) {
       document.head.appendChild(s);
     });
 
-  let map, marker, mainPolyline, walkedPolyline, walkedPolylineGlow, stationMarkers = [];
+  let map, marker, mainPolyline, walkedPolyline, stationMarkers = [];
   let currentTripData = null;
   let isInitialized = false;
-  let markerCircle = null; // 司機位置圓形外圈
-  let glowAnimationTimer = null; // 光暈閃爍動畫計時器
+  let markerCircle = null; // 司機位置圓形外圈（呼吸光圈）
+  let breathingAnimation = null; // 呼吸光圈動畫計時器
   let firebaseListeners = []; // Firebase 監聽器引用，用於清理
   let firebaseConnected = false; // Firebase 連接狀態
   let fallbackTimer = null; // 備用定時輪詢計時器
@@ -2681,8 +2775,8 @@ function initLiveLocation(mount) {
           if (mainPolyline) mainPolyline.setMap(null);
           mainPolyline = new google.maps.Polyline({ 
             path: path, 
-            strokeColor: "#87CEEB", // 淺藍色（未走過的路線）
-            strokeOpacity: 0.8, 
+            strokeColor: "#1a1a1a", // 深黑色（未走過的路線）
+            strokeOpacity: 0.9, 
             strokeWeight: 6, 
             map: mapInstance,
             zIndex: 1
@@ -3046,30 +3140,122 @@ function initLiveLocation(mount) {
         await updateWalkedRoute(data, pos);
         
         updateStatus("#28a745", "良好");
+        
+        // 更新電腦版的 ETA 和時間線信息
+        const destinationStationEl = mount.querySelector("#rt-destination-station-desktop");
+        const destinationEtaEl = mount.querySelector("#rt-destination-eta-desktop");
+        const etaDetailEl = mount.querySelector("#rt-eta-detail-desktop");
+        const destinationMarkerEl = mount.querySelector("#rt-destination-marker-desktop");
+        const completeMarkerEl = mount.querySelector("#rt-complete-marker-desktop");
+        const etaInfoEl = mount.querySelector("#rt-eta-info-desktop");
+        const orderStartTimeEl = mount.querySelector("#rt-order-start-time-desktop");
+        
+        // 更新訂單開始時間
+        if (data.current_trip_start_time) {
+          const startTime = new Date(parseInt(data.current_trip_start_time));
+          if (orderStartTimeEl) orderStartTimeEl.textContent = formatTime(startTime);
+        } else if (data.current_trip_datetime) {
+          try {
+            const dtStr = data.current_trip_datetime;
+            const parts = dtStr.split(' ');
+            if (parts.length >= 2) {
+              const datePart = parts[0].replace(/\//g, '-');
+              const timePart = parts[1];
+              const dateTime = new Date(`${datePart}T${timePart}:00`);
+              if (orderStartTimeEl) orderStartTimeEl.textContent = formatTime(dateTime);
+            }
+          } catch (e) {}
+        }
+        
+        // 更新目的地站點和 ETA
+        const currentStation = data.current_trip_station || '';
+        if (currentStation && currentStation !== '所有站點已完成') {
+          if (destinationStationEl) destinationStationEl.textContent = currentStation;
+          
+          // 計算 ETA
+          const stationCoord = stationCoords[currentStation];
+          if (stationCoord) {
+            const eta = calculateETA(pos.lat, pos.lng, stationCoord.lat, stationCoord.lng);
+            
+            if (eta) {
+              // 更新司機距離顯示
+              if (etaInfoEl) etaInfoEl.textContent = `約 ${eta.minutes} 分鐘`;
+              
+              // 計算預計抵達的具體時間
+              const now = new Date();
+              const arrivalTime = new Date(now.getTime() + eta.minutes * 60 * 1000);
+              const arrivalTimeStr = formatTimeShort(arrivalTime);
+              
+              // 顯示預計抵達時間（格式：預計抵達 HH:MM (提前/延迟 X 小時 X 分鐘)）
+              if (destinationEtaEl) {
+                let etaText = `預計抵達 ${arrivalTimeStr}`;
+                
+                // 計算與預定時間的差異（如果有預定時間）
+                if (data.current_trip_datetime) {
+                  try {
+                    const dtStr = data.current_trip_datetime;
+                    const parts = dtStr.split(' ');
+                    if (parts.length >= 2) {
+                      const datePart = parts[0].replace(/\//g, '-');
+                      const timePart = parts[1];
+                      const scheduledTime = new Date(`${datePart}T${timePart}:00`);
+                      
+                      const timeDiff = calculateTimeDifference(arrivalTime, scheduledTime);
+                      if (timeDiff) {
+                        etaText += ` (${timeDiff.text})`;
+                        destinationEtaEl.style.color = timeDiff.isEarly ? '#28a745' : '#dc3545';
+                      } else {
+                        destinationEtaEl.style.color = '#28a745';
+                      }
+                    }
+                  } catch (e) {
+                    destinationEtaEl.style.color = '#28a745';
+                  }
+                } else {
+                  destinationEtaEl.style.color = '#28a745';
+                }
+                
+                destinationEtaEl.textContent = etaText;
+              }
+              
+              // 清空詳細信息（因為已經合併到 ETA 中）
+              if (etaDetailEl) etaDetailEl.textContent = '';
+              
+              // 更新標記狀態
+              if (destinationMarkerEl) {
+                destinationMarkerEl.style.borderColor = '#28a745';
+                destinationMarkerEl.style.background = '#28a745';
+              }
+            } else {
+              if (destinationEtaEl) destinationEtaEl.textContent = '計算中...';
+              if (etaDetailEl) etaDetailEl.textContent = '';
+            }
+          } else {
+            if (destinationEtaEl) destinationEtaEl.textContent = '等待位置更新...';
+            if (etaDetailEl) etaDetailEl.textContent = '';
+          }
+        } else {
+          if (destinationStationEl) destinationStationEl.textContent = '所有站點已完成';
+          if (destinationEtaEl) destinationEtaEl.textContent = '';
+          if (etaDetailEl) etaDetailEl.textContent = '';
+          if (destinationMarkerEl) {
+            destinationMarkerEl.style.borderColor = '#28a745';
+            destinationMarkerEl.style.background = '#28a745';
+          }
+          if (completeMarkerEl) {
+            completeMarkerEl.style.borderColor = '#28a745';
+            completeMarkerEl.style.background = '#28a745';
+          }
+        }
       } else {
         updateStatus("#ffc107", "連線中");
       }
       
-      // 更新下一站信息（基於已到達站點列表）
+      // 更新下一站信息（基於已到达站點列表）
       const stations = data.current_trip_stations?.stops || [];
       const tripDateTime = data.current_trip_datetime;
       const route = data.current_trip_route;
       const completedStops = data.current_trip_completed_stops || [];  // 已到達站點列表
-      // 不再使用 current_trip_station（已移除"即將抵達"顯示功能）
-      
-      // 根據已到達站點判斷下一站的輔助函數（已不再使用，保留以備將來需要）
-      const getNextStationFromCompleted = (stops, completed) => {
-        for (let i = 0; i < stops.length; i++) {
-          const stop = stops[i];
-          const stopName = typeof stop === "object" && stop.name ? stop.name : (typeof stop === "string" ? stop : "");
-          if (stopName && !completed.includes(stopName)) {
-            return stopName;
-          }
-        }
-        return null; // 所有站點都已完成
-      };
-      
-      // 不再更新下一站信息（已移除"即將抵達"顯示功能）
       
       currentTripData = data;
   };
@@ -3202,79 +3388,103 @@ function initLiveLocation(mount) {
       }
     });
     
-    // 創建司機位置標記（圓形logo，使用Canvas裁切成圓形）
-    // 創建圓形裁切的圖示
-    const createCircularIcon = () => {
-      return new Promise((resolve) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 40;
-        canvas.height = 40;
-        const ctx = canvas.getContext('2d');
-        
-        // 創建圓形裁剪路徑
-        ctx.beginPath();
-        ctx.arc(20, 20, 20, 0, 2 * Math.PI);
-        ctx.clip();
-        
-        // 載入圖片並繪製到圓形區域
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => {
-          // 繪製圖片到圓形區域
-          ctx.drawImage(img, 0, 0, 40, 40);
-          // 繪製圓形邊框
-          ctx.beginPath();
-          ctx.arc(20, 20, 20, 0, 2 * Math.PI);
-          ctx.strokeStyle = '#fff';
-          ctx.lineWidth = 3;
-          ctx.stroke();
-          
-          const dataUrl = canvas.toDataURL();
-          resolve({
-            url: dataUrl,
-            scaledSize: new google.maps.Size(40, 40),
-            anchor: new google.maps.Point(20, 20)
-          });
-        };
-        img.onerror = () => {
-          // 如果圖片載入失敗，使用默認圓形標記
-          ctx.fillStyle = '#4285F4';
-          ctx.fill();
-          ctx.strokeStyle = '#fff';
-          ctx.lineWidth = 3;
-          ctx.stroke();
-          const dataUrl = canvas.toDataURL();
-          resolve({
-            url: dataUrl,
-            scaledSize: new google.maps.Size(40, 40),
-            anchor: new google.maps.Point(20, 20)
-          });
-        };
-        img.src = '/images/接駁車圖示.png';
-      });
+    // 創建司機位置標記（綠色箭頭）
+    const createGreenArrowIcon = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 40;
+      canvas.height = 40;
+      const ctx = canvas.getContext('2d');
+      
+      // 繪製綠色箭頭
+      ctx.save();
+      ctx.translate(20, 20);
+      
+      // 箭頭形狀（向上）
+      ctx.beginPath();
+      ctx.moveTo(0, -15); // 箭頭頂部
+      ctx.lineTo(-10, 5); // 左下
+      ctx.lineTo(-5, 5);  // 左中
+      ctx.lineTo(-5, 15); // 左下延伸
+      ctx.lineTo(5, 15);  // 右下延伸
+      ctx.lineTo(5, 5);   // 右中
+      ctx.lineTo(10, 5);  // 右下
+      ctx.closePath();
+      
+      // 填充綠色
+      ctx.fillStyle = '#28a745';
+      ctx.fill();
+      
+      // 白色邊框
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.restore();
+      
+      const dataUrl = canvas.toDataURL();
+      return {
+        url: dataUrl,
+        scaledSize: new google.maps.Size(40, 40),
+        anchor: new google.maps.Point(20, 20)
+      };
     };
     
-    // 創建圓形裁切的接駁車圖示
-    const circularIcon = await createCircularIcon();
+    // 創建綠色箭頭圖示
+    const greenArrowIcon = createGreenArrowIcon();
     marker = new google.maps.Marker({ 
       position: { lat: 25.055550556928008, lng: 121.63210245291367 }, 
       map, 
       title: "司機位置",
-      icon: circularIcon,
+      icon: greenArrowIcon,
       zIndex: 10
     });
     
-    // 添加圓形外圈效果
+    // 添加呼吸光圈效果（淺綠色光圈閃爍）
     markerCircle = new google.maps.Circle({
-      strokeColor: "#4285F4",
+      strokeColor: "#90EE90", // 淺綠色
       strokeOpacity: 0.6,
       strokeWeight: 2,
-      fillColor: "#4285F4",
+      fillColor: "#90EE90",
       fillOpacity: 0.2,
       map: map,
       center: { lat: 25.055550556928008, lng: 121.63210245291367 },
       radius: 30
     });
+    
+    // 呼吸光圈動畫
+    let breathingRadius = 30;
+    let breathingDirection = 1;
+    let breathingOpacity = 0.2;
+    let breathingOpacityDirection = 1;
+    const breathingAnimation = setInterval(() => {
+      // 半徑呼吸效果（30-50之間）
+      breathingRadius += breathingDirection * 2;
+      if (breathingRadius >= 50) {
+        breathingRadius = 50;
+        breathingDirection = -1;
+      } else if (breathingRadius <= 30) {
+        breathingRadius = 30;
+        breathingDirection = 1;
+      }
+      
+      // 透明度呼吸效果（0.1-0.4之間）
+      breathingOpacity += breathingOpacityDirection * 0.02;
+      if (breathingOpacity >= 0.4) {
+        breathingOpacity = 0.4;
+        breathingOpacityDirection = -1;
+      } else if (breathingOpacity <= 0.1) {
+        breathingOpacity = 0.1;
+        breathingOpacityDirection = 1;
+      }
+      
+      if (markerCircle) {
+        markerCircle.setOptions({
+          radius: breathingRadius,
+          fillOpacity: breathingOpacity,
+          strokeOpacity: breathingOpacity * 2
+        });
+      }
+    }, 50); // 每50毫秒更新一次，實現平滑呼吸效果
     
     // 隱藏遮罩，顯示資訊
     if (overlayEl) overlayEl.style.display = "none";
@@ -3645,5 +3855,4 @@ function isExpiredByCarDateTime(carDateTime) {
     // 也就是說，班次時間已經超過1小時了
     return tripTime < (now - ONE_HOUR_MS);
   } catch (e) { return true; }
-        }
-
+}
