@@ -704,26 +704,6 @@ app.add_middleware(
 )
 
 
-@app.get("/debug/identity")
-def debug_identity():
-    """
-    Debug 端點：顯示目前程式運行的身份與專案資訊
-    """
-    try:
-        # 1. 檢查目前使用的 Service Account
-        import google.auth
-        credentials, project = google.auth.default()
-        
-        # 2. 檢查 Firebase App 狀態
-        firebase_app_name = "Not Initialized"
-        firebase_options = {}
-        if firebase_admin._apps:
-            app = firebase_admin.get_app()
-            firebase_app_name = app.name
-            firebase_options = app.options
-
-        return {
-            "current_project": project,
             "service_account_email": getattr(credentials, "service_account_email", "Unknown (using default/local creds)"),
             "env_google_cloud_project": os.environ.get("GOOGLE_CLOUD_PROJECT"),
             "env_firebase_rtdb_url": os.environ.get("FIREBASE_RTDB_URL"),
@@ -766,7 +746,6 @@ def update_driver_location(loc: DriverLocation):
             if not db_url:
                  project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
                  db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
-                 print(f"Warning: FIREBASE_RTDB_URL not set. Trying default: {db_url}")
 
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         
@@ -808,43 +787,33 @@ def update_driver_location(loc: DriverLocation):
                         
                         path_history_ref.set(current_history)
                 except Exception as path_history_error:
-                    print(f"Path history save error: {path_history_error}")
-            # print(f"Firebase write success: {loc.lat}, {loc.lng}")
+                    pass
             
-            # 優化：站點到達檢測（方式 A：自動更新）
-            # 當司機距離站點 < 50公尺時，自動標記為已到達並更新下一站
-            # 這是主要的更新機制，確保前端能即時顯示正確的下一站
             if loc.trip_id:
                 try:
                     check_station_arrival(loc.lat, loc.lng, loc.trip_id)
-                except Exception as arrival_error:
-                    print(f"Station arrival check error: {arrival_error}")
-            
-            # 方案 1：自動檢查過期班次（基於發車時間）
-            # 每次收到 GPS 位置時檢查，如果發車時間超過 40 分鐘，自動結束班次
+                except Exception:
+                    pass
             try:
                 trip_status = db.reference("/current_trip_status").get()
                 trip_start_time = db.reference("/current_trip_start_time").get()
                 trip_datetime = db.reference("/current_trip_datetime").get()
                 trip_id_ref = db.reference("/current_trip_id").get()
                 
-                # 如果班次狀態為 "active" 且有發車時間
                 if trip_status == "active" and trip_start_time:
                     now_ms = int(time.time() * 1000)
                     elapsed_ms = now_ms - int(trip_start_time)
                     AUTO_SHUTDOWN_MS = 40 * 60 * 1000  # 40分鐘
                     
-                    # 如果超過 40 分鐘，自動結束
                     if elapsed_ms >= AUTO_SHUTDOWN_MS:
-                        print(f"Auto-completing trip: {trip_id_ref} (elapsed: {elapsed_ms/1000/60:.1f} minutes)")
                         auto_complete_trip(
                             trip_id=trip_id_ref or "",
                             main_datetime=trip_datetime or ""
                         )
-            except Exception as auto_complete_error:
-                print(f"Auto-complete check error: {auto_complete_error}")
-    except Exception as e:
-        print(f"Firebase write error: {e}")
+            except Exception:
+                pass
+    except Exception:
+        pass
     return {"status": "ok", "received": loc}
 
 
@@ -871,11 +840,6 @@ def check_station_arrival(lat: float, lng: float, trip_id: str):
     檢查司機是否到達某個站點，如果距離 < 50公尺，自動標記為已到達
     只檢查該班次實際會停靠的站點（從 current_trip_stations 讀取）
     
-    優化：這是主要的自動更新機制（方式 A）
-    - 每次 GPS 更新時自動檢查（每 3 分鐘）
-    - 自動標記已到達站點
-    - 自動更新下一站到 Firebase 的 /current_trip_station
-    - 前端會優先讀取這個值來顯示"即將抵達"
     """
     if not firebase_admin._apps:
         return
@@ -928,22 +892,15 @@ def check_station_arrival(lat: float, lng: float, trip_id: str):
                 if stop_name not in completed_stops:
                     completed_stops.append(stop_name)
                     completed_stops_ref.set(completed_stops)
-                    print(f"Station arrived: {stop_name} (distance: {distance:.1f}m)")
-                    
-                    # 優化：更新下一站（只從實際會停靠的站點中選擇）
-                    # 只有在成功標記為已到達時才更新下一站，避免重複更新
                     next_stop = get_next_station(actual_stops_names, completed_stops)
                     if next_stop:
                         db.reference("/current_trip_station").set(next_stop)
-                        print(f"Updated next station to: {next_stop}")
                     else:
-                        # 所有站點都已完成
                         db.reference("/current_trip_station").set("所有站點已完成")
-                        print("All stations completed")
                 
-                break  # 一次只標記一個站點
-    except Exception as e:
-        print(f"Station arrival check error: {e}")
+                break
+    except Exception:
+        pass
 
 
 def get_next_station(stops: list, completed_stops: list) -> str:
@@ -983,20 +940,17 @@ def get_driver_location():
                  project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
                  # 嘗試常見的 Firebase RTDB URL 格式
                  db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
-                 print(f"Warning: FIREBASE_RTDB_URL not set. Trying default: {db_url}")
 
              firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         
         if firebase_admin._apps:
             ref = db.reference("/driver_location")
             data = ref.get()
-            # print(f"Firebase read result: {data}")
             if data:
                 return data
             else:
                 return {"lat": 0, "lng": 0, "timestamp": 0, "status": "no_data_in_firebase"}
     except Exception as e:
-        print(f"Firebase read error: {e}")
         # 回傳 500 但帶有詳細錯誤訊息，讓前端可以顯示
         return {
             "lat": 0, "lng": 0, "timestamp": 0, 
@@ -1474,13 +1428,11 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
             ]
             ws2.batch_update(update_data, value_input_option="USER_ENTERED")
     except Exception as sheet_update_error:
-        print(f"Sheet update error in trip_start: {sheet_update_error}")
     
     # 檢查是否為櫃台人員：櫃台人員只更新Sheet，不寫入Firebase
     if req.driver_role == 'desk':
         return GoogleTripStartResponse(trip_id=trip_id, share_url=None, stops=None)
     
-    # 系統啟用旗標：系統!E19 為 TRUE 才啟用追蹤（僅影響 Firebase 寫入，不影響 Sheet 更新）
     try:
         ws = open_ws(SHEET_NAME_SYSTEM)
         e19 = (ws.acell("E19").value or "").strip().lower()
@@ -1544,7 +1496,6 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                     ]
                     ws2.batch_update(update_data, value_input_option="USER_ENTERED")
             except Exception as sheet_update_error:
-                print(f"Sheet update error in trip_start: {sheet_update_error}")
         # 優先使用APP傳遞的停靠站點列表（根據乘客資料計算）
         stops_names: List[str] = []
         if req.stops and len(req.stops) > 0:
@@ -1657,14 +1608,11 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                         path = _decode_polyline(points) if points else []
                         polyline_obj = {"points": points, "path": path}
                 else:
-                    print(f"Directions API error: {data.get('status')} {data.get('error_message')}")
+                    pass
             else:
-                if not api_key:
-                    print("Directions skipped: GOOGLE_MAPS_API_KEY not set.")
-                if len(stops) < 2:
-                    print("Directions skipped: insufficient stops.")
-        except Exception as de:
-            print(f"Directions generation error: {de}")
+                pass
+        except Exception:
+            pass
         # 將結果寫入 Firebase
         try:
             if not firebase_admin._apps:
@@ -1703,23 +1651,15 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                     "all_stations": STATIONS
                 }
                 db.reference("/current_trip_stations").set(stations_info)
-                # 優化：初始化即將前往的站點（設置為第一個站點）
                 if stops_names and len(stops_names) > 0:
                     first_stop = stops_names[0]
                     db.reference("/current_trip_station").set(first_stop)
-                    print(f"Initialized current_trip_station to first stop: {first_stop}")
-                # 優化：初始化即將前往的站點（設置為第一個站點）
-                if stops_names and len(stops_names) > 0:
-                    first_stop = stops_names[0]
-                    db.reference("/current_trip_station").set(first_stop)
-                    print(f"Initialized current_trip_station to first stop: {first_stop}")
-            except Exception as e2:
-                print(f"Write current_trip metadata error: {e2}")
-        except Exception as fe:
-            print(f"Firebase route write error: {fe}")
+            except Exception:
+                pass
+        except Exception:
+            pass
         return GoogleTripStartResponse(trip_id=trip_id, share_url=None, stops=stops or None)
-    except Exception as e:
-        print(f"Trip start route generation error: {e}")
+    except Exception:
         return GoogleTripStartResponse(trip_id=trip_id, share_url=None, stops=None)
 
 def auto_complete_trip(trip_id: str = None, main_datetime: str = None):
@@ -1784,7 +1724,6 @@ def auto_complete_trip(trip_id: str = None, main_datetime: str = None):
                 ]
                 ws2.batch_update(update_data, value_input_option="USER_ENTERED")
         except Exception as sheet_update_error:
-            print(f"Sheet update error in trip_complete: {sheet_update_error}")
     
     # 清除目前班次標記
     try:
@@ -1805,10 +1744,9 @@ def auto_complete_trip(trip_id: str = None, main_datetime: str = None):
         try:
             path_history_ref = db.reference("/current_trip_path_history")
             path_history_ref.set([])
-            print(f"Cleaned up path history data for trip")
-        except Exception as cleanup_error:
-            # 清理失敗不影響班次結束流程
-            print(f"Path history cleanup error (non-critical): {cleanup_error}")
+            pass
+        except Exception:
+            pass
         
         # 清除目前班次標記，並設置結束狀態
         db.reference("/current_trip_id").set("")
@@ -1824,8 +1762,8 @@ def auto_complete_trip(trip_id: str = None, main_datetime: str = None):
             pass
         db.reference("/current_trip_datetime").set("")
         db.reference("/current_trip_stations").set({})
-    except Exception as e:
-        print(f"Trip complete cleanup error: {e}")
+    except Exception:
+        pass
     return True
 
 
@@ -1863,7 +1801,6 @@ def api_driver_route(trip_id: str = Query(..., description="主班次時間，�
         data = ref.get()
         return data or {"stops": [], "polyline": None}
     except Exception as e:
-        print(f"Route read error: {e}")
         raise HTTPException(status_code=500, detail=f"Route read error: {str(e)}")
 
 @app.get("/api/driver/system_status")
@@ -1889,7 +1826,6 @@ def api_driver_system_status():
             enabled = True  # 預設啟用
         return {"enabled": bool(enabled), "message": "GPS系統總開關狀態"}
     except Exception as e:
-        print(f"System status read error: {e}")
         return {"enabled": True, "message": "讀取失敗，預設啟用"}
 
 class SystemStatusRequest(BaseModel):
@@ -1916,7 +1852,6 @@ def api_driver_set_system_status(req: SystemStatusRequest):
         ref.set(bool(req.enabled))
         return {"status": "success", "enabled": bool(req.enabled), "message": "GPS系統總開關狀態已更新"}
     except Exception as e:
-        print(f"System status write error: {e}")
         raise HTTPException(status_code=500, detail=f"寫入失敗: {str(e)}")
 
 class UpdateStationRequest(BaseModel):
@@ -1943,5 +1878,4 @@ def api_driver_update_station(req: UpdateStationRequest):
         db.reference("/current_trip_station").set(req.current_station)
         return {"status": "success", "current_station": req.current_station}
     except Exception as e:
-        print(f"Firebase update station error: {e}")
         raise HTTPException(status_code=500, detail=f"? 新站 ?失 ?: {str(e)}")
