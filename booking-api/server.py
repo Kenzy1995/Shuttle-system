@@ -91,7 +91,6 @@ def _set_cached_sheet_data(sheet_name: str, range_name: str, values: list):
 def get_sheet_data():
     """
     Fetches rows from a Google Sheet via the Sheets API.
-    優化：添加 5 秒快取機制，減少 Google Sheets API 調用
 
     Optional query parameters:
     - sheet: Name of the sheet tab to query.  Defaults to the
@@ -170,7 +169,6 @@ def _init_firebase():
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         return True
     except Exception as e:
-        print(f"Firebase init error: {e}")
         return False
 
 
@@ -185,7 +183,6 @@ def api_realtime_location():
             return jsonify({"error": "Firebase initialization failed"}), 500
         
         # 讀取 GPS 系統總開關（優先從 Sheet 的「系統」E19 讀取）
-        # 優化：添加快取機制，減少 Sheet 讀取
         gps_system_enabled = None
         try:
             # 檢查快取（系統開關變化不頻繁，可以快取更長時間）
@@ -212,7 +209,6 @@ def api_realtime_location():
                     e19_value = (cached_gps_enabled[0][0] or "").strip().lower()
                     gps_system_enabled = e19_value in ("true", "t", "yes", "1")
         except Exception as e:
-            print(f"Read GPS system enabled from Sheet error: {e}")
         
         # 如果從 Sheet 讀取失敗，嘗試從 Firebase 讀取
         if gps_system_enabled is None:
@@ -236,7 +232,6 @@ def api_realtime_location():
         current_trip_completed_stops = db.reference("/current_trip_completed_stops").get() or []  # 已到達站點列表
         last_trip_datetime = db.reference("/last_trip_datetime").get() or ""
         
-        # 方案 2：自動檢查過期班次（基於發車時間和 GPS 更新時間）
         # 前端讀取資料時檢查，如果發車時間超過 40 分鐘，自動結束班次
         try:
             import time
@@ -248,15 +243,12 @@ def api_realtime_location():
                 
                 # 如果超過 40 分鐘，自動結束（只更新 Firebase，Sheet 由 driver-api2 處理）
                 if elapsed_ms >= AUTO_SHUTDOWN_MS:
-                    print(f"Auto-completing trip in booking-api: {current_trip_id} (elapsed: {elapsed_ms/1000/60:.1f} minutes)")
-                    # 優化：清理歷史路線資料，節省 Firebase 儲存空間
                     try:
                         if current_trip_id:
                             history_route_ref = db.reference(f"/trip/{current_trip_id}/route")
                             history_route_ref.delete()
-                            print(f"Cleaned up historical route data for trip: {current_trip_id}")
-                    except Exception as cleanup_error:
-                        print(f"Historical route cleanup error (non-critical): {cleanup_error}")
+                    except Exception:
+                        pass
                     
                     # 更新 Firebase 狀態為 ended
                     db.reference("/current_trip_status").set("ended")
@@ -293,13 +285,10 @@ def api_realtime_location():
                             AUTO_SHUTDOWN_MS = 40 * 60 * 1000  # 40分鐘
                             
                             if elapsed_ms >= AUTO_SHUTDOWN_MS:
-                                print(f"Auto-completing trip (GPS timeout): {current_trip_id} (GPS not updated for {elapsed_seconds/60:.1f} minutes)")
-                                # 改進：清理當前班次的路徑歷史資料
                                 try:
                                     db.reference("/current_trip_path_history").set([])
-                                    print(f"Cleaned up path history data for trip")
-                                except Exception as cleanup_error:
-                                    print(f"Path history cleanup error (non-critical): {cleanup_error}")
+                                except Exception:
+                                    pass
                                 
                                 # 更新 Firebase 狀態為 ended
                                 db.reference("/current_trip_status").set("ended")
@@ -315,9 +304,9 @@ def api_realtime_location():
                                 if current_trip_datetime:
                                     last_trip_datetime = current_trip_datetime
                     except Exception as parse_error:
-                        print(f"Parse GPS updated_at error: {parse_error}")
-        except Exception as auto_complete_error:
-            print(f"Auto-complete check error in booking-api: {auto_complete_error}")
+                        pass
+        except Exception:
+            pass
         
         # 獲取GPS位置歷史（用於路線追蹤）
         current_trip_path_history = []
@@ -326,7 +315,6 @@ def api_realtime_location():
                 path_history_ref = db.reference("/current_trip_path_history")
                 current_trip_path_history = path_history_ref.get() or []
         except Exception as path_history_error:
-            print(f"Path history read error: {path_history_error}")
         
         return jsonify({
             "gps_system_enabled": bool(gps_system_enabled),
@@ -343,9 +331,7 @@ def api_realtime_location():
             "last_trip_datetime": last_trip_datetime
         }), 200
     except Exception as e:
-        print(f"Realtime location read error: {e}")
         return jsonify({"error": str(e)}), 500
-
 
 
 if __name__ == "__main__":
