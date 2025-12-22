@@ -9,6 +9,7 @@ from firebase_admin import credentials, db
 from datetime import datetime
 from threading import Lock
 
+
 app = Flask(__name__)
 CORS(app, origins=[
     "https://hotel-web-3addcbkbgq-de.a.run.app",
