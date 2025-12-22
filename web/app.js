@@ -2323,6 +2323,12 @@ function initLiveLocation(mount) {
         <button id="rt-refresh" style="margin-left:auto;padding:8px 16px;background:#fff;border:1px solid #ddd;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.1);">刷新</button>
       </div>
       
+      <!-- 當前位置路名 -->
+      <div id="rt-current-address" style="margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px;border-left:3px solid #28a745;">
+        <div style="font-size:12px;color:#666;margin-bottom:4px;">當前位置</div>
+        <div id="rt-address-text" style="font-size:14px;color:#333;font-weight:500;">載入中...</div>
+      </div>
+      
       <!-- 站點列表 -->
       <div id="rt-stations-list" style="display:flex;flex-direction:column;gap:12px;">
         <!-- 站點將動態生成 -->
@@ -2347,6 +2353,7 @@ function initLiveLocation(mount) {
   const startBtn = mount.querySelector("#rt-start-btn");
   const infoPanel = mount.querySelector("#rt-info-panel");
   const stationsList = mount.querySelector("#rt-stations-list");
+  const addressTextEl = mount.querySelector("#rt-address-text");
   
   // 根據設備選擇對應的元素
   const statusLight = mount.querySelector("#rt-status-light");
@@ -3143,6 +3150,43 @@ function initLiveLocation(mount) {
   };
   
   // 處理位置資料的共用函數（從 fetchLocation 和 updateLocationFromFirebase 調用）
+  // Geocoder 和路名獲取函數（在 initMap 中初始化）
+  let geocoder = null;
+  const getRoadName = (lat, lng) => {
+    if (!geocoder) {
+      return Promise.resolve('載入中...');
+    }
+    return new Promise((resolve) => {
+      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+        if (status === 'OK' && results && results.length > 0) {
+          // 嘗試從結果中提取路名
+          let roadName = '';
+          for (const result of results) {
+            // 查找 route (路名) 或 street_address
+            for (const component of result.address_components) {
+              if (component.types.includes('route')) {
+                roadName = component.long_name || component.short_name;
+                break;
+              }
+            }
+            if (roadName) break;
+            
+            // 如果沒有找到 route，嘗試使用 formatted_address 的第一部分
+            if (!roadName && result.formatted_address) {
+              const parts = result.formatted_address.split(/[，,]/);
+              if (parts.length > 0) {
+                roadName = parts[0].trim();
+              }
+            }
+          }
+          resolve(roadName || '無法取得路名');
+        } else {
+          resolve('無法取得路名');
+        }
+      });
+    });
+  };
+
   const processLocationData = async (data) => {
       
       // 檢查 GPS 系統總開關
@@ -3233,9 +3277,20 @@ function initLiveLocation(mount) {
         // 更新已走過的路線
         await updateWalkedRoute(data, driverPos);
         
+        // 更新路名顯示
+        if (addressTextEl) {
+          try {
+            const roadName = await getRoadName(driverPos.lat, driverPos.lng);
+            addressTextEl.textContent = roadName || '載入中...';
+          } catch (e) {
+            if (addressTextEl) addressTextEl.textContent = '無法取得路名';
+          }
+        }
+        
         updateStatus("#28a745", "良好");
       } else {
         updateStatus("#ffc107", "連線中");
+        if (addressTextEl) addressTextEl.textContent = '等待位置資訊...';
       }
       
       // 更新站點列表
@@ -3377,12 +3432,15 @@ function initLiveLocation(mount) {
     );
     
     // 初始化地圖（使用 styles 設置灰色地圖，不使用 mapId）
-    // 隱藏所有不必要的 UI 元素，讓畫面乾淨
+    // 保留縮放控制功能
     map = new google.maps.Map(mapEl, { 
       center: { lat: 25.055550556928008, lng: 121.63210245291367 }, 
       zoom: 14, 
-      disableDefaultUI: true, // 隱藏所有預設 UI
-      zoomControl: false, 
+      disableDefaultUI: false, // 啟用預設 UI（保留縮放控制）
+      zoomControl: true, // 啟用縮放控制（右下角）
+      zoomControlOptions: {
+        position: google.maps.ControlPosition.RIGHT_BOTTOM
+      },
       mapTypeControl: false, 
       streetViewControl: false,
       fullscreenControl: false,
@@ -3392,6 +3450,9 @@ function initLiveLocation(mount) {
         strictBounds: true // 嚴格限制，不允許拖動到邊界外
       }
     });
+    
+    // 初始化 Geocoder 實例用於獲取路名
+    geocoder = new google.maps.Geocoder();
     
     // 創建司機位置標記（綠色點，使用舊的 Marker API）
     marker = new google.maps.Marker({ 
