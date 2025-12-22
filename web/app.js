@@ -2341,12 +2341,19 @@ function initLiveLocation(mount) {
           <div id="rt-ended-text">班次: <span id="rt-ended-datetime"></span> 已結束</div>
         </div>
       </div>
+      <!-- 無可顯示班次遮罩 -->
+      <div id="rt-no-trip-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:15;pointer-events:none;">
+        <div style="text-align:center;color:#fff;font-size:20px;font-weight:700;">
+          <div>目前無可顯示班次</div>
+        </div>
+      </div>
     </div>
   `;
   const overlayEl = mount.querySelector("#rt-overlay");
   const startBtn = mount.querySelector("#rt-start-btn");
   const infoPanel = mount.querySelector("#rt-info-panel");
   const stationsList = mount.querySelector("#rt-stations-list");
+  const noTripOverlay = mount.querySelector("#rt-no-trip-overlay");
   // 根據設備選擇對應的元素
   const statusLight = mount.querySelector("#rt-status-light");
   const statusText = mount.querySelector("#rt-status-text");
@@ -3177,14 +3184,17 @@ function initLiveLocation(mount) {
         }
       }
       
-      // 如果班次時間超過1小時，顯示"目前無可顯示班次"
+      // 如果班次時間超過1小時，顯示"目前無可顯示班次"遮罩
       if (shouldShowNoTrip) {
+        // 隱藏上方資訊區塊
         if (infoPanel) {
-          infoPanel.style.display = "block";
-          if (stationsList) {
-            stationsList.innerHTML = '<div style="padding:24px;text-align:center;color:#666;font-size:16px;">目前無可顯示班次</div>';
-          }
+          infoPanel.style.display = "none";
         }
+        // 顯示"目前無可顯示班次"遮罩
+        if (noTripOverlay) {
+          noTripOverlay.style.display = "flex";
+        }
+        // 隱藏其他遮罩
         if (endedOverlay) endedOverlay.style.display = "none";
         if (overlayEl) overlayEl.style.display = "none";
         return;
@@ -3214,9 +3224,11 @@ function initLiveLocation(mount) {
           }
         }
         if (infoPanel) infoPanel.style.display = "none";
+        if (noTripOverlay) noTripOverlay.style.display = "none";
         return;
       } else {
         if (endedOverlay) endedOverlay.style.display = "none";
+        if (noTripOverlay) noTripOverlay.style.display = "none";
         if (infoPanel) infoPanel.style.display = "block";
       }
       
