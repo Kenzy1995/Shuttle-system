@@ -3264,32 +3264,47 @@ function initLiveLocation(mount) {
       throw new Error("Google Maps API 初始化超時");
     }
     
-    // 灰白黑色地圖樣式
+    // 灰白黑色地圖樣式 - 隱藏所有不必要的資訊，讓畫面乾淨
     const mapStyles = [
       {
         featureType: "all",
-        elementType: "geometry",
-        stylers: [{ color: "#f5f5f5" }]
+        elementType: "labels",
+        stylers: [{ visibility: "off" }]
       },
       {
         featureType: "all",
-        elementType: "labels.text.fill",
-        stylers: [{ color: "#666666" }]
+        elementType: "labels.text",
+        stylers: [{ visibility: "off" }]
       },
       {
         featureType: "all",
-        elementType: "labels.text.stroke",
-        stylers: [{ color: "#ffffff" }]
+        elementType: "labels.icon",
+        stylers: [{ visibility: "off" }]
       },
       {
-        featureType: "road",
+        featureType: "all",
         elementType: "geometry",
         stylers: [{ color: "#e0e0e0" }]
       },
       {
-        featureType: "water",
+        featureType: "road",
         elementType: "geometry",
         stylers: [{ color: "#d0d0d0" }]
+      },
+      {
+        featureType: "road",
+        elementType: "labels",
+        stylers: [{ visibility: "off" }]
+      },
+      {
+        featureType: "water",
+        elementType: "geometry",
+        stylers: [{ color: "#c0c0c0" }]
+      },
+      {
+        featureType: "water",
+        elementType: "labels",
+        stylers: [{ visibility: "off" }]
       },
       {
         featureType: "poi",
@@ -3315,6 +3330,11 @@ function initLiveLocation(mount) {
         featureType: "transit",
         elementType: "all",
         stylers: [{ visibility: "off" }]
+      },
+      {
+        featureType: "administrative",
+        elementType: "labels",
+        stylers: [{ visibility: "off" }]
       }
     ];
     
@@ -3338,13 +3358,15 @@ function initLiveLocation(mount) {
     );
     
     // 初始化地圖（需要 mapId 以支援 AdvancedMarkerElement）
+    // 隱藏所有不必要的 UI 元素，讓畫面乾淨
     map = new google.maps.Map(mapEl, { 
       center: { lat: 25.055550556928008, lng: 121.63210245291367 }, 
       zoom: 14, 
-      disableDefaultUI: false, 
-      zoomControl: true, 
+      disableDefaultUI: true, // 隱藏所有預設 UI
+      zoomControl: false, 
       mapTypeControl: false, 
       streetViewControl: false,
+      fullscreenControl: false,
       styles: mapStyles,
       mapId: "FORTE_SHUTTLE_MAP", // 地圖 ID，用於支援 AdvancedMarkerElement
       restriction: {
