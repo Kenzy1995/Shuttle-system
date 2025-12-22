@@ -9,7 +9,6 @@ from firebase_admin import credentials, db
 from datetime import datetime
 from threading import Lock
 
-
 app = Flask(__name__)
 CORS(app, origins=[
     "https://hotel-web-3addcbkbgq-de.a.run.app",
@@ -295,14 +294,12 @@ def api_realtime_location():
                             
                             if elapsed_ms >= AUTO_SHUTDOWN_MS:
                                 print(f"Auto-completing trip (GPS timeout): {current_trip_id} (GPS not updated for {elapsed_seconds/60:.1f} minutes)")
-                                # 優化：清理歷史路線資料，節省 Firebase 儲存空間
+                                # 改進：清理當前班次的路徑歷史資料
                                 try:
-                                    if current_trip_id:
-                                        history_route_ref = db.reference(f"/trip/{current_trip_id}/route")
-                                        history_route_ref.delete()
-                                        print(f"Cleaned up historical route data for trip: {current_trip_id}")
+                                    db.reference("/current_trip_path_history").set([])
+                                    print(f"Cleaned up path history data for trip")
                                 except Exception as cleanup_error:
-                                    print(f"Historical route cleanup error (non-critical): {cleanup_error}")
+                                    print(f"Path history cleanup error (non-critical): {cleanup_error}")
                                 
                                 # 更新 Firebase 狀態為 ended
                                 db.reference("/current_trip_status").set("ended")
@@ -312,6 +309,7 @@ def api_realtime_location():
                                 db.reference("/current_trip_route").set({})
                                 db.reference("/current_trip_datetime").set("")
                                 db.reference("/current_trip_stations").set({})
+                                db.reference("/current_trip_path_history").set([])
                                 # 更新狀態變數
                                 current_trip_status = "ended"
                                 if current_trip_datetime:
@@ -320,6 +318,15 @@ def api_realtime_location():
                         print(f"Parse GPS updated_at error: {parse_error}")
         except Exception as auto_complete_error:
             print(f"Auto-complete check error in booking-api: {auto_complete_error}")
+        
+        # 獲取GPS位置歷史（用於路線追蹤）
+        current_trip_path_history = []
+        try:
+            if current_trip_id:
+                path_history_ref = db.reference("/current_trip_path_history")
+                current_trip_path_history = path_history_ref.get() or []
+        except Exception as path_history_error:
+            print(f"Path history read error: {path_history_error}")
         
         return jsonify({
             "gps_system_enabled": bool(gps_system_enabled),
@@ -332,6 +339,7 @@ def api_realtime_location():
             "current_trip_station": current_trip_station,  # 即將前往的站點
             "current_trip_start_time": int(current_trip_start_time) if current_trip_start_time else 0,  # 發車時間戳
             "current_trip_completed_stops": current_trip_completed_stops,  # 已到達站點列表
+            "current_trip_path_history": current_trip_path_history,  # GPS位置歷史（用於路線追蹤）
             "last_trip_datetime": last_trip_datetime
         }), 200
     except Exception as e:
