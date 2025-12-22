@@ -3142,109 +3142,8 @@ function initLiveLocation(mount) {
   };
   
   // 處理位置資料的共用函數（從 fetchLocation 和 updateLocationFromFirebase 調用）
-  // Geocoder 和路名獲取函數（在 initMap 中初始化）
+  // Geocoder（在 initMap 中初始化，保留以備將來需要）
   let geocoder = null;
-  let roadNameLabel = null; // 地圖上的路名標籤
-  
-  // 路名標籤的 OverlayView 類別
-  class RoadNameLabel extends google.maps.OverlayView {
-    constructor(position, text) {
-      super();
-      this.position = position;
-      this.text = text;
-      this.div = null;
-    }
-    
-    onAdd() {
-      const div = document.createElement('div');
-      div.style.cssText = `
-        position: absolute;
-        background: rgba(255, 255, 255, 0.95);
-        border: 2px solid #28a745;
-        border-radius: 8px;
-        padding: 6px 12px;
-        font-size: 13px;
-        font-weight: 600;
-        color: #333;
-        white-space: nowrap;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        z-index: 1000;
-        pointer-events: none;
-      `;
-      div.textContent = this.text;
-      this.div = div;
-      
-      const panes = this.getPanes();
-      if (panes && panes.overlayMouseTarget) {
-        panes.overlayMouseTarget.appendChild(div);
-      }
-    }
-    
-    draw() {
-      const overlayProjection = this.getProjection();
-      if (!overlayProjection || !this.position) return;
-      
-      const position = overlayProjection.fromLatLngToDivPixel(this.position);
-      
-      if (this.div && position) {
-        this.div.style.left = (position.x - this.div.offsetWidth / 2) + 'px';
-        this.div.style.top = (position.y - this.div.offsetHeight - 35) + 'px';
-      }
-    }
-    
-    onRemove() {
-      if (this.div && this.div.parentNode) {
-        this.div.parentNode.removeChild(this.div);
-      }
-    }
-    
-    setPosition(position) {
-      this.position = position;
-      this.draw();
-    }
-    
-    setText(text) {
-      this.text = text;
-      if (this.div) {
-        this.div.textContent = text;
-      }
-    }
-  }
-  
-  const getRoadName = (lat, lng) => {
-    if (!geocoder) {
-      return Promise.resolve('載入中...');
-    }
-    return new Promise((resolve) => {
-      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-        if (status === 'OK' && results && results.length > 0) {
-          // 嘗試從結果中提取路名
-          let roadName = '';
-          for (const result of results) {
-            // 查找 route (路名) 或 street_address
-            for (const component of result.address_components) {
-              if (component.types.includes('route')) {
-                roadName = component.long_name || component.short_name;
-                break;
-              }
-            }
-            if (roadName) break;
-            
-            // 如果沒有找到 route，嘗試使用 formatted_address 的第一部分
-            if (!roadName && result.formatted_address) {
-              const parts = result.formatted_address.split(/[，,]/);
-              if (parts.length > 0) {
-                roadName = parts[0].trim();
-              }
-            }
-          }
-          resolve(roadName || '無法取得路名');
-        } else {
-          resolve('無法取得路名');
-        }
-      });
-    });
-  };
 
   const processLocationData = async (data) => {
       
@@ -3336,26 +3235,9 @@ function initLiveLocation(mount) {
         // 更新已走過的路線
         await updateWalkedRoute(data, driverPos);
         
-        // 更新地圖上的路名顯示
-        if (roadNameLabel) {
-          try {
-            const roadName = await getRoadName(driverPos.lat, driverPos.lng);
-            roadNameLabel.setPosition(driverPos);
-            roadNameLabel.setText(roadName || '載入中...');
-          } catch (e) {
-            if (roadNameLabel) {
-              roadNameLabel.setPosition(driverPos);
-              roadNameLabel.setText('無法取得路名');
-            }
-          }
-        }
-        
         updateStatus("#28a745", "良好");
       } else {
         updateStatus("#ffc107", "連線中");
-        if (roadNameLabel) {
-          roadNameLabel.setText('等待位置資訊...');
-        }
       }
       
       // 更新站點列表
@@ -3403,23 +3285,8 @@ function initLiveLocation(mount) {
       throw new Error("Google Maps API 初始化超時");
     }
     
-    // 灰白黑色地圖樣式 - 隱藏所有不必要的資訊，讓畫面乾淨
+    // 灰色地圖樣式 - 地圖灰色，隱藏地標，但保留路名
     const mapStyles = [
-      {
-        featureType: "all",
-        elementType: "labels",
-        stylers: [{ visibility: "off" }]
-      },
-      {
-        featureType: "all",
-        elementType: "labels.text",
-        stylers: [{ visibility: "off" }]
-      },
-      {
-        featureType: "all",
-        elementType: "labels.icon",
-        stylers: [{ visibility: "off" }]
-      },
       {
         featureType: "all",
         elementType: "geometry",
@@ -3431,19 +3298,9 @@ function initLiveLocation(mount) {
         stylers: [{ color: "#d0d0d0" }]
       },
       {
-        featureType: "road",
-        elementType: "labels",
-        stylers: [{ visibility: "off" }]
-      },
-      {
         featureType: "water",
         elementType: "geometry",
         stylers: [{ color: "#c0c0c0" }]
-      },
-      {
-        featureType: "water",
-        elementType: "labels",
-        stylers: [{ visibility: "off" }]
       },
       {
         featureType: "poi",
@@ -3468,11 +3325,6 @@ function initLiveLocation(mount) {
       {
         featureType: "transit",
         elementType: "all",
-        stylers: [{ visibility: "off" }]
-      },
-      {
-        featureType: "administrative",
-        elementType: "labels",
         stylers: [{ visibility: "off" }]
       }
     ];
@@ -3516,15 +3368,8 @@ function initLiveLocation(mount) {
       }
     });
     
-    // 初始化 Geocoder 實例用於獲取路名
+    // 初始化 Geocoder 實例（保留以備將來需要）
     geocoder = new google.maps.Geocoder();
-    
-    // 創建路名標籤（在地圖上顯示路名）
-    roadNameLabel = new RoadNameLabel(
-      { lat: 25.055550556928008, lng: 121.63210245291367 },
-      '載入中...'
-    );
-    roadNameLabel.setMap(map);
     
     // 創建司機位置標記（綠色點，使用舊的 Marker API）
     marker = new google.maps.Marker({ 
