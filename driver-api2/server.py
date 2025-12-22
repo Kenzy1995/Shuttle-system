@@ -781,6 +781,34 @@ def update_driver_location(loc: DriverLocation):
             if loc.trip_id:
                 location_data["trip_id"] = loc.trip_id
             ref.set(location_data)
+            
+            # 改進：記錄GPS位置歷史（用於路線追蹤）
+            # 每次GPS更新時，將位置和時間戳記錄到當前班次的路徑歷史中
+            if loc.trip_id:
+                try:
+                    # 獲取當前班次ID
+                    current_trip_id = db.reference("/current_trip_id").get()
+                    if current_trip_id == loc.trip_id:
+                        # 記錄GPS位置歷史到 /current_trip_path_history
+                        path_history_ref = db.reference("/current_trip_path_history")
+                        current_history = path_history_ref.get() or []
+                        
+                        # 添加新的位置點（包含時間戳）
+                        new_point = {
+                            "lat": loc.lat,
+                            "lng": loc.lng,
+                            "timestamp": loc.timestamp,
+                            "updated_at": DRIVER_LOCATION_CACHE["updated_at"]
+                        }
+                        
+                        # 只保留最近的路徑點（避免資料過大，保留最近1000個點）
+                        current_history.append(new_point)
+                        if len(current_history) > 1000:
+                            current_history = current_history[-1000:]
+                        
+                        path_history_ref.set(current_history)
+                except Exception as path_history_error:
+                    print(f"Path history save error: {path_history_error}")
             # print(f"Firebase write success: {loc.lat}, {loc.lng}")
             
             # 優化：站點到達檢測（方式 A：自動更新）
@@ -1651,11 +1679,11 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                     project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
                     db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
                 firebase_admin.initialize_app(cred, {"databaseURL": db_url})
-            ref = db.reference(f"/trip/{trip_id}/route")
+            # 改進：不再保存到 /trip/{trip_id}/route，直接覆蓋 /current_trip_route
+            # 這樣可以避免累積歷史資料，每次都是覆蓋當前班次的路線
             payload = {"stops": stops}
             if polyline_obj:
                 payload["polyline"] = polyline_obj
-            ref.set(payload)
             # 寫入目前班次 ID、狀態、日期時間、路線和站點信息，供乘客端直接讀取
             try:
                 import time
@@ -1772,27 +1800,21 @@ def auto_complete_trip(trip_id: str = None, main_datetime: str = None):
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         
-        # 優化：清理歷史路線資料，節省 Firebase 儲存空間
-        # 在班次結束時，刪除 /trip/{trip_id}/route，避免累積歷史資料
+        # 改進：清理當前班次的路徑歷史資料
+        # 在班次結束時，清除 /current_trip_path_history，避免累積歷史資料
         try:
-            # 獲取當前班次 ID（如果沒有傳入 trip_id）
-            current_trip_id_to_clean = trip_id
-            if not current_trip_id_to_clean:
-                current_trip_id_to_clean = db.reference("/current_trip_id").get()
-            
-            # 如果有班次 ID，刪除歷史路線資料
-            if current_trip_id_to_clean:
-                history_route_ref = db.reference(f"/trip/{current_trip_id_to_clean}/route")
-                history_route_ref.delete()
-                print(f"Cleaned up historical route data for trip: {current_trip_id_to_clean}")
+            path_history_ref = db.reference("/current_trip_path_history")
+            path_history_ref.set([])
+            print(f"Cleaned up path history data for trip")
         except Exception as cleanup_error:
             # 清理失敗不影響班次結束流程
-            print(f"Historical route cleanup error (non-critical): {cleanup_error}")
+            print(f"Path history cleanup error (non-critical): {cleanup_error}")
         
         # 清除目前班次標記，並設置結束狀態
         db.reference("/current_trip_id").set("")
         db.reference("/current_trip_route").set({})
         db.reference("/current_trip_status").set("ended")
+        db.reference("/current_trip_path_history").set([])
         # 保存最後一次班次的日期時間
         try:
             last_trip_datetime = db.reference("/current_trip_datetime").get()
