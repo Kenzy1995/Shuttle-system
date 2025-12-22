@@ -1419,6 +1419,7 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
             ]
             ws2.batch_update(update_data, value_input_option="USER_ENTERED")
     except Exception as sheet_update_error:
+        pass
     
     # 檢查是否為櫃台人員：櫃台人員只更新Sheet，不寫入Firebase
     if req.driver_role == 'desk':
@@ -1444,13 +1445,13 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                 ws2 = open_ws("車次管理(備品)")
             headers = ws2.row_values(6)
             headers = [(h or "").strip() for h in headers]
-            def hidx(name: str) -> int:
+            def hidx2(name: str) -> int:
                 try:
                     return headers.index(name)
                 except ValueError:
                     return -1
-            idx_date = hidx("日期")
-            idx_time = hidx("班次") if hidx("時間") < 0 else hidx("時間")
+            idx_date = hidx2("日期")
+            idx_time = hidx2("班次") if hidx2("時間") < 0 else hidx2("時間")
             # 規範化候選日期/時間
             target_date = dt.strftime("%Y/%m/%d")
             alt_date = dt.strftime("%Y-%m-%d")
@@ -1487,6 +1488,8 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                     ]
                     ws2.batch_update(update_data, value_input_option="USER_ENTERED")
             except Exception as sheet_update_error:
+                pass
+        
         # 優先使用APP傳遞的停靠站點列表（根據乘客資料計算）
         stops_names: List[str] = []
         if req.stops and len(req.stops) > 0:
@@ -1715,6 +1718,7 @@ def auto_complete_trip(trip_id: str = None, main_datetime: str = None):
                 ]
                 ws2.batch_update(update_data, value_input_option="USER_ENTERED")
         except Exception as sheet_update_error:
+            pass
     
     # 清除目前班次標記
     try:
