@@ -704,15 +704,6 @@ app.add_middleware(
 )
 
 
-            "service_account_email": getattr(credentials, "service_account_email", "Unknown (using default/local creds)"),
-            "env_google_cloud_project": os.environ.get("GOOGLE_CLOUD_PROJECT"),
-            "env_firebase_rtdb_url": os.environ.get("FIREBASE_RTDB_URL"),
-            "firebase_app": firebase_app_name,
-            "firebase_options": firebase_options,
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
 @app.get("/health")
 def health():
     return {"status": "ok", "time": _tz_now_str()}
