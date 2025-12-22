@@ -2425,6 +2425,11 @@ function initLiveLocation(mount) {
       const stopName = typeof stop === "object" && stop.name ? stop.name : (typeof stop === "string" ? stop : "");
       const stopCoord = typeof stop === "object" && stop.lat ? { lat: stop.lat, lng: stop.lng } : stationCoords[stopName] || null;
       const isCompleted = completedStops.includes(stopName);
+      
+      // 判斷站點是否已經過了（根據路線順序）
+      // 如果已完成站點數量 > 當前站點索引，表示已經過了這個站點
+      const isPassed = completedStops.length > index;
+      
       const isCurrent = index === stops.findIndex((s, i) => {
         const sName = typeof s === "object" && s.name ? s.name : (typeof s === "string" ? s : "");
         return !completedStops.includes(sName) && i >= completedStops.length;
@@ -2445,7 +2450,15 @@ function initLiveLocation(mount) {
         const minutes = String(mainTripTime.getMinutes()).padStart(2, '0');
         timeLabel = "發車時間";
         timeText = `${year}/${month}/${day} ${hours}:${minutes}`;
-      } else if (driverLocation && stopCoord && !isCompleted) {
+      } else if (isCompleted) {
+        // 已抵達的站點
+        timeLabel = "狀態";
+        timeText = "已抵達";
+      } else if (isPassed && !isCompleted) {
+        // 已經過了但還沒標記為已抵達的站點
+        timeLabel = "狀態";
+        timeText = "已過站";
+      } else if (driverLocation && stopCoord) {
         // 其他站點計算ETA
         const eta = calculateETA(driverLocation.lat, driverLocation.lng, stopCoord.lat, stopCoord.lng);
         if (eta) {
@@ -2458,9 +2471,6 @@ function initLiveLocation(mount) {
         } else {
           timeLabel = "預計抵達";
         }
-      } else if (isCompleted) {
-        timeLabel = "狀態";
-        timeText = "已抵達";
       } else {
         timeLabel = "預計抵達";
       }
@@ -2471,9 +2481,9 @@ function initLiveLocation(mount) {
         align-items: center;
         gap: 12px;
         padding: 12px;
-        background: ${isCompleted ? '#f5f5f5' : (isCurrent ? '#e8f5e9' : '#ffffff')};
+        background: ${isCompleted || isPassed ? '#f5f5f5' : (isCurrent ? '#e8f5e9' : '#ffffff')};
         border-radius: 8px;
-        border-left: 3px solid ${isCompleted ? '#808080' : (isCurrent ? '#28a745' : '#e0e0e0')};
+        border-left: 3px solid ${isCompleted ? '#808080' : (isPassed ? '#999999' : (isCurrent ? '#28a745' : '#e0e0e0'))};
       `;
       
       stationsHTML += `
@@ -2482,7 +2492,7 @@ function initLiveLocation(mount) {
             <div style="font-size:15px;color:#333;font-weight:${isCurrent ? '600' : '500'};margin-bottom:4px;">${stopName}</div>
             <div style="font-size:13px;color:#666;">${timeLabel}: ${timeText}</div>
           </div>
-          ${isCompleted ? '<div style="color:#28a745;font-size:20px;">✓</div>' : ''}
+          ${isCompleted ? '<div style="color:#28a745;font-size:20px;">✓</div>' : (isPassed ? '<div style="color:#999999;font-size:20px;">→</div>' : '')}
         </div>
       `;
     });
@@ -3067,6 +3077,41 @@ function initLiveLocation(mount) {
       if (!data.gps_system_enabled) {
         if (overlayEl) overlayEl.style.display = "flex";
         if (infoPanel) infoPanel.style.display = "none";
+        return;
+      }
+      
+      // 檢查班次時間是否超過1小時
+      let shouldShowNoTrip = false;
+      if (data.current_trip_datetime) {
+        try {
+          const parts = data.current_trip_datetime.split(' ');
+          if (parts.length >= 2) {
+            const datePart = parts[0].replace(/\//g, '-');
+            const timePart = parts[1];
+            const tripTime = new Date(`${datePart}T${timePart}:00`);
+            const now = Date.now();
+            const tripTimeMs = tripTime.getTime();
+            const ONE_HOUR_MS = 60 * 60 * 1000; // 1小時
+            // 如果班次時間超過現在時間1小時以上，顯示"目前無可顯示班次"
+            if (tripTimeMs < (now - ONE_HOUR_MS)) {
+              shouldShowNoTrip = true;
+            }
+          }
+        } catch (e) {
+          console.error("Parse trip datetime for expiry check error:", e);
+        }
+      }
+      
+      // 如果班次時間超過1小時，顯示"目前無可顯示班次"
+      if (shouldShowNoTrip) {
+        if (infoPanel) {
+          infoPanel.style.display = "block";
+          if (stationsList) {
+            stationsList.innerHTML = '<div style="padding:24px;text-align:center;color:#666;font-size:16px;">目前無可顯示班次</div>';
+          }
+        }
+        if (endedOverlay) endedOverlay.style.display = "none";
+        if (overlayEl) overlayEl.style.display = "none";
         return;
       }
       
