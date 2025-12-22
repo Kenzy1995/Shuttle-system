@@ -128,7 +128,6 @@ function showPage(id) {
   }
 
   if (id === "schedule") {
-    // 優化：切換到班次查詢頁面時，清除快取以確保資料最新
     clearScheduleCache();
     loadScheduleData();
   }
@@ -1955,7 +1954,6 @@ async function loadScheduleData() {
       }
     }
   } catch (e) {
-    console.warn("Schedule cache read error:", e);
   }
 
   resultsEl.innerHTML = `<div class="loading-text">${t("loading")}</div>`;
@@ -1998,7 +1996,6 @@ async function loadScheduleData() {
         stations: Array.from(scheduleData.stations)
       }));
     } catch (e) {
-      console.warn("Schedule cache write error:", e);
     }
 
     renderScheduleFilters();
@@ -2015,7 +2012,6 @@ function clearScheduleCache() {
   try {
     localStorage.removeItem(SCHEDULE_CACHE_KEY);
   } catch (e) {
-    console.warn("Clear schedule cache error:", e);
   }
 }
 
@@ -2206,7 +2202,6 @@ async function loadSystemConfig() {
       }
     }
   } catch (err) {
-    console.error("loadSystemConfig 錯誤:", err);
   }
 }
 
@@ -2287,7 +2282,6 @@ async function renderLiveLocationPlaceholder() {
       return;
     }
   } catch (e) {
-    console.error("Check GPS system status error:", e);
     // 發生錯誤時，為了安全起見，隱藏區塊
     sec.style.display = "none";
     mount.innerHTML = "";
@@ -2415,7 +2409,6 @@ function initLiveLocation(mount) {
           mainTripTime = new Date(`${datePart}T${timePart}:00`);
         }
       } catch (e) {
-        console.error("Parse trip datetime error:", e);
       }
     }
     
@@ -2751,7 +2744,7 @@ function initLiveLocation(mount) {
         return;
       }
       const s = document.createElement("script");
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(cfg.key)}&libraries=places&loading=async`;
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(cfg.key)}&libraries=places,marker&loading=async`;
       s.async = true;
       s.onload = resolve;
       s.onerror = reject;
@@ -2862,7 +2855,6 @@ function initLiveLocation(mount) {
             try {
               mapInstance.fitBounds(bounds);
             } catch (e) {
-              console.error("fitBounds 錯誤:", e);
             }
           }
         }
@@ -3032,33 +3024,33 @@ function initLiveLocation(mount) {
           const fullName = getStationFullName(stop, idx, displayStops.length);
           const displayLabel = getStationDisplayLabel(stop, idx, displayStops.length);
           
-          const marker = new google.maps.Marker({
+          const pinElement = document.createElement('div');
+          pinElement.style.width = idx === 0 || idx === displayStops.length - 1 ? '28px' : '24px';
+          pinElement.style.height = idx === 0 || idx === displayStops.length - 1 ? '28px' : '24px';
+          pinElement.style.borderRadius = '50%';
+          pinElement.style.backgroundColor = '#0b63ce';
+          pinElement.style.border = '2px solid #fff';
+          pinElement.style.display = 'flex';
+          pinElement.style.alignItems = 'center';
+          pinElement.style.justifyContent = 'center';
+          pinElement.style.color = '#fff';
+          pinElement.style.fontSize = idx === 0 || idx === displayStops.length - 1 ? '11px' : '14px';
+          pinElement.style.fontWeight = idx === 0 || idx === displayStops.length - 1 ? 'bold' : 'normal';
+          pinElement.textContent = displayLabel;
+          pinElement.title = fullName;
+          
+          const marker = new google.maps.marker.AdvancedMarkerElement({
             position: { lat: coord.lat, lng: coord.lng },
             map: map,
-            label: { 
-              text: displayLabel, 
-              color: "#fff",
-              fontSize: idx === 0 || idx === displayStops.length - 1 ? "11px" : "14px",
-              fontWeight: idx === 0 || idx === displayStops.length - 1 ? "bold" : "normal"
-            },
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: idx === 0 || idx === displayStops.length - 1 ? 14 : 12,
-              fillColor: "#0b63ce",
-              fillOpacity: 1,
-              strokeColor: "#fff",
-              strokeWeight: 2
-            },
-            title: fullName // 滑鼠懸停時顯示全名
+            content: pinElement,
+            title: fullName
           });
           
-          // 添加點擊事件，顯示 InfoWindow
-          marker.addListener('click', () => {
+          pinElement.addEventListener('click', () => {
             const infoWindow = new google.maps.InfoWindow({
               content: `<div style="padding: 8px; font-weight: 600; font-size: 14px;">${fullName}</div>`
             });
             infoWindow.open(map, marker);
-            // 3秒後自動關閉
             setTimeout(() => {
               infoWindow.close();
             }, 3000);
@@ -3117,7 +3109,6 @@ function initLiveLocation(mount) {
         await updateWalkedRoute(currentTripData, pos);
       }
     } catch (e) {
-      console.error("Draw route error:", e);
     }
   };
   // 從 Firebase 資料更新前端（用於監聽器回調）
@@ -3128,7 +3119,6 @@ function initLiveLocation(mount) {
       // 直接使用傳入的資料結構（已在監聽器中構建）
       await processLocationData(firebaseData);
     } catch (e) {
-      console.error("Update location from Firebase error:", e);
       updateStatus("#dc3545", "更新失敗");
     }
   };
@@ -3161,7 +3151,6 @@ function initLiveLocation(mount) {
             }
           }
         } catch (e) {
-          console.error("Parse trip datetime for expiry check error:", e);
         }
       }
       
@@ -3191,7 +3180,6 @@ function initLiveLocation(mount) {
         const AUTO_SHUTDOWN_MS = 40 * 60 * 1000; // 40分鐘
         if (elapsed >= AUTO_SHUTDOWN_MS) {
           shouldShowEnded = true;
-          console.log("Trip expired (frontend check): elapsed " + (elapsed/1000/60).toFixed(1) + " minutes");
         }
       }
       
@@ -3215,7 +3203,7 @@ function initLiveLocation(mount) {
       if (driverLoc && typeof driverLoc.lat === "number" && typeof driverLoc.lng === "number") {
         driverPos = { lat: driverLoc.lat, lng: driverLoc.lng };
         if (marker) {
-          marker.setPosition(driverPos);
+          marker.position = driverPos;
           map.panTo(driverPos);
         }
         // 更新圓形外圈位置
@@ -3249,7 +3237,6 @@ function initLiveLocation(mount) {
       const data = await r.json();
       await processLocationData(data);
     } catch (e) {
-      console.error("Fetch location error:", e);
       updateStatus("#dc3545", "錯誤");
     }
   };
@@ -3366,38 +3353,19 @@ function initLiveLocation(mount) {
     });
     
     // 創建司機位置標記（綠色點）
-    const createGreenDotIcon = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 20;
-      canvas.height = 20;
-      const ctx = canvas.getContext('2d');
-      
-      // 繪製綠色圓點
-      ctx.beginPath();
-      ctx.arc(10, 10, 8, 0, 2 * Math.PI);
-      ctx.fillStyle = '#28a745';
-      ctx.fill();
-      
-      // 白色邊框
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      
-      const dataUrl = canvas.toDataURL();
-      return {
-        url: dataUrl,
-        scaledSize: new google.maps.Size(20, 20),
-        anchor: new google.maps.Point(10, 10)
-      };
-    };
+    const driverPinElement = document.createElement('div');
+    driverPinElement.style.width = '16px';
+    driverPinElement.style.height = '16px';
+    driverPinElement.style.borderRadius = '50%';
+    driverPinElement.style.backgroundColor = '#28a745';
+    driverPinElement.style.border = '2px solid #ffffff';
+    driverPinElement.style.boxShadow = '0 0 4px rgba(40, 167, 69, 0.6)';
     
-    // 創建綠色點圖示
-    const greenDotIcon = createGreenDotIcon();
-    marker = new google.maps.Marker({ 
+    marker = new google.maps.marker.AdvancedMarkerElement({ 
       position: { lat: 25.055550556928008, lng: 121.63210245291367 }, 
       map, 
       title: "司機位置",
-      icon: greenDotIcon,
+      content: driverPinElement,
       zIndex: 10
     });
     
@@ -3470,7 +3438,6 @@ function initLiveLocation(mount) {
   // 優化：Firebase 監聽器優化 - 只監聽需要的特定路徑，減少資料傳輸
   const setupFirebaseListeners = async () => {
     if (!await ensureFirebase()) {
-      console.error("Firebase initialization failed, using fallback polling");
       startFallbackPolling();
       return;
     }
@@ -3569,7 +3536,6 @@ function initLiveLocation(mount) {
             }
           }
         }, (error) => {
-          console.error(`Firebase listener error for ${path}:`, error);
           firebaseConnected = false;
           updateStatus("#dc3545", "連線失敗");
           updateRefreshButtonVisibility();
@@ -3588,7 +3554,6 @@ function initLiveLocation(mount) {
       // 停止備用輪詢（如果正在運行）
       stopFallbackPolling();
     } catch (e) {
-      console.error("Setup Firebase listeners error:", e);
       firebaseConnected = false;
       updateRefreshButtonVisibility();
       startFallbackPolling();
@@ -3599,7 +3564,6 @@ function initLiveLocation(mount) {
   const AUTO_REFRESH_MS = 3 * 60 * 1000; // 3分鐘
   const startFallbackPolling = () => {
     if (fallbackTimer) return; // 已經在運行
-    console.log("Starting fallback polling mechanism");
     fallbackTimer = setInterval(async () => {
       if (isInitialized && !firebaseConnected) {
         await fetchLocation();
@@ -3614,7 +3578,6 @@ function initLiveLocation(mount) {
     if (fallbackTimer) {
       clearInterval(fallbackTimer);
       fallbackTimer = null;
-      console.log("Stopped fallback polling mechanism");
     }
   };
   
@@ -3622,11 +3585,9 @@ function initLiveLocation(mount) {
   let isInitializing = false;
   const wrappedInitMap = async () => {
     if (isInitializing) {
-      console.log("地圖正在初始化中，請稍候...");
       return;
     }
     if (isInitialized) {
-      console.log("地圖已經初始化完成");
       return;
     }
     try {
@@ -3635,7 +3596,6 @@ function initLiveLocation(mount) {
       // 設置 Firebase 監聽器（主要機制）
       await setupFirebaseListeners();
     } catch (e) {
-      console.error("初始化地圖錯誤:", e);
       isInitialized = false; // 允許重試
     } finally {
       isInitializing = false;
@@ -3647,33 +3607,45 @@ function initLiveLocation(mount) {
     startBtn.addEventListener("click", wrappedInitMap);
   }
   
-  // 優化：刷新按鈕點擊事件（手機版和電腦版）
-  // 只在 Firebase 連接失敗時才真正需要手動刷新
   const handleManualRefresh = async () => {
     const now = Date.now();
     if (now - lastManualRefreshTime < MANUAL_REFRESH_COOLDOWN) {
-      return; // 按鈕已禁用，不會觸發
+      return;
     }
     
-    // 優化：如果 Firebase 正常連接，提示用戶資料已自動更新
     if (firebaseConnected) {
       updateStatus("#28a745", "資料已自動更新");
       setTimeout(() => {
         updateStatus("#28a745", "良好");
       }, 2000);
-      return; // Firebase 正常時，不需要手動刷新
+      lastManualRefreshTime = now;
+      updateRefreshButton(false, 30);
+      
+      if (refreshCountdownTimer) {
+        clearInterval(refreshCountdownTimer);
+      }
+      
+      let countdown = 30;
+      refreshCountdownTimer = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+          updateRefreshButton(false, countdown);
+        } else {
+          clearInterval(refreshCountdownTimer);
+          refreshCountdownTimer = null;
+          updateRefreshButton(true);
+        }
+      }, 1000);
+      return;
     }
     
-    // 禁用按鈕並開始倒數
     lastManualRefreshTime = now;
     updateRefreshButton(false, 30);
     
-    // 清除舊的倒數計時器
     if (refreshCountdownTimer) {
       clearInterval(refreshCountdownTimer);
     }
     
-    // 開始倒數
     let countdown = 30;
     refreshCountdownTimer = setInterval(() => {
       countdown--;
@@ -3686,17 +3658,13 @@ function initLiveLocation(mount) {
       }
     }, 1000);
     
-    // 執行刷新（只在 Firebase 連接失敗時執行）
     await fetchLocation();
     if (currentTripData) {
       await drawRoute(currentTripData);
     }
   };
   
-  // 優化：根據 Firebase 連接狀態更新刷新按鈕的顯示
   const updateRefreshButtonVisibility = () => {
-    // 如果 Firebase 正常連接，可以隱藏或禁用刷新按鈕（可選）
-    // 目前保留按鈕，但添加視覺提示
     if (btnRefresh) {
       if (firebaseConnected) {
         btnRefresh.title = "資料已自動更新，無需手動刷新";
@@ -3740,7 +3708,6 @@ async function init() {
   try {
     await renderLiveLocationPlaceholder();
   } catch (e) {
-    console.error("renderLiveLocationPlaceholder error:", e);
   }
 }
 
@@ -3761,12 +3728,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 使用 try-catch 確保 init() 的錯誤不會阻塞整個頁面
   init().catch(e => {
-    console.error("init() error:", e);
     // 即使初始化失敗，也要確保按鈕可以點擊
     try {
       showPage('reservation');
     } catch (e2) {
-      console.error("showPage error in init catch:", e2);
     }
   });
 });
