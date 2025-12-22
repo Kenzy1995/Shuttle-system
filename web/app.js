@@ -1,5 +1,3 @@
-
-
 /* ====== 常數（API） ====== */
 const API_URL =
   "https://booking-api-995728097341.asia-east1.run.app/api/sheet";
@@ -3648,3 +3646,4 @@ function isExpiredByCarDateTime(carDateTime) {
     return tripTime < (now - ONE_HOUR_MS);
   } catch (e) { return true; }
         }
+
