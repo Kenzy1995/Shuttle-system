@@ -3337,7 +3337,7 @@ function initLiveLocation(mount) {
       { lat: centerLat + latDelta, lng: centerLng + lngDelta }   // 東北角
     );
     
-    // 初始化地圖
+    // 初始化地圖（需要 mapId 以支援 AdvancedMarkerElement）
     map = new google.maps.Map(mapEl, { 
       center: { lat: 25.055550556928008, lng: 121.63210245291367 }, 
       zoom: 14, 
@@ -3346,6 +3346,7 @@ function initLiveLocation(mount) {
       mapTypeControl: false, 
       streetViewControl: false,
       styles: mapStyles,
+      mapId: "FORTE_SHUTTLE_MAP", // 地圖 ID，用於支援 AdvancedMarkerElement
       restriction: {
         latLngBounds: restrictionBounds,
         strictBounds: true // 嚴格限制，不允許拖動到邊界外
