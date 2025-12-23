@@ -3315,7 +3315,8 @@ function initLiveLocation(mount) {
           try {
             map.fitBounds(bounds);
           } catch (e) {
-            console.error("fitBounds 錯誤:", e);
+            // 靜默處理 fitBounds 錯誤（可能是 bounds 無效）
+            // 不影響主要功能，無需記錄到控制台
           }
         }
       } else if (displayStops.length >= 2) {
