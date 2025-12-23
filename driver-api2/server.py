@@ -741,8 +741,8 @@ def update_driver_location(loc: DriverLocation):
 
             db_url = os.environ.get("FIREBASE_RTDB_URL")
             if not db_url:
-                 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
-                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
+                db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         
@@ -803,7 +803,7 @@ def update_driver_location(loc: DriverLocation):
                                 current_history = current_history[-MAX_HISTORY_POINTS:]
                             
                             path_history_ref.set(current_history)
-                except Exception as path_history_error:
+                except Exception:
                     pass
             
             if loc.trip_id:
@@ -827,10 +827,14 @@ def update_driver_location(loc: DriverLocation):
                             trip_id=trip_id_ref or "",
                             main_datetime=trip_datetime or ""
                         )
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except (ValueError, KeyError, IndexError) as e:
+                logger.warning(f"Error processing GPS history point: {e}")
+            except Exception as e:
+                logger.error(f"Unexpected error in GPS history processing: {e}", exc_info=True)
+    except (ValueError, KeyError) as e:
+        logger.warning(f"Error in GPS history structure: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error in update_driver_location: {e}", exc_info=True)
     return {"status": "ok", "received": loc}
 
 
@@ -852,7 +856,7 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     return R * c
 
 
-def check_station_arrival(lat: float, lng: float, trip_id: str):
+def check_station_arrival(lat: float, lng: float, trip_id: str):  # trip_id 保留用於未來擴展
     """
     優化版：檢查司機是否到達某個站點
     結合距離判斷和路線索引判斷，提高準確性
@@ -984,23 +988,23 @@ def get_driver_location():
     """
     try:
         if not firebase_admin._apps:
-             # 1. 嘗試讀取本地 service_account.json
-             service_account_path = "service_account.json"
-             if os.path.exists(service_account_path):
-                 cred = credentials.Certificate(service_account_path)
-             else:
-                 cred = credentials.ApplicationDefault()
+            # 1. 嘗試讀取本地 service_account.json
+            service_account_path = "service_account.json"
+            if os.path.exists(service_account_path):
+                cred = credentials.Certificate(service_account_path)
+            else:
+                cred = credentials.ApplicationDefault()
 
-             # 優先使用環境變數，若無則嘗試預設 URL
-             db_url = os.environ.get("FIREBASE_RTDB_URL")
-             if not db_url:
-                 # 嘗試根據專案 ID 猜測預設 URL
-                 # Cloud Run 的專案 ID 通常可從環境變數 GOOGLE_CLOUD_PROJECT 取得
-                 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
-                 # 嘗試常見的 Firebase RTDB URL 格式
-                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
+            # 優先使用環境變數，若無則嘗試預設 URL
+            db_url = os.environ.get("FIREBASE_RTDB_URL")
+            if not db_url:
+                # 嘗試根據專案 ID 猜測預設 URL
+                # Cloud Run 的專案 ID 通常可從環境變數 GOOGLE_CLOUD_PROJECT 取得
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
+                # 嘗試常見的 Firebase RTDB URL 格式
+                db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
-             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+            firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         
         if firebase_admin._apps:
             ref = db.reference("/driver_location")
@@ -1144,6 +1148,23 @@ def api_driver_checkin(req: DriverCheckinRequest):
     if sheet_booking_id:
         booking_id = sheet_booking_id
 
+    # 取得主班次時間（需要在檢查「已上車」之前獲取，因為返回響應時需要用到）
+    main_raw = getv("主班次時間").strip()
+    if not main_raw:
+        return DriverCheckinResponse(
+            status="error",
+            message="此預約缺少『主班次時間』，無法核銷上車",
+            booking_id=booking_id or None,
+        )
+
+    main_dt = _parse_main_dt(main_raw)
+    if not main_dt:
+        return DriverCheckinResponse(
+            status="error",
+            message=f"主班次時間格式錯誤：{main_raw}",
+            booking_id=booking_id or None,
+        )
+
     # 先檢查是否已經「已上車」→ 不重複核銷
     ride_status_current = getv("乘車狀態").strip()
     if ride_status_current and ("已上車" in ride_status_current):
@@ -1158,17 +1179,6 @@ def api_driver_checkin(req: DriverCheckinRequest):
             station=getv("上車地點") or None,
             main_datetime=main_dt.strftime("%Y/%m/%d %H:%M"),
         )
-
-    # 取得主班次時間，並做 ±30 分鐘判斷
-    main_raw = getv("主班次時間").strip()
-    if not main_raw:
-        return DriverCheckinResponse(
-            status="error",
-            message="此預約缺少『主班次時間』，無法核銷上車",
-            booking_id=booking_id or None,
-        )
-
-    main_dt = _parse_main_dt(main_raw)
     if not main_dt:
         return DriverCheckinResponse(
             status="error",
@@ -1307,7 +1317,11 @@ def api_driver_trip_status(req: TripStatusRequest):
     sheet_name = "車次管理(櫃台)"
     try:
         ws = open_ws(sheet_name)
-    except Exception:
+    except (gspread.exceptions.SpreadsheetNotFound, gspread.exceptions.WorksheetNotFound) as e:
+        logger.warning(f"Primary worksheet not found, using backup: {e}")
+        ws = open_ws("車次管理(備品)")
+    except Exception as e:
+        logger.error(f"Unexpected error opening worksheet: {e}", exc_info=True)
         ws = open_ws("車次管理(備品)")
     headers = ws.row_values(6)
     headers = [(h or "").strip() for h in headers]
@@ -1392,7 +1406,6 @@ class QrInfoResponse(BaseModel):
 @app.post("/api/driver/qrcode_info", response_model=QrInfoResponse)
 def api_driver_qrinfo(req: QrInfoRequest):
     values, hmap = _get_sheet_data_main()
-    ws = open_ws(SHEET_NAME_MAIN)
     rowno = _find_qrcode_row(values, hmap, req.qrcode)
     if not rowno:
         return QrInfoResponse(booking_id=None, name=None, main_datetime=None, ride_status=None, station_up=None, station_down=None)
@@ -1486,7 +1499,7 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                 {"range": rowcol_to_a1(target_rowno, idx_last + 1), "values": [[now_text]]},
             ]
             ws2.batch_update(update_data, value_input_option="USER_ENTERED")
-    except Exception as sheet_update_error:
+    except Exception:
         pass
     
     # 檢查是否為櫃台人員：櫃台人員只更新Sheet，不寫入Firebase
@@ -1502,7 +1515,6 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
     if not enabled:
         return GoogleTripStartResponse(trip_id=trip_id, share_url=None, stops=None)
     # 不再自動生成乘客地圖分享連結；由前端固定網址負責
-    share_url = ""
     # 從《車次管理(櫃台)》讀取該班次停靠站，並寫入 Firebase（route/stops）
     try:
         # 如果上面已經打開了 ws2，重複使用；否則重新打開
@@ -1555,7 +1567,7 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                         {"range": rowcol_to_a1(target_rowno, idx_last + 1), "values": [[now_text]]},
                     ]
                     ws2.batch_update(update_data, value_input_option="USER_ENTERED")
-            except Exception as sheet_update_error:
+            except Exception:
                 pass
         
         # 優先使用APP傳遞的停靠站點列表（根據乘客資料計算）
@@ -1785,7 +1797,7 @@ def auto_complete_trip(trip_id: str = None, main_datetime: str = None):
                     {"range": rowcol_to_a1(target_rowno, idx_last + 1), "values": [[now_text]]},
                 ]
                 ws2.batch_update(update_data, value_input_option="USER_ENTERED")
-        except Exception as sheet_update_error:
+        except Exception:
             pass
     
     # 清除目前班次標記
@@ -1821,8 +1833,10 @@ def auto_complete_trip(trip_id: str = None, main_datetime: str = None):
             last_trip_datetime = db.reference("/current_trip_datetime").get()
             if last_trip_datetime:
                 db.reference("/last_trip_datetime").set(last_trip_datetime)
-        except:
-            pass
+        except (ValueError, KeyError, IndexError) as e:
+            logger.warning(f"Error processing route data: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error in route processing: {e}", exc_info=True)
         db.reference("/current_trip_datetime").set("")
         db.reference("/current_trip_stations").set({})
     except Exception:
@@ -1888,7 +1902,7 @@ def api_driver_system_status():
         if enabled is None:
             enabled = True  # 預設啟用
         return {"enabled": bool(enabled), "message": "GPS系統總開關狀態"}
-    except Exception as e:
+    except Exception:
         return {"enabled": True, "message": "讀取失敗，預設啟用"}
 
 class SystemStatusRequest(BaseModel):
