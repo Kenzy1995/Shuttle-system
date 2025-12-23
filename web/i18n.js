@@ -88,8 +88,8 @@ const TEXTS = {
     stopsInfoTitle: "接駁車資訊",
     stopsInfoText: `<p><strong>※房客、用餐客人可享免費預約接駁，非房客或用餐客人預約接駁須收費每位NT$200/單趟，每趟次可搭乘19名旅客，座位有限，約滿為止。</strong></p>
                     <p><strong>※本飯店保有彈性調整發車時段，發車與否及車輛型式之權利。 車種介紹： 依預約人數安排白色20人中巴(車牌PAB-311)或鐵灰 色福斯九人座(車牌BLD-0361)</strong></p>`,
-    stopHotelTitle: "福泰大飯店 / Forte Hotel",
-    stopMRTTitle: "南港展覽館捷運站 / Nangang Exhibition Center - MRT Exit 3",
+    stopHotelTitle: "福泰大飯店發車-側門出口 / Forte Hotel Xizhi Departure - Side Entrance",
+    stopMRTTitle: "南港展覽館捷運站-3號出口 / Nangang Exhibition Center - MRT Exit 3",
     stopTrainTitle: "南港火車站 / Nangang Train Station",
     stopLalaTitle: "LaLaport Shopping Park",
     stopMRTDesc: "捷運南港展覽館 3 號出口 - 汽機車臨停接送區。",
@@ -204,8 +204,8 @@ const TEXTS = {
     stopsInfoTitle: "Shuttle Info",
     stopsInfoText: `<p><strong>※ Hotel and dining guests ride free with reservation. Non-guests will be charged NT$200 per person per one-way ride. Max 19 passengers per trip; seats are limited.</strong></p>
                     <p><strong>※ We may adjust departure times and vehicle type. Vehicles: 20-seat white minibus (PAB-311) or 9-seat grey Volkswagen (BLD-0361), depending on reservations.</strong></p>`,
-    stopHotelTitle: "福泰大飯店 / Forte Hotel",
-    stopMRTTitle: "南港展覽館捷運站 / Nangang Exhibition Center - MRT Exit 3",
+    stopHotelTitle: "福泰大飯店發車-側門出口 / Forte Hotel Xizhi Departure - Side Entrance",
+    stopMRTTitle: "南港展覽館捷運站-3號出口 / Nangang Exhibition Center - MRT Exit 3",
     stopTrainTitle: "南港火車站 / Nangang Train Station",
     stopLalaTitle: "LaLaport Shopping Park",
     stopMRTDesc: "MRT Nangang Exhibition Center Exit 3 — Motor Vehicle Pick-up and Drop-off Area.",
@@ -320,7 +320,7 @@ const TEXTS = {
     stopsInfoTitle: "シャトル案内",
     stopsInfoText: `<p><strong>※ 宿泊客・レストラン客は予約により無料で乗車できます。非宿泊・非利用の場合は1名片道NT$200を頂戴します。1便最大19名、席数に限りがあります。</strong></p>
                     <p><strong>※ 出発時刻や車両は変更となる場合があります。予約状況により、白い20人乗りミニバス(PAB-311)または鉄灰色の9人乗りフォルクスワーゲン(BLD-0361)を手配します。</strong></p>`,
-    stopHotelTitle: "フォルテホテル / Forte Hotel",
+    stopHotelTitle: "フォルテホテル発-側門出口 / Forte Hotel Xizhi Departure - Side Entrance",
     stopMRTTitle: "南港展示館MRT3番出口 / Nangang Exhibition Center - MRT Exit 3",
     stopTrainTitle: "南港駅 / Nangang Train Station",
     stopLalaTitle: "LaLaportショッピングパーク / LaLaport Shopping Park",
@@ -436,7 +436,7 @@ const TEXTS = {
     stopsInfoTitle: "셔틀 정보",
     stopsInfoText: `<p><strong>※ 숙박/식사 고객은 예약 시 무료 탑승. 비고객은 1인 편도 NT$200. 회당 최대 19명, 좌석 한정.</strong></p>
                     <p><strong>※ 출발 시간과 차량은 변동될 수 있습니다. 예약 인원에 따라 20인승 백색 미니버스(PAB-311) 또는 9인승 회색 폭스바겐(BLD-0361)을 배차합니다.</strong></p>`,
-    stopHotelTitle: "포르테 호텔 / Forte Hotel",
+    stopHotelTitle: "포르테 호텔 출발 - 측문 출구 / Forte Hotel Xizhi Departure - Side Entrance",
     stopMRTTitle: "난강 전람관 MRT 3번 출구 / Nangang Exhibition Center - MRT Exit 3",
     stopTrainTitle: "난강역 / Nangang Train Station",
     stopLalaTitle: "라라포트 쇼핑파크 / LaLaport Shopping Park",
