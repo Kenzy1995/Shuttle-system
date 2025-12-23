@@ -2344,6 +2344,106 @@ const stationCoords = {
   "福泰大飯店(回) Forte Hotel (Back)": { lat: 25.05483619868674, lng: 121.63115105443562 }  // 回程終點
 };
 
+// 站點名稱映射表（各語系）
+const stationNames = {
+  "福泰大飯店 Forte Hotel": {
+    zh: "福泰大飯店",
+    en: "Forte Hotel",
+    ja: "フォルテホテル",
+    ko: "포르테 호텔"
+  },
+  "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": {
+    zh: "南港展覽館捷運站",
+    en: "Nangang Exhibition Center - MRT Exit 3",
+    ja: "南港展示館MRT3番出口",
+    ko: "난강 전람관 MRT 3번 출구"
+  },
+  "南港火車站 Nangang Train Station": {
+    zh: "南港火車站",
+    en: "Nangang Train Station",
+    ja: "南港駅",
+    ko: "난강역"
+  },
+  "LaLaport Shopping Park": {
+    zh: "LaLaport Shopping Park",
+    en: "LaLaport Shopping Park",
+    ja: "LaLaportショッピングパーク",
+    ko: "라라포트 쇼핑파크"
+  },
+  "福泰大飯店(回) Forte Hotel (Back)": {
+    zh: "福泰大飯店",
+    en: "Forte Hotel",
+    ja: "フォルテホテル",
+    ko: "포르테 호텔"
+  }
+};
+
+// 格式化站點名稱（根據語系顯示）
+function formatStationName(stationName) {
+  if (!stationName) return "";
+  
+  const lang = getCurrentLang();
+  
+  // 先嘗試直接匹配
+  let station = stationNames[stationName];
+  
+  // 如果找不到，嘗試匹配變體
+  if (!station) {
+    // 處理 "1. 福泰大飯店 (去)" 格式
+    if (stationName.includes("福泰大飯店") && (stationName.includes("(去)") || stationName.includes("去"))) {
+      station = stationNames["福泰大飯店 Forte Hotel"];
+    }
+    // 處理 "福泰大飯店(回) Forte Hotel (Back)" 格式
+    else if (stationName.includes("福泰大飯店") && (stationName.includes("(回)") || stationName.includes("回") || stationName.includes("Back"))) {
+      station = stationNames["福泰大飯店(回) Forte Hotel (Back)"];
+    }
+    // 處理 "南港展覽館捷運站" 或包含 "南港" 和 "捷運" 的格式
+    else if (stationName.includes("南港") && (stationName.includes("捷運") || stationName.includes("MRT") || stationName.includes("展覽館"))) {
+      station = stationNames["南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3"];
+    }
+    // 處理 "南港火車站" 或包含 "南港" 和 "火車" 的格式
+    else if (stationName.includes("南港") && (stationName.includes("火車") || stationName.includes("Train"))) {
+      station = stationNames["南港火車站 Nangang Train Station"];
+    }
+    // 處理 LaLaport 相關
+    else if (stationName.toLowerCase().includes("lalaport")) {
+      station = stationNames["LaLaport Shopping Park"];
+    }
+  }
+  
+  if (station) {
+    const zhName = station.zh;
+    const enName = station.en;
+    const currentName = station[lang] || station.en;
+    
+    // 中文和英文：顯示 "中文 / 英文"
+    if (lang === "zh" || lang === "en") {
+      return `${zhName} / ${enName}`;
+    }
+    
+    // 其他語系：顯示 "選擇的語系 / 英文"
+    return `${currentName} / ${enName}`;
+  }
+  
+  // 如果找不到映射，嘗試從原始名稱中提取
+  // 檢查是否包含 " / " 分隔符
+  if (stationName.includes(" / ")) {
+    const parts = stationName.split(" / ");
+    const zhName = parts[0].trim();
+    const enName = parts[1].trim();
+    
+    if (lang === "zh" || lang === "en") {
+      return `${zhName} / ${enName}`;
+    } else {
+      // 其他語系：使用英文
+      return `${enName}`;
+    }
+  }
+  
+  // 如果沒有分隔符，直接返回原始名稱
+  return stationName;
+}
+
 function initLiveLocation(mount) {
   const cfg = getLiveConfig();
   // 即時位置區塊：資訊顯示在上方，不覆蓋地圖
@@ -2581,10 +2681,12 @@ function initLiveLocation(mount) {
         border-left: 3px solid ${isCompleted ? '#808080' : (isPassed ? '#999999' : (isCurrent ? '#28a745' : '#e0e0e0'))};
       `;
       
+      const formattedStopName = formatStationName(stopName);
+      
       stationsHTML += `
         <div style="${stationStyle}">
           <div style="flex: 1;">
-            <div style="font-size:15px;color:#333;font-weight:${isCurrent ? '600' : '500'};margin-bottom:4px;">${stopName}</div>
+            <div style="font-size:15px;color:#333;font-weight:${isCurrent ? '600' : '500'};margin-bottom:4px;">${formattedStopName}</div>
             <div style="font-size:13px;color:#666;">${timeLabel}: ${timeText}</div>
           </div>
           ${isCompleted ? '<div style="color:#28a745;font-size:20px;">✓</div>' : (isPassed ? '<div style="color:#999999;font-size:20px;">→</div>' : '')}
@@ -3781,6 +3883,13 @@ function initLiveLocation(mount) {
     if (endedDatetimeLabelEl && endedDatetimeEl.textContent) {
       const datetime = endedDatetimeEl.textContent;
       endedDatetimeLabelEl.textContent = t("rtTripEnded").replace("{datetime}", datetime);
+    }
+    // 更新站點列表（如果存在）
+    if (currentTripData && stationsList) {
+      const driverPos = currentTripData.driver_location && typeof currentTripData.driver_location.lat === "number" 
+        ? { lat: currentTripData.driver_location.lat, lng: currentTripData.driver_location.lng } 
+        : null;
+      updateStationsList(currentTripData, driverPos);
     }
   };
   
