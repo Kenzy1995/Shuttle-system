@@ -130,9 +130,13 @@
 
     .navbar{
       position:sticky;top:0;z-index:50;
-      top:24px;               /* 讓 navbar 永遠在跑馬燈下面 */
+      top:0;                  /* 預設貼到最上方，沒有跑馬燈時不預留空間 */
       display:flex;align-items:center;
       padding:12px 16px;background:var(--card);box-shadow:0 1px 4px rgba(0,0,0,.06)
+    }
+    /* 只有當 body 有 has-marquee 類別時，navbar 才往下移 */
+    body.has-marquee .navbar {
+      top: 24px;              /* 有跑馬燈時，navbar 在跑馬燈下面 */
     }
     .brand{display:flex;align-items:center;gap:10px;margin-right: 30px;}
     .brand img{height:28px;width:auto;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
@@ -316,7 +320,6 @@
     .tickets-row{display:flex;gap:12px;padding:14px;overflow-x:auto;scroll-snap-type:x mandatory}
     .tickets-row .ticket-card{scroll-snap-align:start;flex:0 0 auto}
 
-    .check-date-card.wizard-fixed{}
     .ticket-page .ticket-card{ max-width: 1000px; width:100%; }
 
     /* === 手機版 === */
