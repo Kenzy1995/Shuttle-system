@@ -532,7 +532,7 @@ def build_driver_all_passengers(
     乘客清單（全部班次、照出車總覽公式）：
     完整模擬你在 Sheet 中那條「出車總覽」 ARRAYFORMULA + QUERY 的邏輯：
       - data 來源：預約審核(櫃台)
-      - 用 主班次時間 >= NOW() 做篩選
+      - 用 主班次時間 >= (NOW() - 1小時) 做篩選（與 build_driver_trips 保持一致）
       - 排除含「❌」的確認狀態
       - 依 主班次時間、往返、stationSort、dropoff_order 排序
       - 輸出欄位：車次、主班次時間、預約編號、乘車狀態、往返、
@@ -571,6 +571,7 @@ def build_driver_all_passengers(
     mall = STATION_NAMES["mall"]
 
     now = _tz_now()
+    cutoff = now - timedelta(hours=1)  # NOW() - 1/24（與 build_driver_trips 保持一致）
 
     # 優化：將字典映射提取到循環外，避免每次循環都重新創建
     SORT_GO_MAP = {hotel: 1, mrt: 2, train: 3, mall: 4}
@@ -591,8 +592,8 @@ def build_driver_all_passengers(
             continue
 
         dt = _parse_main_dt(main_raw)
-        if not dt or dt < now:
-            # 只有主班次時間 >= NOW 的才保留
+        if not dt or dt < cutoff:
+            # 只有主班次時間 >= (NOW() - 1小時) 的才保留（與 build_driver_trips 保持一致）
             continue
 
         status_val = _get_cell(row, idx_status)
