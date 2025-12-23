@@ -74,22 +74,32 @@ function handleScroll() {
     0
   );
   
-  // 超過一個畫面高度就顯示（使用 window.innerHeight 作為一個畫面高度）
-  const oneScreenHeight = window.innerHeight || document.documentElement.clientHeight || 300;
-  const shouldShow = y > oneScreenHeight;
+  // 手機版使用更小的滾動閾值（因為畫面高度較小）
+  const isMobile = window.innerWidth <= 768;
+  let scrollThreshold;
+  if (isMobile) {
+    // 手機版：滾動超過 200px 或視窗高度的 30% 就顯示（取較小值）
+    const screenHeight = window.innerHeight || document.documentElement.clientHeight || 300;
+    scrollThreshold = Math.min(200, screenHeight * 0.3);
+  } else {
+    // 電腦版：超過一個畫面高度就顯示
+    scrollThreshold = window.innerHeight || document.documentElement.clientHeight || 300;
+  }
+  
+  const shouldShow = y > scrollThreshold;
   
   // 強制更新 display 狀態，確保手機版也能正確觸發
   // 直接操作 style.display，確保樣式優先級最高
+  // 移除所有可能影響顯示的屬性
   if (shouldShow) {
-    if (btn.style.display !== "block") {
-      btn.style.display = "block";
-      btn.style.visibility = "visible";
-    }
+    btn.style.display = "block";
+    btn.style.visibility = "visible";
+    btn.removeAttribute("hidden");
+    btn.style.opacity = "1";
   } else {
-    if (btn.style.display !== "none") {
-      btn.style.display = "none";
-      btn.style.visibility = "hidden";
-    }
+    btn.style.display = "none";
+    btn.style.visibility = "hidden";
+    btn.setAttribute("hidden", "true");
   }
 }
 
@@ -4052,7 +4062,8 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // 監聽滾動事件，確保手機版也能正常運作
-window.addEventListener("scroll", handleScroll, { passive: true });
+// 使用 capture 模式確保能捕獲到所有滾動事件
+window.addEventListener("scroll", handleScroll, { passive: true, capture: true });
 window.addEventListener("resize", handleScroll, { passive: true });
 // 手機版觸摸滾動事件（使用 throttle 避免過度觸發）
 let scrollTimeout = null;
@@ -4063,8 +4074,16 @@ function throttledHandleScroll() {
     scrollTimeout = null;
   }, 50);
 }
-window.addEventListener("touchmove", throttledHandleScroll, { passive: true });
-window.addEventListener("touchend", handleScroll, { passive: true });
+window.addEventListener("touchmove", throttledHandleScroll, { passive: true, capture: true });
+window.addEventListener("touchend", handleScroll, { passive: true, capture: true });
+// 監聽 document 和 body 的滾動事件（某些手機瀏覽器可能使用這些）
+document.addEventListener("scroll", handleScroll, { passive: true, capture: true });
+if (document.documentElement) {
+  document.documentElement.addEventListener("scroll", handleScroll, { passive: true, capture: true });
+}
+if (document.body) {
+  document.body.addEventListener("scroll", handleScroll, { passive: true, capture: true });
+}
 
 /* ====== 解析/過期判斷 (查詢頁用) ====== */
 function getDateFromCarDateTime(carDateTime) {
