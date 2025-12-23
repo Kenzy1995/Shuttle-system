@@ -1164,7 +1164,9 @@ function maskName(name) {
 
 function maskPhone(phone) {
   const p = String(phone || "");
-  return p.slice(-4);
+  if (p.length <= 4) return p;
+  const last4 = p.slice(-4);
+  return "**" + last4;
 }
 
 function maskEmail(email) {
