@@ -352,7 +352,7 @@ def build_driver_trips(
 
     pax_col = hmap.get("確認人數", hmap.get("預約人數", 0))
     idx_pax = pax_col - 1 if pax_col else -1
-    status_col = hmap.get("預約狀態")
+    status_col = hmap.get("確認狀態")
     idx_status = status_col - 1 if status_col else -1
 
     now = _tz_now()
@@ -423,6 +423,7 @@ def build_driver_trip_passengers(
     idx_status = _col_index(hmap, "乘車狀態")
     idx_dir = _col_index(hmap, "往返")
     idx_qr = _col_index(hmap, "QRCode編碼")
+    idx_confirm_status = _col_index(hmap, "確認狀態")
 
     result: List[DriverPassenger] = []
 
@@ -435,6 +436,12 @@ def build_driver_trip_passengers(
         main_raw = _get_cell(row, idx_main_dt)
         if not main_raw:
             continue
+
+        # 排除已取消（確認狀態包含 ❌ 的都跳過）
+        if idx_confirm_status >= 0 and idx_confirm_status < len(row):
+            confirm_status = _get_cell(row, idx_confirm_status)
+            if "❌" in confirm_status or confirm_status == CANCELLED_TEXT:
+                continue
 
         if trip_id is not None and main_raw != trip_id:
             continue
@@ -506,7 +513,7 @@ def build_driver_all_passengers(
     完整模擬你在 Sheet 中那條「出車總覽」 ARRAYFORMULA + QUERY 的邏輯：
       - data 來源：預約審核(櫃台)
       - 用 主班次時間 >= NOW() 做篩選
-      - 排除含「❌」的預約狀態
+      - 排除含「❌」的確認狀態
       - 依 主班次時間、往返、stationSort、dropoff_order 排序
       - 輸出欄位：車次、主班次時間、預約編號、乘車狀態、往返、
                   姓名、手機、房號、確認人數、
@@ -525,7 +532,7 @@ def build_driver_all_passengers(
     idx_phone = col_idx("手機")
     idx_room = col_idx("房號")
     idx_qty = col_idx("確認人數")
-    idx_status = col_idx("預約狀態")
+    idx_status = col_idx("確認狀態")
     idx_ride = col_idx("乘車狀態")
 
     if idx_main_dt < 0:
