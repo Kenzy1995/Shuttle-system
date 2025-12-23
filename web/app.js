@@ -300,26 +300,21 @@ function hardResetOverlays() {
 
 /* ====== 跑馬燈 ====== */
 function showMarquee() {
-  if (marqueeClosed) {
-    const marqueeContainer = domCache.get("marqueeContainer");
-    if (marqueeContainer) {
-      marqueeContainer.style.display = "none";
-    }
-    document.body.classList.remove("has-marquee");
-    return;
-  }
-
   const marqueeContainer = domCache.get("marqueeContainer");
   const marqueeContent = domCache.get("marqueeContent");
   if (!marqueeContainer || !marqueeContent) return;
 
-  if (!marqueeData.text) {
+  // 如果跑馬燈被關閉或沒有內容，隱藏容器並移除 body 類別
+  if (marqueeClosed || !marqueeData.text || !marqueeData.text.trim()) {
     marqueeContainer.style.display = "none";
+    document.body.classList.remove("has-marquee");
     return;
   }
 
+  // 有內容時顯示跑馬燈
   marqueeContent.textContent = marqueeData.text;
   marqueeContainer.style.display = "block";
+  document.body.classList.add("has-marquee");
   restartMarqueeAnimation();
 }
 
@@ -1280,7 +1275,9 @@ function maskPhone(phone) {
   const p = String(phone || "");
   if (p.length <= 4) return p;
   const last4 = p.slice(-4);
-  return "**" + last4;
+  const hiddenCount = p.length - 4;
+  // 用*取代前面的數字，保持總長度（有幾個被隱藏的就要有幾個*）
+  return "*".repeat(hiddenCount) + last4;
 }
 
 function maskEmail(email) {
