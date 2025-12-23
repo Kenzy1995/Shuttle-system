@@ -2831,7 +2831,8 @@ function initLiveLocation(mount) {
     // 不再更新任何內容
   };
   
-  // 改進：更新已走過的路線（基於GPS位置歷史，使用時間戳判斷）
+  // 優化：更新已走過的路線（基於GPS位置歷史，使用增量更新和快取）
+  let lastHistoryLength = 0; // 快取上次的歷史長度，用於增量更新
   const updateWalkedRoute = async (data, driverPos = null) => {
     // 檢查 Google Maps API 是否已載入
     if (!window.google || !window.google.maps || !mainPolyline || !data.current_trip_route) {
@@ -2840,16 +2841,30 @@ function initLiveLocation(mount) {
     
     const path = mainPolyline.getPath().getArray();
     
-    // 改進：使用GPS位置歷史來判斷走過的路線
+    // 優化：使用GPS位置歷史來判斷走過的路線
     // 這樣可以準確處理折返情況，不會誤判
     let walkedPath = [];
+    let shouldUpdate = false;
     
     // 如果有GPS位置歷史，使用歷史來繪製走過的路線
     if (data.current_trip_path_history && Array.isArray(data.current_trip_path_history) && data.current_trip_path_history.length > 0) {
-      // 將GPS歷史位置轉換為Google Maps LatLng對象
-      walkedPath = data.current_trip_path_history.map(point => 
-        new google.maps.LatLng(point.lat, point.lng)
-      );
+      // 優化：增量更新 - 只處理新增的點
+      const currentHistoryLength = data.current_trip_path_history.length;
+      if (currentHistoryLength !== lastHistoryLength) {
+        shouldUpdate = true;
+        lastHistoryLength = currentHistoryLength;
+        
+        // 優化：如果歷史點太多，進行抽樣（每5個點取1個）
+        const historyPoints = data.current_trip_path_history;
+        const sampledPoints = historyPoints.length > 200 
+          ? historyPoints.filter((_, idx) => idx % 5 === 0 || idx === historyPoints.length - 1)
+          : historyPoints;
+        
+        // 將GPS歷史位置轉換為Google Maps LatLng對象
+        walkedPath = sampledPoints.map(point => 
+          new google.maps.LatLng(point.lat, point.lng)
+        );
+      }
     } else if (driverPos) {
       // 如果沒有歷史，使用當前位置和路線的最近點來判斷
       // 找到當前位置在路線上的最近點
@@ -2864,14 +2879,21 @@ function initLiveLocation(mount) {
         }
       }
       // 繪製從起點到最近點的路線
-      walkedPath = path.slice(0, Math.max(1, nearestIdx + 1));
+      const newPath = path.slice(0, Math.max(1, nearestIdx + 1));
+      
+      // 優化：只有當路線改變時才更新
+      if (!walkedPolyline || walkedPolyline.getPath().getLength() !== newPath.length) {
+        shouldUpdate = true;
+        walkedPath = newPath;
+      }
     }
     
-    // 清除舊的路線
-    if (walkedPolyline) walkedPolyline.setMap(null);
-    
-    // 如果有走過的路線，繪製灰色路線
-    if (walkedPath.length > 1) {
+    // 優化：只有當需要更新時才重新繪製
+    if (shouldUpdate && walkedPath.length > 1) {
+      // 清除舊的路線
+      if (walkedPolyline) walkedPolyline.setMap(null);
+      
+      // 繪製灰色路線（走過的路線）
       walkedPolyline = new google.maps.Polyline({ 
         path: walkedPath, 
         strokeColor: "#808080", // 灰色（走過的路線）
