@@ -62,24 +62,47 @@ function getCurrentLang() {
 }
 
 function handleScroll() {
-  // 支援多種滾動位置獲取方式，確保手機版也能正常運作
-  const y = Math.max(
-    window.scrollY || 0,
-    document.documentElement.scrollTop || 0,
-    document.body.scrollTop || 0,
-    window.pageYOffset || 0
-  );
   const btn = document.getElementById("backToTop");
   if (!btn) return;
+  
+  // 支援多種滾動位置獲取方式，確保手機版也能正常運作
+  // 優先使用 window.scrollY，這是標準的滾動位置 API
+  const y = window.scrollY !== undefined ? window.scrollY : (
+    document.documentElement.scrollTop || 
+    document.body.scrollTop || 
+    window.pageYOffset || 
+    0
+  );
+  
   // 超過一個畫面高度就顯示（使用 window.innerHeight 作為一個畫面高度）
   const oneScreenHeight = window.innerHeight || document.documentElement.clientHeight || 300;
   const shouldShow = y > oneScreenHeight;
+  
   // 強制更新 display 狀態，確保手機版也能正確觸發
+  // 直接操作 style.display，確保樣式優先級最高
   if (shouldShow) {
-    btn.style.display = "block";
+    if (btn.style.display !== "block") {
+      btn.style.display = "block";
+      btn.style.visibility = "visible";
+    }
   } else {
-    btn.style.display = "none";
+    if (btn.style.display !== "none") {
+      btn.style.display = "none";
+      btn.style.visibility = "hidden";
+    }
   }
+}
+
+// 回到頂部函數（確保手機版也能正常觸發）
+function scrollToTop() {
+  // 使用多種方式確保滾動到頂部
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+  document.body.scrollTo({ top: 0, behavior: "smooth" });
+  // 立即更新按鈕狀態
+  setTimeout(() => {
+    handleScroll();
+  }, 100);
 }
 
 function showPage(id) {
@@ -4017,46 +4040,20 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// 監聽多種滾動事件，確保手機版也能正常運作
+// 監聽滾動事件，確保手機版也能正常運作
 window.addEventListener("scroll", handleScroll, { passive: true });
 window.addEventListener("resize", handleScroll, { passive: true });
-// 手機版觸摸滾動事件
-window.addEventListener("touchmove", handleScroll, { passive: true });
-window.addEventListener("touchend", handleScroll, { passive: true });
-// 監聽 document 的滾動事件（某些情況下滾動發生在 document 上）
-document.addEventListener("scroll", handleScroll, { passive: true });
-// 監聽 document.documentElement 的滾動事件
-if (document.documentElement) {
-  document.documentElement.addEventListener("scroll", handleScroll, { passive: true });
-}
-// 監聽 document.body 的滾動事件
-if (document.body) {
-  document.body.addEventListener("scroll", handleScroll, { passive: true });
-}
-// 定期檢查滾動位置（作為備用方案，確保手機版也能正確觸發）
-let scrollCheckInterval = null;
-function startScrollCheck() {
-  if (scrollCheckInterval) return;
-  scrollCheckInterval = setInterval(() => {
+// 手機版觸摸滾動事件（使用 throttle 避免過度觸發）
+let scrollTimeout = null;
+function throttledHandleScroll() {
+  if (scrollTimeout) return;
+  scrollTimeout = setTimeout(() => {
     handleScroll();
-  }, 200); // 每 200ms 檢查一次
+    scrollTimeout = null;
+  }, 50);
 }
-function stopScrollCheck() {
-  if (scrollCheckInterval) {
-    clearInterval(scrollCheckInterval);
-    scrollCheckInterval = null;
-  }
-}
-// 頁面可見時啟動檢查，不可見時停止（節省資源）
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    stopScrollCheck();
-  } else {
-    startScrollCheck();
-  }
-});
-// 初始化時啟動檢查
-startScrollCheck();
+window.addEventListener("touchmove", throttledHandleScroll, { passive: true });
+window.addEventListener("touchend", handleScroll, { passive: true });
 
 /* ====== 解析/過期判斷 (查詢頁用) ====== */
 function getDateFromCarDateTime(carDateTime) {
