@@ -932,10 +932,13 @@ async function submitBooking() {
 
     const backendMsg =
       result && (result.error || result.code || result.detail || result.message || "");
+    const backendMsgStr = String(backendMsg || "");
     const isCapacityError =
       res.status === 409 ||
-      backendMsg === "capacity_not_found" ||
-      String(backendMsg || "").includes("capacity_not_found");
+      backendMsgStr.includes("capacity_exceeded") ||
+      backendMsgStr.includes("capacity_not_found") ||
+      backendMsgStr.includes("capacity_header_missing") ||
+      backendMsgStr.includes("capacity_not_numeric");
 
     if (!res.ok) {
       if (isCapacityError) {
@@ -981,10 +984,13 @@ async function submitBooking() {
 
     mountTicketAndShow(currentBookingData);
   } catch (err) {
+    const errMsg = String((err && (err.error || err.message || err.detail || err.code)) || "");
     const maybeCapacity =
       err &&
-      (err.error === "capacity_not_found" ||
-        String(err.message || "").includes("capacity_not_found"));
+      (errMsg.includes("capacity_exceeded") ||
+        errMsg.includes("capacity_not_found") ||
+        errMsg.includes("capacity_header_missing") ||
+        errMsg.includes("capacity_not_numeric"));
     if (maybeCapacity) {
       showErrorCard(t("overPaxOrMissing"));
     } else {
@@ -1821,10 +1827,13 @@ async function openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax 
 
       const backendMsg =
         j && (j.error || j.code || j.detail || j.message || "");
+      const backendMsgStr = String(backendMsg || "");
       const isCapacityError =
         r.status === 409 ||
-        backendMsg === "capacity_not_found" ||
-        String(backendMsg || "").includes("capacity_not_found");
+        backendMsgStr.includes("capacity_exceeded") ||
+        backendMsgStr.includes("capacity_not_found") ||
+        backendMsgStr.includes("capacity_header_missing") ||
+        backendMsgStr.includes("capacity_not_numeric");
 
       // 4️⃣ HTTP 錯誤
       if (!r.ok) {
