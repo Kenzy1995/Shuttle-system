@@ -1099,6 +1099,94 @@ def driver_get_all_data():
     )
 
 
+# ========= 調試端點：數據一致性測試 =========
+
+class DebugDataResponse(BaseModel):
+    """調試端點返回的數據統計信息"""
+    trips_count: int
+    passengers_count: int
+    trips_main_datetimes: List[str]
+    passengers_main_datetimes: List[str]
+    missing_in_passengers: List[str]  # 在班次中但不在乘客清單中的主班次時間
+    missing_in_trips: List[str]  # 在乘客清單中但不在班次中的主班次時間
+    filter_info: Dict[str, Any]
+    raw_data_stats: Dict[str, Any]
+
+@app.get("/api/driver/debug", response_model=DebugDataResponse)
+def driver_debug_data():
+    """
+    調試端點：返回班次清單和乘客清單的數據統計和比較信息
+    用於測試和驗證兩個列表的數據一致性
+    """
+    values, hmap = _get_sheet_data_main()
+    
+    # 構建數據
+    trips = build_driver_trips(values, hmap)
+    passenger_list = build_driver_all_passengers(values, hmap)
+    
+    # 提取主班次時間
+    trips_main_datetimes = [t.trip_id for t in trips]  # trip_id 就是主班次時間原始字串
+    passengers_main_datetimes = [p.main_datetime for p in passenger_list if p.main_datetime]
+    
+    # 轉換為集合以便比較
+    trips_set = set(trips_main_datetimes)
+    passengers_set = set(passengers_main_datetimes)
+    
+    # 找出差異
+    missing_in_passengers = sorted(list(trips_set - passengers_set))
+    missing_in_trips = sorted(list(passengers_set - trips_set))
+    
+    # 過濾條件信息
+    now = _tz_now()
+    cutoff = now - timedelta(hours=1)
+    filter_info = {
+        "now": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "cutoff": cutoff.strftime("%Y-%m-%d %H:%M:%S"),
+        "filter_condition": "主班次時間 >= (NOW() - 1小時)"
+    }
+    
+    # 原始數據統計
+    total_rows = len(values) - HEADER_ROW_MAIN
+    idx_main_dt = _col_index(hmap, "主班次時間")
+    rows_with_main_dt = 0
+    rows_without_main_dt = 0
+    rows_cancelled = 0
+    idx_status = _col_index(hmap, "確認狀態")
+    
+    for row in values[HEADER_ROW_MAIN:]:
+        if not any(row):
+            continue
+        main_raw = _get_cell(row, idx_main_dt) if idx_main_dt >= 0 else ""
+        if main_raw:
+            rows_with_main_dt += 1
+            # 檢查是否已取消
+            if idx_status >= 0 and idx_status < len(row):
+                status_val = _get_cell(row, idx_status)
+                if "❌" in status_val:
+                    rows_cancelled += 1
+        else:
+            rows_without_main_dt += 1
+    
+    raw_data_stats = {
+        "total_rows": total_rows,
+        "rows_with_main_dt": rows_with_main_dt,
+        "rows_without_main_dt": rows_without_main_dt,
+        "rows_cancelled": rows_cancelled,
+        "rows_after_filter": rows_with_main_dt - rows_cancelled
+    }
+    
+    return DebugDataResponse(
+        trips_count=len(trips),
+        passengers_count=len(passenger_list),
+        trips_main_datetimes=sorted(trips_main_datetimes),
+        passengers_main_datetimes=sorted(passengers_main_datetimes),
+        missing_in_passengers=missing_in_passengers,
+        missing_in_trips=missing_in_trips,
+        filter_info=filter_info,
+        raw_data_stats=raw_data_stats,
+    )
+
+
 # ========= 兼容舊前端的三個端點（改用快取與共用邏輯） =========
 
 @app.get("/api/driver/trips", response_model=List[DriverTrip])
