@@ -241,6 +241,7 @@ function scrollToTop() {
 function showPage(id) {
   hardResetOverlays();
 
+  querySelector(".page")?.parentElement?.querySelectorAll(".page").forEach((p) => p.classList.remove("active")) || 
   document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
   const pageEl = getElement(id);
   if (pageEl) pageEl.classList.add("active");
@@ -263,7 +264,10 @@ function showPage(id) {
 
   // 批量操作優化
   requestAnimationFrame(() => {
-    document.querySelectorAll(".mobile-tabbar button").forEach((b) => b.classList.remove("active"));
+    const tabbar = querySelector(".mobile-tabbar");
+    if (tabbar) {
+      tabbar.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
+    }
   });
   const mId =
     id === "reservation"
@@ -4279,13 +4283,16 @@ function hideInitialLoading() {
 document.addEventListener("DOMContentLoaded", () => {
   // 初始化 DOM 元素緩存（優化：避免重複查詢）
   domCache.init();
-  document.querySelectorAll(".actions").forEach((a) => {
-    const btns = a.querySelectorAll("button");
-    if (btns.length === 3) a.classList.add("has-three");
-  });
-  document.querySelectorAll(".ticket-actions").forEach((a) => {
-    const btns = a.querySelectorAll("button");
-    if (btns.length === 3) a.classList.add("has-three");
+  // 使用 DocumentFragment 進行批量操作（優化）
+  requestAnimationFrame(() => {
+    document.querySelectorAll(".actions").forEach((a) => {
+      const btns = a.querySelectorAll("button");
+      if (btns.length === 3) a.classList.add("has-three");
+    });
+    document.querySelectorAll(".ticket-actions").forEach((a) => {
+      const btns = a.querySelectorAll("button");
+      if (btns.length === 3) a.classList.add("has-three");
+    });
   });
   ["stopHotel", "stopMRT", "stopTrain", "stopLala"].forEach((id) => {
     const el = getElement(id);
