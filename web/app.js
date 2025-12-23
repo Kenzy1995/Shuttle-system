@@ -1109,7 +1109,8 @@ function showCheckDateStep() {
   const qForm = document.getElementById("queryForm");
   const dateStep = document.getElementById("checkDateStep");
   const ticketStep = document.getElementById("checkTicketStep");
-  if (qForm) qForm.style.display = "none";
+  // 保持搜尋框可見，只顯示日期選擇頁面
+  if (qForm) qForm.style.display = "flex";
   if (dateStep) dateStep.style.display = "block";
   if (ticketStep) ticketStep.style.display = "none";
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1126,7 +1127,31 @@ function showCheckTicketStep() {
 }
 
 function closeCheckTicket() {
-  showCheckDateStep();
+  // 關閉車票頁面時，返回到日期選擇頁面（如果有查詢結果），否則返回到查詢表單
+  const checkTicketStep = document.getElementById("checkTicketStep");
+  const checkDateStep = document.getElementById("checkDateStep");
+  if (checkTicketStep) checkTicketStep.style.display = "none";
+  
+  // 檢查是否有查詢結果
+  if (lastQueryResults && lastQueryResults.length > 0) {
+    // 提取所有唯一的日期
+    const uniqueDates = new Set();
+    lastQueryResults.forEach((r) => {
+      const dt = getDateFromCarDateTime(String(r["車次-日期時間"] || ""));
+      if (dt) uniqueDates.add(dt);
+    });
+    
+    // 如果有日期（無論多少個），都返回到日期選擇頁面，保持搜尋框可見
+    if (uniqueDates.size > 0) {
+      showCheckDateStep();
+    } else {
+      // 沒有有效日期，返回到查詢表單
+      showCheckQueryForm();
+    }
+  } else {
+    // 沒有查詢結果，返回到查詢表單
+    showCheckQueryForm();
+  }
 }
 
 function withinOneMonth(dateIso) {
@@ -1275,8 +1300,8 @@ function buildTicketCard(row, { mask = false } = {}) {
   closeBtn.setAttribute("aria-label", "close");
   closeBtn.style.cssText = "position:relative;right:0;top:0;";
   closeBtn.onclick = () => {
-    const checkTicketStep = document.getElementById("checkTicketStep");
-    if (checkTicketStep) checkTicketStep.style.display = "none";
+    // 關閉車票時，使用統一的關閉函數
+    closeCheckTicket();
   };
   topBar.appendChild(closeBtn);
   
