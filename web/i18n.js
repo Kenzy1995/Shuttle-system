@@ -114,7 +114,14 @@ const TEXTS = {
     queryFailedPrefix: "查詢失敗：",
     paxHintPrefix: "此班次可預約：",
     paxHintSuffix: " 人；單筆最多 4 人",
-    overPaxOrMissing: "班次已不存在或已超過可預訂人數，請重新查詢預約。"
+    overPaxOrMissing: "班次已不存在或已超過可預訂人數，請重新查詢預約。",
+    rtStatusGood: "良好",
+    rtStatusConnecting: "連線中",
+    rtRefresh: "刷新",
+    rtNoTripAvailable: "目前無可顯示班次",
+    rtViewLocation: "查看即時位置",
+    rtDataUpdated: "資料已自動更新",
+    rtTripEnded: "班次: {datetime} 已結束"
   },
   en: {
     title: "Hotel Service - Free Shuttle Booking",
@@ -223,7 +230,14 @@ const TEXTS = {
     paxHintSuffix: " seats; up to 4 per order",
     editBookingTitle: "Edit Booking",
     phoneHint: "Please enter a valid phone number (including non-Taiwan numbers)",
-    overPaxOrMissing: "This trip no longer exists or is fully booked. Please search again."
+    overPaxOrMissing: "This trip no longer exists or is fully booked. Please search again.",
+    rtStatusGood: "Good",
+    rtStatusConnecting: "Connecting",
+    rtRefresh: "Refresh",
+    rtNoTripAvailable: "No trips available",
+    rtViewLocation: "View Live Location",
+    rtDataUpdated: "Data auto-updated",
+    rtTripEnded: "Trip: {datetime} ended"
   },
   ja: {
     title: "ホテルサービス-無料シャトル予約",
@@ -332,7 +346,14 @@ const TEXTS = {
     paxHintSuffix: " 人；1回の予約で最大4名",
     editBookingTitle: "予約を編集",
     phoneHint: "正しい電話番号を入力してください（台湾以外の番号も可）",
-    overPaxOrMissing: "便が存在しないか満席です。再度検索してください。"
+    overPaxOrMissing: "便が存在しないか満席です。再度検索してください。",
+    rtStatusGood: "良好",
+    rtStatusConnecting: "接続中",
+    rtRefresh: "更新",
+    rtNoTripAvailable: "表示可能な便がありません",
+    rtViewLocation: "リアルタイム位置を表示",
+    rtDataUpdated: "データが自動更新されました",
+    rtTripEnded: "便: {datetime} 終了"
   },
   ko: {
     title: "호텔 서비스-무료 셔틀 예약",
@@ -441,7 +462,14 @@ const TEXTS = {
     paxHintSuffix: "명; 주문당 최대 4명",
     editBookingTitle: "예약 수정",
     phoneHint: "정확한 휴대폰 번호를 입력하세요(대만 번호가 아니어도 입력 가능)",
-    overPaxOrMissing: "해당 편은 존재하지 않거나 예약 가능 인원을 초과했습니다. 다시 조회해주세요."
+    overPaxOrMissing: "해당 편은 존재하지 않거나 예약 가능 인원을 초과했습니다. 다시 조회해주세요.",
+    rtStatusGood: "양호",
+    rtStatusConnecting: "연결 중",
+    rtRefresh: "새로고침",
+    rtNoTripAvailable: "표시 가능한 편이 없습니다",
+    rtViewLocation: "실시간 위치 보기",
+    rtDataUpdated: "데이터가 자동 업데이트되었습니다",
+    rtTripEnded: "편: {datetime} 종료"
   }
 };
 
@@ -562,5 +590,10 @@ function onLanguageChange(lang) {
   // ✅ 跑馬燈：語言切換時重新渲染一次（如果有文案）
   if (typeof showMarquee === "function" && marqueeData.isLoaded) {
     showMarquee();
+  }
+
+  // ✅ 即時位置：語言切換時更新文字
+  if (typeof updateLiveLocationI18N === "function") {
+    updateLiveLocationI18N();
   }
 }
