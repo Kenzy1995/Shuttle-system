@@ -753,7 +753,7 @@ def update_driver_location(loc: DriverLocation):
             ref.set(location_data)
             
             # 改進：記錄GPS位置歷史（用於路線追蹤）
-            # 每次GPS更新時，將位置和時間戳記錄到當前班次的路徑歷史中
+            # 優化策略：添加時間過濾和抽樣機制，減少資料量
             if loc.trip_id:
                 try:
                     # 獲取當前班次ID
@@ -763,20 +763,40 @@ def update_driver_location(loc: DriverLocation):
                         path_history_ref = db.reference("/current_trip_path_history")
                         current_history = path_history_ref.get() or []
                         
-                        # 添加新的位置點（包含時間戳）
-                        new_point = {
-                            "lat": loc.lat,
-                            "lng": loc.lng,
-                            "timestamp": loc.timestamp,
-                            "updated_at": DRIVER_LOCATION_CACHE["updated_at"]
-                        }
+                        # 優化：時間過濾 - 只保留最近60分鐘的GPS點
+                        now_ts = int(time.time() * 1000)  # 當前時間戳（毫秒）
+                        THIRTY_MINUTES_MS = 60 * 60 * 1000  # 60分鐘
+                        current_history = [
+                            point for point in current_history
+                            if point.get("timestamp", 0) > (now_ts - THIRTY_MINUTES_MS)
+                        ]
                         
-                        # 只保留最近的路徑點（避免資料過大，保留最近1000個點）
-                        current_history.append(new_point)
-                        if len(current_history) > 1000:
-                            current_history = current_history[-1000:]
+                        # 優化：抽樣機制 - 如果GPS更新頻率過高（< 5秒），只記錄部分點
+                        should_record = True
+                        if len(current_history) > 0:
+                            last_point = current_history[-1]
+                            last_ts = last_point.get("timestamp", 0)
+                            time_diff = now_ts - last_ts
+                            MIN_INTERVAL_MS = 5 * 1000  # 5秒最小間隔
+                            if time_diff < MIN_INTERVAL_MS:
+                                should_record = False
                         
-                        path_history_ref.set(current_history)
+                        if should_record:
+                            # 添加新的位置點（包含時間戳）
+                            new_point = {
+                                "lat": loc.lat,
+                                "lng": loc.lng,
+                                "timestamp": loc.timestamp,
+                                "updated_at": DRIVER_LOCATION_CACHE["updated_at"]
+                            }
+                            current_history.append(new_point)
+                            
+                            # 優化：限制總數量（保留最近500個點，因為已經有時間過濾）
+                            MAX_HISTORY_POINTS = 500
+                            if len(current_history) > MAX_HISTORY_POINTS:
+                                current_history = current_history[-MAX_HISTORY_POINTS:]
+                            
+                            path_history_ref.set(current_history)
                 except Exception as path_history_error:
                     pass
             
@@ -828,9 +848,9 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 
 def check_station_arrival(lat: float, lng: float, trip_id: str):
     """
-    檢查司機是否到達某個站點，如果距離 < 50公尺，自動標記為已到達
+    優化版：檢查司機是否到達某個站點
+    結合距離判斷和路線索引判斷，提高準確性
     只檢查該班次實際會停靠的站點（從 current_trip_stations 讀取）
-    
     """
     if not firebase_admin._apps:
         return
@@ -859,7 +879,22 @@ def check_station_arrival(lat: float, lng: float, trip_id: str):
         completed_stops_ref = db.reference("/current_trip_completed_stops")
         completed_stops = completed_stops_ref.get() or []
         
-        STATION_ARRIVAL_DISTANCE = 50  # 50公尺
+        # 優化：根據站點類型調整距離閾值
+        def get_station_threshold(stop_name: str) -> float:
+            """根據站點類型返回距離閾值（公尺）"""
+            if "飯店" in stop_name or "Hotel" in stop_name:
+                return 60  # 飯店可以更大（停車場較大）
+            elif "捷運" in stop_name or "MRT" in stop_name:
+                return 40  # 捷運站可以更小（位置較精確）
+            elif "火車" in stop_name or "Train" in stop_name:
+                return 40  # 火車站可以更小
+            else:
+                return 50  # 預設值
+        
+        # 優化：嘗試讀取路線資料，用於路線索引判斷
+        route_ref = db.reference("/current_trip_route")
+        route_data = route_ref.get()
+        route_path = route_data.get("path", []) if route_data else []
         
         # 只檢查實際會停靠的站點
         for stop_name in actual_stops_names:
@@ -877,8 +912,42 @@ def check_station_arrival(lat: float, lng: float, trip_id: str):
             
             # 計算距離
             distance = haversine_distance(lat, lng, stop_lat, stop_lng)
+            threshold = get_station_threshold(stop_name)
             
-            if distance < STATION_ARRIVAL_DISTANCE:
+            # 判斷1：距離判斷（主要判斷）
+            distance_check = distance < threshold
+            
+            # 判斷2：路線索引判斷（輔助判斷，提高準確性）
+            route_index_check = False
+            if route_path and len(route_path) > 0:
+                # 找到站點在路線上的最近點索引
+                station_nearest_idx = 0
+                station_best_dist = float('inf')
+                for i, point in enumerate(route_path):
+                    dx = point.get("lat", 0) - stop_lat
+                    dy = point.get("lng", 0) - stop_lng
+                    dist = dx * dx + dy * dy
+                    if dist < station_best_dist:
+                        station_best_dist = dist
+                        station_nearest_idx = i
+                
+                # 找到司機位置在路線上的最近點索引
+                driver_nearest_idx = 0
+                driver_best_dist = float('inf')
+                for i, point in enumerate(route_path):
+                    dx = point.get("lat", 0) - lat
+                    dy = point.get("lng", 0) - lng
+                    dist = dx * dx + dy * dy
+                    if dist < driver_best_dist:
+                        driver_best_dist = dist
+                        driver_nearest_idx = i
+                
+                # 如果司機位置在路線上的索引 > 站點索引，且距離 < 100公尺，也認為已過站
+                if driver_nearest_idx > station_nearest_idx and distance < 100:
+                    route_index_check = True
+            
+            # 綜合判斷：距離判斷 OR 路線索引判斷
+            if distance_check or route_index_check:
                 # 標記為已到達
                 if stop_name not in completed_stops:
                     completed_stops.append(stop_name)
