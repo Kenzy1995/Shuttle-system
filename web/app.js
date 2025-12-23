@@ -73,7 +73,13 @@ function handleScroll() {
   if (!btn) return;
   // 超過一個畫面高度就顯示（使用 window.innerHeight 作為一個畫面高度）
   const oneScreenHeight = window.innerHeight || document.documentElement.clientHeight || 300;
-  btn.style.display = y > oneScreenHeight ? "block" : "none";
+  const shouldShow = y > oneScreenHeight;
+  // 強制更新 display 狀態，確保手機版也能正確觸發
+  if (shouldShow) {
+    btn.style.display = "block";
+  } else {
+    btn.style.display = "none";
+  }
 }
 
 function showPage(id) {
@@ -115,6 +121,15 @@ function showPage(id) {
   if (mEl) mEl.classList.add("active");
 
   window.scrollTo({ top: 0, behavior: "smooth" });
+  
+  // 確保在頁面切換後更新按鈕狀態（延遲執行以確保滾動完成）
+  setTimeout(() => {
+    handleScroll();
+  }, 100);
+  // 再次延遲執行，確保平滑滾動完成後也能正確更新
+  setTimeout(() => {
+    handleScroll();
+  }, 500);
 
   if (id === "reservation") {
     const homeHero = document.getElementById("homeHero");
@@ -4002,8 +4017,46 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
+// 監聽多種滾動事件，確保手機版也能正常運作
 window.addEventListener("scroll", handleScroll, { passive: true });
 window.addEventListener("resize", handleScroll, { passive: true });
+// 手機版觸摸滾動事件
+window.addEventListener("touchmove", handleScroll, { passive: true });
+window.addEventListener("touchend", handleScroll, { passive: true });
+// 監聽 document 的滾動事件（某些情況下滾動發生在 document 上）
+document.addEventListener("scroll", handleScroll, { passive: true });
+// 監聽 document.documentElement 的滾動事件
+if (document.documentElement) {
+  document.documentElement.addEventListener("scroll", handleScroll, { passive: true });
+}
+// 監聽 document.body 的滾動事件
+if (document.body) {
+  document.body.addEventListener("scroll", handleScroll, { passive: true });
+}
+// 定期檢查滾動位置（作為備用方案，確保手機版也能正確觸發）
+let scrollCheckInterval = null;
+function startScrollCheck() {
+  if (scrollCheckInterval) return;
+  scrollCheckInterval = setInterval(() => {
+    handleScroll();
+  }, 200); // 每 200ms 檢查一次
+}
+function stopScrollCheck() {
+  if (scrollCheckInterval) {
+    clearInterval(scrollCheckInterval);
+    scrollCheckInterval = null;
+  }
+}
+// 頁面可見時啟動檢查，不可見時停止（節省資源）
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stopScrollCheck();
+  } else {
+    startScrollCheck();
+  }
+});
+// 初始化時啟動檢查
+startScrollCheck();
 
 /* ====== 解析/過期判斷 (查詢頁用) ====== */
 function getDateFromCarDateTime(carDateTime) {
