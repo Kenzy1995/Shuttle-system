@@ -94,6 +94,36 @@ def _tz_now_str() -> str:
     return t.strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _normalize_main_dt_format(main_raw: str) -> str:
+    """
+    正規化主班次時間格式，確保時間部分為 HH:MM（兩位數小時）
+    例如："2025/12/24 0:50" -> "2025/12/24 00:50"
+         "2025/12/24 8:30" -> "2025/12/24 08:30"
+         "2025/12/24 10:00" -> "2025/12/24 10:00"
+    """
+    if not main_raw:
+        return main_raw
+    
+    # 匹配日期時間格式：YYYY/MM/DD H:MM 或 YYYY/MM/DD HH:MM
+    pattern = r'^(\d{4})[/-](\d{1,2})[/-](\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$'
+    match = re.match(pattern, main_raw.strip())
+    
+    if match:
+        year, month, day, hour, minute, second = match.groups()
+        # 統一使用 / 作為日期分隔符
+        # 確保小時為兩位數
+        normalized_hour = hour.zfill(2)
+        normalized_month = month.zfill(2)
+        normalized_day = day.zfill(2)
+        
+        if second:
+            return f"{year}/{normalized_month}/{normalized_day} {normalized_hour}:{minute}:{second}"
+        else:
+            return f"{year}/{normalized_month}/{normalized_day} {normalized_hour}:{minute}"
+    
+    # 如果無法匹配，返回原值
+    return main_raw
+
 def _parse_main_dt(raw: str) -> Optional[datetime]:
     """解析主班次時間：可能是 '2025/12/08 18:30' 或 '2025-12-08 18:30' 等。"""
     if not raw:
@@ -423,17 +453,21 @@ def build_driver_trips(
 
         date_str = dt.strftime("%Y-%m-%d")
         time_str = dt.strftime("%H:%M")
+        
+        # 正規化 trip_id 格式，確保時間部分為 HH:MM
+        normalized_trip_id = _normalize_main_dt_format(main_raw)
 
-        if main_raw not in trips_by_dt:
-            trips_by_dt[main_raw] = DriverTrip(
-                trip_id=main_raw,
+        if normalized_trip_id not in trips_by_dt:
+            trips_by_dt[normalized_trip_id] = DriverTrip(
+                trip_id=normalized_trip_id,
                 date=date_str,
                 time=time_str,
                 total_pax=0,
             )
 
         if idx_pax >= 0 and idx_pax < len(row):
-            trips_by_dt[main_raw].total_pax += _safe_int(row[idx_pax], 0)
+            normalized_trip_id = _normalize_main_dt_format(main_raw)
+            trips_by_dt[normalized_trip_id].total_pax += _safe_int(row[idx_pax], 0)
 
     return sorted(trips_by_dt.values(), key=lambda t: (t.date, t.time))
 
@@ -502,11 +536,14 @@ def build_driver_trip_passengers(
         pick = _get_cell(row, idx_pick)
         drop = _get_cell(row, idx_drop)
 
+        # 正規化 trip_id 格式
+        normalized_trip_id = _normalize_main_dt_format(main_raw)
+
         # 上車
         if pick:
             result.append(
                 DriverPassenger(
-                    trip_id=main_raw,
+                    trip_id=normalized_trip_id,
                     station=pick,
                     updown="上車",
                     booking_id=booking_id,
@@ -524,7 +561,7 @@ def build_driver_trip_passengers(
         if drop:
             result.append(
                 DriverPassenger(
-                    trip_id=main_raw,
+                    trip_id=normalized_trip_id,
                     station=drop,
                     updown="下車",
                     booking_id=booking_id,
@@ -723,10 +760,12 @@ def build_driver_all_passengers(
     for row in base_rows:
         dt = row["main_dt"]
         depart_time = dt.strftime("%H:%M") if dt else ""
+        # 正規化 main_datetime 格式，確保時間部分為 HH:MM
+        normalized_main_dt = _normalize_main_dt_format(row["main_dt_raw"])
         result.append(
             DriverAllPassenger(
                 booking_id=row["booking_id"],
-                main_datetime=row["main_dt_raw"],
+                main_datetime=normalized_main_dt,
                 depart_time=depart_time,
                 name=row["name"],
                 phone=row["phone"],
