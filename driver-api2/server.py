@@ -98,38 +98,53 @@ def _parse_main_dt(raw: str) -> Optional[datetime]:
     """解析主班次時間：可能是 '2025/12/08 18:30' 或 '2025-12-08 18:30' 等。"""
     if not raw:
         return None
+    original_raw = raw
     raw = raw.strip()
     
     # 標準化時間格式：將單數字小時補零（如 "0:50" → "00:50"）
-    # 處理 "YYYY/MM/DD H:MM" 或 "YYYY-MM-DD H:MM" 格式（H 是單數字小時）
-    # 匹配日期 + 空格 + 單數字小時的時間格式
-    # 例如：2025/12/24 0:50 或 2025-12-24 0:50:30
-    pattern = r'^(\d{4}[/-]\d{1,2}[/-]\d{1,2})\s+(\d{1}):(\d{2})(?::(\d{2}))?$'
+    # 處理多種可能的格式變體：
+    # - "YYYY/MM/DD H:MM" 或 "YYYY-MM-DD H:MM"（H 是單數字小時 0-9）
+    # - "YYYY/M/D H:MM" 或 "YYYY-M-D H:MM"（月份和日期也可能是單數字）
+    # 例如：2025/12/24 0:50, 2025-12-24 0:50:30, 2025/1/5 9:30
+    
+    # 匹配日期 + 空格 + 時間的格式
+    # 日期部分：YYYY/MM/DD 或 YYYY-MM-DD（月份和日期可能是單數字或雙數字）
+    # 時間部分：H:MM 或 HH:MM 或 H:MM:SS 或 HH:MM:SS（小時可能是單數字）
+    pattern = r'^(\d{4})[/-](\d{1,2})[/-](\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$'
     match = re.match(pattern, raw)
     if match:
-        date_part = match.group(1)
-        hour = match.group(2)  # 單數字小時（0-9）
-        minute = match.group(3)
-        second = match.group(4) if match.lastindex >= 4 and match.group(4) else None
-        # 補零小時（0 → 00, 1 → 01, ..., 9 → 09）
-        hour_padded = hour.zfill(2)
+        year = match.group(1)
+        month = match.group(2).zfill(2)  # 補零月份
+        day = match.group(3).zfill(2)    # 補零日期
+        hour = match.group(4).zfill(2)    # 補零小時
+        minute = match.group(5)
+        second = match.group(6) if match.lastindex >= 6 and match.group(6) else None
+        
+        # 重組標準化後的字符串
+        date_part = f"{year}/{month}/{day}"  # 統一使用 / 分隔符
         if second:
-            raw = f"{date_part} {hour_padded}:{minute}:{second}"
+            raw = f"{date_part} {hour}:{minute}:{second}"
         else:
-            raw = f"{date_part} {hour_padded}:{minute}"
+            raw = f"{date_part} {hour}:{minute}"
     
+    # 嘗試解析標準化後的時間字符串
     for fmt in ("%Y/%m/%d %H:%M", "%Y-%m-%d %H:%M",
                 "%Y/%m/%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
         try:
-            return datetime.strptime(raw, fmt)
+            result = datetime.strptime(raw, fmt)
+            return result
         except ValueError:
             continue
-    # 有些可能只存日期
+    
+    # 有些可能只存日期（無時間部分）
     for fmt in ("%Y/%m/%d", "%Y-%m-%d"):
         try:
             return datetime.strptime(raw, fmt)
         except ValueError:
             continue
+    
+    # 如果所有格式都失敗，記錄警告（但不在生產環境中頻繁記錄，避免日誌過多）
+    logger.warning(f"無法解析主班次時間格式: {original_raw}")
     return None
 
 
@@ -397,7 +412,13 @@ def build_driver_trips(
                 continue
 
         dt = _parse_main_dt(main_raw)
-        if not dt or dt < cutoff:
+        if not dt:
+            # 解析失敗，記錄警告（但避免日誌過多，只在必要時記錄）
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"build_driver_trips: 無法解析主班次時間，跳過該行: {main_raw}")
+            continue
+        if dt < cutoff:
+            # 時間過早，被過濾（正常情況，不記錄日誌）
             continue
 
         date_str = dt.strftime("%Y-%m-%d")
@@ -592,7 +613,13 @@ def build_driver_all_passengers(
             continue
 
         dt = _parse_main_dt(main_raw)
-        if not dt or dt < cutoff:
+        if not dt:
+            # 解析失敗，記錄警告（但避免日誌過多，只在必要時記錄）
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"build_driver_all_passengers: 無法解析主班次時間，跳過該行: {main_raw}")
+            continue
+        if dt < cutoff:
+            # 時間過早，被過濾（正常情況，不記錄日誌）
             # 只有主班次時間 >= (NOW() - 1小時) 的才保留（與 build_driver_trips 保持一致）
             continue
 
@@ -1180,6 +1207,7 @@ def api_driver_checkin(req: DriverCheckinRequest):
 
     main_dt = _parse_main_dt(main_raw)
     if not main_dt:
+        logger.warning(f"api_driver_checkin: 無法解析主班次時間: {main_raw}, booking_id: {booking_id}")
         return DriverCheckinResponse(
             status="error",
             message=f"主班次時間格式錯誤：{main_raw}",
@@ -1375,6 +1403,7 @@ def api_driver_trip_status(req: TripStatusRequest):
         d2 = str(day).zfill(2)
         return [f"{y}/{m2}/{d2}", f"{y}-{m2}-{d2}"]
     def norm_time(t: str) -> list:
+        """標準化時間字符串，處理單數字小時（如 0:50 → 00:50）"""
         t = t.strip()
         parts = t.split(":")
         if len(parts) == 1:
@@ -1382,10 +1411,12 @@ def api_driver_trip_status(req: TripStatusRequest):
         h = parts[0]
         mm = parts[1] if len(parts) > 1 else "00"
         ss = parts[2] if len(parts) > 2 else None
-        h2 = str(h).zfill(2)
-        res = [f"{h2}:{mm}", f"{int(h)}:{mm}"]
+        h2 = str(h).zfill(2)  # 補零小時（0 → 00, 1 → 01, ..., 9 → 09）
+        # 返回多種格式以匹配不同的可能格式
+        res = [f"{h2}:{mm}", f"{int(h)}:{mm}"]  # 00:50 和 0:50
         if ss is not None:
             res.append(f"{h2}:{mm}:{ss}")
+            res.append(f"{int(h)}:{mm}:{ss}")  # 也包含單數字小時的秒數格式
         return res
     t_dates = norm_dates(target_date)
     t_times = norm_time(target_time)
