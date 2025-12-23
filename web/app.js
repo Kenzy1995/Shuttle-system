@@ -46,6 +46,47 @@ let queryDateList = [];
 let currentQueryDate = "";
 let currentDateRows = [];
 
+/* ====== DOM 元素緩存（優化：避免重複查詢） ====== */
+const domCache = {
+  // 常用元素緩存
+  backToTop: null,
+  marqueeContainer: null,
+  marqueeContent: null,
+  dialogOverlay: null,
+  dialogTitle: null,
+  dialogContent: null,
+  dialogCancelBtn: null,
+  dialogConfirmBtn: null,
+  loading: null,
+  loadingConfirm: null,
+  expiredOverlay: null,
+  navbar: null,
+  
+  // 初始化緩存（在 DOM 加載完成後調用）
+  init() {
+    this.backToTop = document.getElementById("backToTop");
+    this.marqueeContainer = document.getElementById("marqueeContainer");
+    this.marqueeContent = document.getElementById("marqueeContent");
+    this.dialogOverlay = document.getElementById("dialogOverlay");
+    this.dialogTitle = document.getElementById("dialogTitle");
+    this.dialogContent = document.getElementById("dialogContent");
+    this.dialogCancelBtn = document.getElementById("dialogCancelBtn");
+    this.dialogConfirmBtn = document.getElementById("dialogConfirmBtn");
+    this.loading = document.getElementById("loading");
+    this.loadingConfirm = document.getElementById("loadingConfirm");
+    this.expiredOverlay = document.getElementById("expiredOverlay");
+    this.navbar = document.querySelector(".navbar");
+  },
+  
+  // 獲取元素（如果緩存中沒有，則查詢並緩存）
+  get(id) {
+    if (!this[id]) {
+      this[id] = document.getElementById(id);
+    }
+    return this[id];
+  }
+};
+
 /* ====== 小工具 ====== */
 
 // 取得目前語系，優先用 i18n.js 的 currentLang，全都不在預期範圍就 fallback zh
@@ -65,7 +106,7 @@ function getCurrentLang() {
 // 這些函數被多處使用，統一放在這裡便於維護和優化
 
 function handleScroll() {
-  const btn = document.getElementById("backToTop");
+  const btn = domCache.get("backToTop");
   if (!btn) return;
   
   // 支援多種滾動位置獲取方式，確保手機版也能正常運作
@@ -189,15 +230,15 @@ function showPage(id) {
 }
 
 function showLoading(s = true) {
-  const el = document.getElementById("loading");
+  const el = domCache.get("loading");
   if (el) el.classList.toggle("show", s);
 }
 function showVerifyLoading(s = true) {
-  const el = document.getElementById("loadingConfirm");
+  const el = domCache.get("loadingConfirm");
   if (el) el.classList.toggle("show", s);
 }
 function showExpiredOverlay(s = true) {
-  const el = document.getElementById("expiredOverlay");
+  const el = domCache.get("expiredOverlay");
   if (el) el.classList.toggle("show", s);
 }
 function overlayRestart() {
@@ -213,15 +254,16 @@ function shake(el) {
 
 // 關閉跑馬燈：只在本次畫面隱藏（不寫入 storage）
 function closeMarquee() {
-  const bar = document.getElementById('marqueeContainer');
+  const bar = domCache.get("marqueeContainer");
   if (bar) {
     bar.style.display = 'none';
   }
 
   // 跑馬燈沒了，讓 navbar 貼到最上方
-  const nav = document.querySelector('.navbar');
+  const nav = domCache.navbar || document.querySelector('.navbar');
   if (nav) {
     nav.style.top = '0';
+    if (!domCache.navbar) domCache.navbar = nav;
   }
 
   // 跑馬燈關閉，不需要額外操作
@@ -236,24 +278,30 @@ function toggleCollapse(id) {
 }
 
 function hardResetOverlays() {
-  ["loading", "loadingConfirm", "expiredOverlay", "dialogOverlay", "successAnimation"].forEach(
-    (id) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      if (id === "successAnimation") {
-        el.classList.remove("show");
-        el.style.display = "none";
-      } else {
-        el.classList.remove("show");
-      }
+  // 使用緩存的元素
+  const elements = {
+    loading: domCache.get("loading"),
+    loadingConfirm: domCache.get("loadingConfirm"),
+    expiredOverlay: domCache.get("expiredOverlay"),
+    dialogOverlay: domCache.get("dialogOverlay"),
+    successAnimation: document.getElementById("successAnimation")
+  };
+  
+  Object.entries(elements).forEach(([id, el]) => {
+    if (!el) return;
+    if (id === "successAnimation") {
+      el.classList.remove("show");
+      el.style.display = "none";
+    } else {
+      el.classList.remove("show");
     }
-  );
+  });
 }
 
 /* ====== 跑馬燈 ====== */
 function showMarquee() {
   if (marqueeClosed) {
-    const marqueeContainer = document.getElementById("marqueeContainer");
+    const marqueeContainer = domCache.get("marqueeContainer");
     if (marqueeContainer) {
       marqueeContainer.style.display = "none";
     }
@@ -261,8 +309,8 @@ function showMarquee() {
     return;
   }
 
-  const marqueeContainer = document.getElementById("marqueeContainer");
-  const marqueeContent = document.getElementById("marqueeContent");
+  const marqueeContainer = domCache.get("marqueeContainer");
+  const marqueeContent = domCache.get("marqueeContent");
   if (!marqueeContainer || !marqueeContent) return;
 
   if (!marqueeData.text) {
@@ -276,7 +324,7 @@ function showMarquee() {
 }
 
 function restartMarqueeAnimation() {
-  const marqueeContent = document.getElementById("marqueeContent");
+  const marqueeContent = domCache.get("marqueeContent");
   if (!marqueeContent) return;
 
   marqueeContent.style.animation = "none";
@@ -295,11 +343,11 @@ function sanitize(s) {
 }
 
 function showErrorCard(message) {
-  const overlay = document.getElementById("dialogOverlay");
-  const title = document.getElementById("dialogTitle");
-  const content = document.getElementById("dialogContent");
-  const cancelBtn = document.getElementById("dialogCancelBtn");
-  const confirmBtn = document.getElementById("dialogConfirmBtn");
+  const overlay = domCache.get("dialogOverlay");
+  const title = domCache.get("dialogTitle");
+  const content = domCache.get("dialogContent");
+  const cancelBtn = domCache.get("dialogCancelBtn");
+  const confirmBtn = domCache.get("dialogConfirmBtn");
   if (!overlay || !title || !content || !cancelBtn || !confirmBtn) return;
 
   title.textContent = t("errorTitle");
@@ -312,11 +360,11 @@ function showErrorCard(message) {
 }
 
 function showConfirmDelete(bookingId, onConfirm) {
-  const overlay = document.getElementById("dialogOverlay");
-  const title = document.getElementById("dialogTitle");
-  const content = document.getElementById("dialogContent");
-  const cancelBtn = document.getElementById("dialogCancelBtn");
-  const confirmBtn = document.getElementById("dialogConfirmBtn");
+  const overlay = domCache.get("dialogOverlay");
+  const title = domCache.get("dialogTitle");
+  const content = domCache.get("dialogContent");
+  const cancelBtn = domCache.get("dialogCancelBtn");
+  const confirmBtn = domCache.get("dialogConfirmBtn");
   if (!overlay || !title || !content || !cancelBtn || !confirmBtn) return;
 
   title.textContent = t("confirmDeleteTitle");
@@ -4012,6 +4060,8 @@ async function init() {
 
 
 document.addEventListener("DOMContentLoaded", () => {
+  // 初始化 DOM 元素緩存（優化：避免重複查詢）
+  domCache.init();
   document.querySelectorAll(".actions").forEach((a) => {
     const btns = a.querySelectorAll("button");
     if (btns.length === 3) a.classList.add("has-three");
