@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
 import time
+import logging
 from datetime import datetime, timedelta
 from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
@@ -12,6 +13,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import firebase_admin
 from firebase_admin import credentials, db
+
+# 設置日誌
+logger = logging.getLogger("driver-api2")
 
 # ========= Google Sheets 設定 =========
 
@@ -46,6 +50,16 @@ SHEET_CACHE: Dict[str, Any] = {
     "fetched_at": None,
 }
 CACHE_LOCK = Lock()
+
+# ========= 站點座標常數 =========
+# 統一管理站點座標，便於維護和重用
+STATION_COORDS = {
+    "福泰大飯店 Forte Hotel": {"lat": 25.054964953523683, "lng": 121.63077275881052},
+    "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": {"lat": 25.055017007293404, "lng": 121.61818547695053},
+    "南港火車站 Nangang Train Station": {"lat": 25.052822671279454, "lng": 121.60771823129633},
+    "LaLaport Shopping Park": {"lat": 25.05629820919232, "lng": 121.61700981622211},
+    "福泰大飯店(回) Forte Hotel (Back)": {"lat": 25.054800375417987, "lng": 121.63117576557792},
+}
 
 # ========= 司機即時位置 (In-Memory) =========
 # 注意：若部署在 Serverless (Cloud Run) 且有多個實例，這裡的變數不會共享。
@@ -517,13 +531,25 @@ def build_driver_all_passengers(
     if idx_main_dt < 0:
         return []
 
-    # 站點文字（照你公式中使用的）
-    hotel = "福泰大飯店 Forte Hotel"
-    mrt = "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3"
-    train = "南港火車站 Nangang Train Station"
-    mall = "LaLaport Shopping Park"
+    # 站點文字（統一提取為常數，便於維護）
+    STATION_NAMES = {
+        "hotel": "福泰大飯店 Forte Hotel",
+        "mrt": "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3",
+        "train": "南港火車站 Nangang Train Station",
+        "mall": "LaLaport Shopping Park"
+    }
+    hotel = STATION_NAMES["hotel"]
+    mrt = STATION_NAMES["mrt"]
+    train = STATION_NAMES["train"]
+    mall = STATION_NAMES["mall"]
 
     now = _tz_now()
+
+    # 優化：將字典映射提取到循環外，避免每次循環都重新創建
+    SORT_GO_MAP = {hotel: 1, mrt: 2, train: 3, mall: 4}
+    SORT_BACK_MAP = {mrt: 1, train: 2, mall: 3}
+    DROPOFF_GO_MAP = {mrt: 1, train: 2, mall: 3}
+    DROPOFF_BACK_MAP = {mall: 1, train: 2, mrt: 3}
 
     base_rows: List[Dict[str, Any]] = []
 
@@ -562,25 +588,12 @@ def build_driver_all_passengers(
         room_text = room_raw if room_raw else ""
         qty = _safe_int(qty_raw, 1)
 
-        # sort_go
-        if up == hotel:
-            sort_go = 1
-        elif up == mrt:
-            sort_go = 2
-        elif up == train:
-            sort_go = 3
-        elif up == mall:
-            sort_go = 4
-        else:
-            sort_go = 99
+        # sort_go - 使用字典映射優化性能（已在循環外定義）
+        sort_go = SORT_GO_MAP.get(up, 99)
 
-        # sort_back
-        if up == mrt:
-            sort_back = 1
-        elif up == train:
-            sort_back = 2
-        elif up == mall:
-            sort_back = 3
+        # sort_back - 使用字典映射優化性能（已在循環外定義）
+        if up in SORT_BACK_MAP:
+            sort_back = SORT_BACK_MAP[up]
         elif down == hotel:
             sort_back = 4
         else:
@@ -612,25 +625,11 @@ def build_driver_all_passengers(
         # hotel_back
         hotel_back = "下" if (direction == "回程" and down == hotel) else ""
 
-        # dropoff_order
+        # dropoff_order - 使用字典映射優化性能（已在循環外定義）
         if direction == "去程":
-            if down == mrt:
-                dropoff_order = 1
-            elif down == train:
-                dropoff_order = 2
-            elif down == mall:
-                dropoff_order = 3
-            else:
-                dropoff_order = 4
+            dropoff_order = DROPOFF_GO_MAP.get(down, 4)
         elif direction == "回程":
-            if up == mall:
-                dropoff_order = 1
-            elif up == train:
-                dropoff_order = 2
-            elif up == mrt:
-                dropoff_order = 3
-            else:
-                dropoff_order = 4
+            dropoff_order = DROPOFF_BACK_MAP.get(up, 4)
         else:
             dropoff_order = 99
 
@@ -867,15 +866,7 @@ def check_station_arrival(lat: float, lng: float, trip_id: str):
         if not actual_stops_names:
             return
         
-        # 站點座標映射（與 trip_start 中的 COORDS 一致）
-        STATION_COORDS = {
-            "福泰大飯店 Forte Hotel": {"lat": 25.054964953523683, "lng": 121.63077275881052},
-            "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3": {"lat": 25.055017007293404, "lng": 121.61818547695053},
-            "南港火車站 Nangang Train Station": {"lat": 25.052822671279454, "lng": 121.60771823129633},
-            "LaLaport Shopping Park": {"lat": 25.05629820919232, "lng": 121.61700981622211},
-            "福泰大飯店(回) Forte Hotel (Back)": {"lat": 25.054800375417987, "lng": 121.63117576557792},
-        }
-        
+        # 使用模組級常數 STATION_COORDS（已在文件頂部定義）
         completed_stops_ref = db.reference("/current_trip_completed_stops")
         completed_stops = completed_stops_ref.get() or []
         
@@ -959,8 +950,9 @@ def check_station_arrival(lat: float, lng: float, trip_id: str):
                         db.reference("/current_trip_station").set("所有站點已完成")
                 
                 break
-    except Exception:
-        pass
+    except Exception as e:
+        # 記錄錯誤以便調試，但不中斷主流程
+        logger.warning(f"check_station_arrival error: {e}", exc_info=True)
 
 
 def get_next_station(stops: list, completed_stops: list) -> str:
