@@ -377,10 +377,32 @@ function showConfirmDelete(bookingId, onConfirm) {
     }
   }, 1000);
 
+  // 保存定時器引用以便清理
+  let confirmTimerRef = timer;
+  
   confirmBtn.onclick = () => {
+    if (confirmTimerRef) {
+      clearInterval(confirmTimerRef);
+      confirmTimerRef = null;
+    }
     overlay.classList.remove("show");
     onConfirm && onConfirm();
   };
+  
+  // 當對話框關閉時也清理定時器（監聽 class 變化）
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+        if (!overlay.classList.contains('show') && confirmTimerRef) {
+          clearInterval(confirmTimerRef);
+          confirmTimerRef = null;
+          observer.disconnect();
+        }
+      }
+    });
+  });
+  observer.observe(overlay, { attributes: true });
+  
   overlay.classList.add("show");
 }
 
@@ -1465,7 +1487,12 @@ async function queryOrders() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "query", data: { booking_id: id, phone, email } })
     });
-    const data = await res.json();
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (e) {
+      throw new Error("無法解析伺服器回應");
+    }
     const arr = Array.isArray(data) ? data : data.results || [];
     lastQueryResults = arr;
     buildDateListFromResults(arr);
@@ -1602,8 +1629,13 @@ async function deleteOrder(bookingId) {
           }
         })
       });
-      const j = await r.json();
-      if (j.status === "success") {
+      let j = null;
+      try {
+        j = await r.json();
+      } catch (e) {
+        throw new Error("無法解析伺服器回應");
+      }
+      if (j && j.status === "success") {
         showSuccessAnimation();
         setTimeout(async () => {
           const id = (document.getElementById("qBookId").value || "").trim();
@@ -1618,10 +1650,15 @@ async function deleteOrder(bookingId) {
               lang: getCurrentLang()
             })
           });
-          const queryData = await queryRes.json();
+          let queryData = null;
+          try {
+            queryData = await queryRes.json();
+          } catch (e) {
+            queryData = [];
+          }
           lastQueryResults = Array.isArray(queryData)
             ? queryData
-            : queryData.results || [];
+            : (queryData && queryData.results) || [];
           buildDateListFromResults(lastQueryResults);
           if (currentQueryDate) openTicketsForDate(currentQueryDate);
           else showCheckDateStep();
@@ -1963,10 +2000,15 @@ async function openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax 
           data: { booking_id: id, phone: phoneInput, email: emailInput }
         })
       });
-      const queryData = await queryRes.json();
+      let queryData = null;
+      try {
+        queryData = await queryRes.json();
+      } catch (e) {
+        queryData = [];
+      }
       lastQueryResults = Array.isArray(queryData)
         ? queryData
-        : queryData.results || [];
+        : (queryData && queryData.results) || [];
       buildDateListFromResults(lastQueryResults);
       if (currentQueryDate) {
         openTicketsForDate(currentQueryDate);
@@ -1994,7 +2036,15 @@ async function refreshData() {
   showLoading(true);
   try {
     const res = await fetch(API_URL);
-    const raw = await res.json();
+    let raw = null;
+    try {
+      raw = await res.json();
+    } catch (e) {
+      throw new Error("無法解析伺服器回應");
+    }
+    if (!raw || !Array.isArray(raw) || raw.length === 0) {
+      throw new Error("伺服器回應格式錯誤");
+    }
     const headers = raw[0];
     const rows = raw.slice(1);
     allRows = rows
@@ -2058,7 +2108,15 @@ async function loadScheduleData() {
   try {
     const res = await fetch(API_URL + "?sheet=可預約班次(web)");
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (e) {
+      throw new Error("無法解析伺服器回應");
+    }
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      throw new Error("伺服器回應格式錯誤");
+    }
     const headers = data[0];
     const rows = data.slice(1);
 
@@ -2255,7 +2313,13 @@ async function loadSystemConfig() {
   try {
     const url = `${API_URL}?sheet=系統`;
     const res = await fetch(url);
-    const data = await res.json();
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (e) {
+      console.error("無法解析系統設定回應:", e);
+      return;
+    }
 
     if (!Array.isArray(data) || data.length === 0) return;
 
@@ -2366,7 +2430,13 @@ async function renderLiveLocationPlaceholder() {
     const apiUrl = "https://booking-api-995728097341.asia-east1.run.app/api/realtime/location";
     const r = await fetch(apiUrl);
     if (r.ok) {
-      const data = await r.json();
+      let data = null;
+      try {
+        data = await r.json();
+      } catch (e) {
+        console.error("無法解析即時位置回應:", e);
+        return;
+      }
       // 如果 gps_system_enabled 不是 true，隱藏整個即時位置區塊
       if (!data.gps_system_enabled) {
         sec.style.display = "none";
@@ -3509,7 +3579,13 @@ function initLiveLocation(mount) {
         updateStatus("#dc3545", "連線失敗");
         return;
       }
-      const data = await r.json();
+      let data = null;
+      try {
+        data = await r.json();
+      } catch (e) {
+        updateStatus("#dc3545", "資料解析錯誤");
+        return;
+      }
       await processLocationData(data);
     } catch (e) {
       updateStatus("#dc3545", "錯誤");
@@ -3654,11 +3730,16 @@ function initLiveLocation(mount) {
     });
     
     // 呼吸光圈動畫
+    // 清理之前的動畫（如果存在）
+    if (breathingAnimation) {
+      clearInterval(breathingAnimation);
+      breathingAnimation = null;
+    }
     let breathingRadius = 30;
     let breathingDirection = 1;
     let breathingOpacity = 0.2;
     let breathingOpacityDirection = 1;
-    const breathingAnimation = setInterval(() => {
+    breathingAnimation = setInterval(() => {
       // 半徑呼吸效果（30-50之間）
       breathingRadius += breathingDirection * 2;
       if (breathingRadius >= 50) {
