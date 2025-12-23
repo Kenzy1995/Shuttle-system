@@ -256,11 +256,20 @@
 
     /* 回到頂端按鈕 */
     #backToTop{
-      position:fixed;right:18px;bottom:24px;z-index:10000;display:none;width:44px;height:44px;border:none;border-radius:50%;cursor:pointer;background:#0009;color:#fff;font-size:22px;line-height:44px;text-align:center;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent
+      position:fixed;right:18px;bottom:24px;z-index:10000;display:none;width:44px;height:44px;border:none;border-radius:50%;cursor:pointer;background:#0009;color:#fff;font-size:22px;line-height:44px;text-align:center;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 8px rgba(0,0,0,0.3)
     }
     #backToTop:hover{filter:brightness(1.2)}
     #backToTop:active{transform:scale(0.95);background:#000c}
-    @media (max-width: 768px){ #backToTop{ bottom:96px; } }
+    @media (max-width: 768px){ 
+      #backToTop{ 
+        bottom:96px;
+        right:12px;
+        width:40px;
+        height:40px;
+        font-size:20px;
+        line-height:40px;
+      } 
+    }
 
     /* 成功動畫（3秒） */
     .success-animation{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10000;background:rgba(255,255,255,.95);border-radius:16px;padding:30px;box-shadow:var(--shadow-lg);display:none;align-items:center;justify-content:center;flex-direction:column;pointer-events:none}
