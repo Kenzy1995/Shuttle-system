@@ -12,8 +12,8 @@ from threading import Lock
 app = Flask(__name__)
 CORS(app, 
      origins=[
-         "https://hotel-web-3addcbkbgq-de.a.run.app",
-         "https://hotel-web-995728097341.asia-east1.run.app",
+    "https://hotel-web-3addcbkbgq-de.a.run.app",
+    "https://hotel-web-995728097341.asia-east1.run.app",
      ],
      supports_credentials=True,
      allow_headers=["Content-Type", "Authorization"],
