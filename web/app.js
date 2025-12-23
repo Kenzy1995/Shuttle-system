@@ -4046,6 +4046,17 @@ async function init() {
     await renderLiveLocationPlaceholder();
   } catch (e) {
   }
+
+  // 5. 隱藏初始載入遮罩
+  hideInitialLoading();
+}
+
+// 隱藏初始載入遮罩的輔助函數
+function hideInitialLoading() {
+  const initialLoading = document.getElementById("initialLoading");
+  if (initialLoading) {
+    initialLoading.classList.remove("show");
+  }
 }
 
 
@@ -4067,11 +4078,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 使用 try-catch 確保 init() 的錯誤不會阻塞整個頁面
   init().catch(e => {
-    // 即使初始化失敗，也要確保按鈕可以點擊
+    // 即使初始化失敗，也要確保按鈕可以點擊並隱藏載入遮罩
     try {
       showPage('reservation');
     } catch (e2) {
     }
+    // 確保載入遮罩被隱藏
+    hideInitialLoading();
   });
 });
 
