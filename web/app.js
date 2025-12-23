@@ -258,15 +258,8 @@ function closeMarquee() {
   if (bar) {
     bar.style.display = 'none';
   }
-
-  // 跑馬燈沒了，讓 navbar 貼到最上方
-  const nav = domCache.navbar || document.querySelector('.navbar');
-  if (nav) {
-    nav.style.top = '0';
-    if (!domCache.navbar) domCache.navbar = nav;
-  }
-
-  // 跑馬燈關閉，不需要額外操作
+  // 移除 has-marquee 類別，讓 navbar 回到 top: 0（通過 CSS 自動處理）
+  document.body.classList.remove("has-marquee");
 }
 
 function toggleCollapse(id) {
