@@ -55,6 +55,23 @@ HEADER_ROW_MAIN = 2
 BOOKED_TEXT = "✔️ 已預約 Booked"
 CANCELLED_TEXT = "❌ 已取消 Cancelled"
 
+# ========== 快取設定 ==========
+# 目標：在 5 秒 TTL 內，所有讀取 API 都共用同一份 Sheet 資料，避免重複打 Google Sheets
+CACHE_TTL_SECONDS = 5
+
+# SHEET_CACHE 結構：
+# {
+#   "values": List[List[str]] 或 None,
+#   "header_map": Dict[str, int] 或 None,
+#   "fetched_at": datetime 或 None
+# }
+SHEET_CACHE: Dict[str, Any] = {
+    "values": None,
+    "header_map": None,
+    "fetched_at": None,
+}
+CACHE_LOCK = threading.Lock()
+
 # 主表允許欄位
 HEADER_KEYS = {
     "申請日期", "最後操作時間", "預約編號", "往返", "日期", "班次", "車次",
@@ -175,17 +192,83 @@ def _sheet_headers(ws: gspread.Worksheet, header_row: int) -> List[str]:
     headers = ws.row_values(header_row)
     return [h.strip() for h in headers]
 
-def header_map_main(ws: gspread.Worksheet) -> Dict[str, int]:
-    row = _sheet_headers(ws, HEADER_ROW_MAIN)
-    m: Dict[str, int] = {}
-    for idx, name in enumerate(row, start=1):
-        name = (name or "").strip()
-        if name in HEADER_KEYS and name not in m:
-            m[name] = idx
-    return m
+def header_map_main(ws: Optional[gspread.Worksheet] = None, values: Optional[List[List[str]]] = None) -> Dict[str, int]:
+    """
+    取得 header_map，可以從 Worksheet 或 values 列表取得
+    如果提供 values，則不需要讀取 Sheet（用於快取場景）
+    """
+    if values is not None:
+        # 從 values 列表取得 header（用於快取場景）
+        if len(values) < HEADER_ROW_MAIN:
+            return {}
+        row = values[HEADER_ROW_MAIN - 1]
+        m: Dict[str, int] = {}
+        for idx, name in enumerate(row, start=1):
+            name = (name or "").strip()
+            if name in HEADER_KEYS and name not in m:
+                m[name] = idx
+        return m
+    else:
+        # 從 Worksheet 取得 header（傳統方式）
+        if ws is None:
+            raise ValueError("必須提供 ws 或 values")
+        row = _sheet_headers(ws, HEADER_ROW_MAIN)
+        m: Dict[str, int] = {}
+        for idx, name in enumerate(row, start=1):
+            name = (name or "").strip()
+            if name in HEADER_KEYS and name not in m:
+                m[name] = idx
+        return m
 
 def _read_all_rows(ws: gspread.Worksheet) -> List[List[str]]:
     return ws.get_all_values()
+
+# ========== Sheet 讀取快取核心 ==========
+def _get_sheet_data_main() -> Tuple[List[List[str]], Dict[str, int]]:
+    """
+    取得《預約審核(櫃台)》的整張表資料與 header_map。
+    - 在 CACHE_TTL_SECONDS 內，如果 cache 有值，直接回傳 cache。
+    - 超過 TTL 或 cache 無效時，重新讀取 Google Sheets 並更新 cache。
+    """
+    now = datetime.now()
+    global SHEET_CACHE
+
+    with CACHE_LOCK:
+        cached_values = SHEET_CACHE.get("values")
+        fetched_at: Optional[datetime] = SHEET_CACHE.get("fetched_at")
+
+        if (
+            cached_values is not None
+            and fetched_at is not None
+            and (now - fetched_at).total_seconds() < CACHE_TTL_SECONDS
+        ):
+            # 使用快取
+            return cached_values, SHEET_CACHE["header_map"]
+
+        # 重新讀取 Sheet
+        ws = open_ws(SHEET_NAME_MAIN)
+        values = _read_all_rows(ws)
+        hmap = header_map_main(values=values)
+
+        SHEET_CACHE = {
+            "values": values,
+            "header_map": hmap,
+            "fetched_at": now,
+        }
+        return values, hmap
+
+
+def _invalidate_sheet_cache() -> None:
+    """
+    寫入操作後呼叫，讓下一次讀取時一定會重新抓最新資料。
+    """
+    global SHEET_CACHE
+    with CACHE_LOCK:
+        SHEET_CACHE = {
+            "values": None,
+            "header_map": None,
+            "fetched_at": None,
+        }
 
 def _find_rows_by_pred(ws: gspread.Worksheet, headers: List[str], start_row: int, pred) -> List[int]:
     values = _read_all_rows(ws)
@@ -806,7 +889,8 @@ def ops(req: OpsRequest):
             p = QueryPayload(**data)
             if not (p.booking_id or p.phone or p.email):
                 raise HTTPException(400, "至少提供 booking_id / phone / email 其中一項")
-            all_values = _read_all_rows(ws_main)
+            # 使用快取機制，減少 Google Sheets API 調用
+            all_values, hmap = _get_sheet_data_main()
             if not all_values:
                 return []
             def get(row: List[str], key: str) -> str:
@@ -1025,6 +1109,8 @@ def ops(req: OpsRequest):
                 ws_main.batch_update(batch_updates, value_input_option="USER_ENTERED")
 
             log.info(f"modify updated booking_id={p.booking_id}")
+            # 清除快取，確保下次讀取時獲取最新資料
+            _invalidate_sheet_cache()
 
             # 立即回覆前端
             response_data = {
@@ -1083,6 +1169,8 @@ def ops(req: OpsRequest):
             if batch_updates:
                 ws_main.batch_update(batch_updates, value_input_option="USER_ENTERED")
             log.info(f"delete updated booking_id={p.booking_id}")
+            # 清除快取，確保下次讀取時獲取最新資料
+            _invalidate_sheet_cache()
             
             # 立即回覆前端
             response_data = {"status": "success", "booking_id": p.booking_id}
@@ -1135,6 +1223,8 @@ def ops(req: OpsRequest):
             if batch_updates:
                 ws_main.batch_update(batch_updates, value_input_option="USER_ENTERED")
             log.info(f"check_in row={rowno}")
+            # 清除快取，確保下次讀取時獲取最新資料
+            _invalidate_sheet_cache()
             return {"status": "success", "row": rowno}
 
         # ===== 寄信（手動補寄） =====
