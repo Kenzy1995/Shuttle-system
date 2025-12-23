@@ -1240,12 +1240,20 @@ function buildTicketCard(row, { mask = false } = {}) {
   const card = document.createElement("div");
   card.className = "ticket-card" + (expired ? " expired" : "");
 
+  // 頂部狀態欄：狀態 pill 和關閉按鈕在一行
+  const topBar = document.createElement("div");
+  topBar.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;";
+  
+  const leftGroup = document.createElement("div");
+  leftGroup.style.cssText = "display:flex;align-items:center;gap:8px;";
+  
   const pill = document.createElement("div");
   pill.className =
     "status-pill " +
     (expired ? "status-expired" : "status-" + statusCode);
   pill.textContent = expired ? ts("expired") : ts(statusCode);
-  card.appendChild(pill);
+  pill.style.cssText = "position:relative;left:0;top:0;";
+  leftGroup.appendChild(pill);
 
   if (statusCode === "rejected") {
     const tip = document.createElement("button");
@@ -1253,8 +1261,24 @@ function buildTicketCard(row, { mask = false } = {}) {
     tip.title = t("rejectedTip");
     tip.textContent = "!";
     tip.onclick = () => showErrorCard(t("rejectedTip"));
-    card.appendChild(tip);
+    leftGroup.appendChild(tip);
   }
+  
+  topBar.appendChild(leftGroup);
+  
+  // 關閉按鈕（如果需要，由調用者添加）
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "ticket-close";
+  closeBtn.innerHTML = "✕";
+  closeBtn.setAttribute("aria-label", "close");
+  closeBtn.style.cssText = "position:relative;right:0;top:0;";
+  closeBtn.onclick = () => {
+    const checkTicketStep = document.getElementById("checkTicketStep");
+    if (checkTicketStep) checkTicketStep.style.display = "none";
+  };
+  topBar.appendChild(closeBtn);
+  
+  card.appendChild(topBar);
 
   const header = document.createElement("div");
   header.className = "ticket-header";
@@ -2328,8 +2352,8 @@ function initLiveLocation(mount) {
     <div id="rt-info-panel" style="margin-bottom:12px;padding:16px;background:#ffffff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);display:none;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
         <div id="rt-status-light" style="width:12px;height:12px;border-radius:50%;background:#28a745;box-shadow:0 0 8px rgba(40,167,69,0.6);"></div>
-        <span id="rt-status-text" style="font-size:15px;color:#333;font-weight:500;">良好</span>
-        <button id="rt-refresh" style="margin-left:auto;padding:8px 16px;background:#fff;border:1px solid #ddd;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.1);">刷新</button>
+        <span id="rt-status-text" style="font-size:15px;color:#333;font-weight:500;">${t("rtStatusGood")}</span>
+        <button id="rt-refresh" style="margin-left:auto;padding:8px 16px;background:#fff;border:1px solid #ddd;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.1);">${t("rtRefresh")}</button>
       </div>
       
       <!-- 站點列表 -->
@@ -2342,18 +2366,18 @@ function initLiveLocation(mount) {
       <div id="rt-map" style="width:100%;height:100%;"></div>
       <!-- 灰色透明遮罩，預設顯示 -->
       <div id="rt-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10;">
-        <button id="rt-start-btn" class="button" style="padding:16px 32px;font-size:18px;font-weight:700;background:var(--primary);color:#fff;border:none;border-radius:12px;cursor:pointer;">查看即時位置</button>
+        <button id="rt-start-btn" class="button" style="padding:16px 32px;font-size:18px;font-weight:700;background:var(--primary);color:#fff;border:none;border-radius:12px;cursor:pointer;">${t("rtViewLocation")}</button>
       </div>
       <!-- 班次結束提示 -->
       <div id="rt-ended-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:15;pointer-events:none;">
         <div style="text-align:center;color:#fff;font-size:20px;font-weight:700;">
-          <div id="rt-ended-text">班次: <span id="rt-ended-datetime"></span> 已結束</div>
+          <div id="rt-ended-text"><span id="rt-ended-datetime-label"></span><span id="rt-ended-datetime"></span></div>
         </div>
       </div>
       <!-- 無可顯示班次遮罩 -->
       <div id="rt-no-trip-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:15;pointer-events:none;">
         <div style="text-align:center;color:#fff;font-size:20px;font-weight:700;">
-          <div>目前無可顯示班次</div>
+          <div id="rt-no-trip-text">${t("rtNoTripAvailable")}</div>
         </div>
       </div>
     </div>
@@ -2381,13 +2405,13 @@ function initLiveLocation(mount) {
         btnRefresh.style.opacity = "1";
         btnRefresh.style.cursor = "pointer";
         btnRefresh.style.background = "#fff";
-        btnRefresh.textContent = countdown > 0 ? `刷新 (${countdown}秒)` : "刷新";
+        btnRefresh.textContent = countdown > 0 ? `${t("rtRefresh")} (${countdown}秒)` : t("rtRefresh");
       } else {
         btnRefresh.disabled = true;
         btnRefresh.style.opacity = "0.5";
         btnRefresh.style.cursor = "not-allowed";
         btnRefresh.style.background = "#f0f0f0";
-        btnRefresh.textContent = countdown > 0 ? `刷新 (${countdown}秒)` : "刷新";
+        btnRefresh.textContent = countdown > 0 ? `${t("rtRefresh")} (${countdown}秒)` : t("rtRefresh");
       }
     }
   };
@@ -2731,6 +2755,7 @@ function initLiveLocation(mount) {
   };
   const endedOverlay = mount.querySelector("#rt-ended-overlay");
   const endedTextEl = mount.querySelector("#rt-ended-text");
+  const endedDatetimeLabelEl = mount.querySelector("#rt-ended-datetime-label");
   const endedDatetimeEl = mount.querySelector("#rt-ended-datetime");
   const mapEl = mount.querySelector("#rt-map");
   const mapWrapper = mount.querySelector("#rt-map-wrapper");
@@ -3228,8 +3253,12 @@ function initLiveLocation(mount) {
       if (shouldShowEnded) {
         if (endedOverlay) {
           endedOverlay.style.display = "flex";
+          const datetime = data.last_trip_datetime || data.current_trip_datetime || "";
+          if (endedDatetimeLabelEl) {
+            endedDatetimeLabelEl.textContent = t("rtTripEnded").replace("{datetime}", datetime);
+          }
           if (endedDatetimeEl) {
-            endedDatetimeEl.textContent = data.last_trip_datetime || data.current_trip_datetime || "";
+            endedDatetimeEl.textContent = "";
           }
         }
         if (infoPanel) infoPanel.style.display = "none";
@@ -3259,9 +3288,9 @@ function initLiveLocation(mount) {
         // 更新已走過的路線（updateWalkedRoute 內部會檢查 Google Maps API）
         await updateWalkedRoute(data, driverPos);
         
-        updateStatus("#28a745", "良好");
+        updateStatus("#28a745", t("rtStatusGood"));
       } else {
-        updateStatus("#ffc107", "連線中");
+        updateStatus("#ffc107", t("rtStatusConnecting"));
       }
       
       // 更新站點列表
@@ -3656,9 +3685,9 @@ function initLiveLocation(mount) {
     }
     
     if (firebaseConnected) {
-      updateStatus("#28a745", "資料已自動更新");
+      updateStatus("#28a745", t("rtDataUpdated"));
       setTimeout(() => {
-        updateStatus("#28a745", "良好");
+        updateStatus("#28a745", t("rtStatusGood"));
       }, 2000);
       lastManualRefreshTime = now;
       updateRefreshButton(false, 30);
@@ -3709,12 +3738,49 @@ function initLiveLocation(mount) {
   const updateRefreshButtonVisibility = () => {
     if (btnRefresh) {
       if (firebaseConnected) {
-        btnRefresh.title = "資料已自動更新，無需手動刷新";
+        btnRefresh.title = t("rtDataUpdated") + "，無需手動刷新";
         btnRefresh.style.opacity = "0.6";
       } else {
-        btnRefresh.title = "點擊手動刷新";
+        btnRefresh.title = t("rtRefresh");
         btnRefresh.style.opacity = "1";
       }
+    }
+  };
+  
+  // 語言切換時更新即時位置文字
+  window.updateLiveLocationI18N = function() {
+    if (statusText) {
+      const currentColor = statusLight ? statusLight.style.background : "#28a745";
+      if (currentColor === "#28a745") {
+        statusText.textContent = t("rtStatusGood");
+      } else if (currentColor === "#ffc107") {
+        statusText.textContent = t("rtStatusConnecting");
+      }
+    }
+    if (btnRefresh) {
+      const countdown = btnRefresh.textContent.match(/\((\d+)秒\)/);
+      if (countdown) {
+        btnRefresh.textContent = `${t("rtRefresh")} (${countdown[1]}秒)`;
+      } else {
+        btnRefresh.textContent = t("rtRefresh");
+      }
+      if (firebaseConnected) {
+        btnRefresh.title = t("rtDataUpdated") + "，無需手動刷新";
+      } else {
+        btnRefresh.title = t("rtRefresh");
+      }
+    }
+    const startBtn = mount.querySelector("#rt-start-btn");
+    if (startBtn) {
+      startBtn.textContent = t("rtViewLocation");
+    }
+    const noTripText = mount.querySelector("#rt-no-trip-text");
+    if (noTripText) {
+      noTripText.textContent = t("rtNoTripAvailable");
+    }
+    if (endedDatetimeLabelEl && endedDatetimeEl.textContent) {
+      const datetime = endedDatetimeEl.textContent;
+      endedDatetimeLabelEl.textContent = t("rtTripEnded").replace("{datetime}", datetime);
     }
   };
   
