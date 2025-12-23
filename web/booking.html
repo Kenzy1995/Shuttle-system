@@ -256,9 +256,10 @@
 
     /* 回到頂端按鈕 */
     #backToTop{
-      position:fixed;right:18px;bottom:24px;z-index:1000;display:none;width:44px;height:44px;border:none;border-radius:50%;cursor:pointer;background:#0009;color:#fff;font-size:22px;line-height:44px;text-align:center
+      position:fixed;right:18px;bottom:24px;z-index:10000;display:none;width:44px;height:44px;border:none;border-radius:50%;cursor:pointer;background:#0009;color:#fff;font-size:22px;line-height:44px;text-align:center;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent
     }
     #backToTop:hover{filter:brightness(1.2)}
+    #backToTop:active{transform:scale(0.95);background:#000c}
     @media (max-width: 768px){ #backToTop{ bottom:96px; } }
 
     /* 成功動畫（3秒） */
@@ -443,7 +444,7 @@
   </nav>
 
   <!-- 回到頂端 -->
-  <button id="backToTop" title="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+  <button id="backToTop" title="Back to top" onclick="scrollToTop()">↑</button>
 
   <!-- 預約流程 -->
   <main id="reservation" class="page active">
