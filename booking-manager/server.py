@@ -21,10 +21,9 @@ import hashlib
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
 from email.mime.base import MIMEBase
 from email import encoders
-from PIL import Image, ImageDraw, ImageFont
+# MIMEImage, PIL.Image, ImageDraw, ImageFont 未使用，已移除
 
 # Email settings
 EMAIL_FROM_NAME = "汐止福泰大飯店"
@@ -71,6 +70,14 @@ SHEET_CACHE: Dict[str, Any] = {
     "fetched_at": None,
 }
 CACHE_LOCK = threading.Lock()
+
+# 可預約班次表快取（類似主表快取機制）
+CAP_SHEET_CACHE: Dict[str, Any] = {
+    "values": None,
+    "header_map": None,
+    "hdr_row": None,
+    "fetched_at": None,
+}
 
 # 主表允許欄位
 HEADER_KEYS = {
@@ -270,6 +277,19 @@ def _invalidate_sheet_cache() -> None:
             "fetched_at": None,
         }
 
+def _invalidate_cap_sheet_cache() -> None:
+    """
+    清除可預約班次表快取（當容量發生變化時調用）。
+    """
+    global CAP_SHEET_CACHE
+    with CACHE_LOCK:
+        CAP_SHEET_CACHE = {
+            "values": None,
+            "header_map": None,
+            "hdr_row": None,
+            "fetched_at": None,
+        }
+
 def _find_rows_by_pred(ws: gspread.Worksheet, headers: List[str], start_row: int, pred) -> List[int]:
     values = _read_all_rows(ws)
     if not values:
@@ -350,10 +370,47 @@ def _parse_available(s: str) -> Optional[int]:
     m = re.search(r"(\d+)", str(s))
     return int(m.group(1)) if m else None
 
+def _get_cap_sheet_data() -> Tuple[List[List[str]], Dict[str, int], int]:
+    """
+    取得《可預約班次(web)》的整張表資料與 header_map。
+    使用快取機制減少 Google Sheets API 調用。
+    """
+    now = datetime.now()
+    global CAP_SHEET_CACHE
+
+    with CACHE_LOCK:
+        cached_values = CAP_SHEET_CACHE.get("values")
+        cached_hmap = CAP_SHEET_CACHE.get("header_map")
+        cached_hdr_row = CAP_SHEET_CACHE.get("hdr_row")
+        fetched_at: Optional[datetime] = CAP_SHEET_CACHE.get("fetched_at")
+
+        if (
+            cached_values is not None
+            and cached_hmap is not None
+            and cached_hdr_row is not None
+            and fetched_at is not None
+            and (now - fetched_at).total_seconds() < CACHE_TTL_SECONDS
+        ):
+            # 使用快取
+            return cached_values, cached_hmap, cached_hdr_row
+
+        # 重新讀取 Sheet
+        ws_cap = open_ws(SHEET_NAME_CAP)
+        values = _read_all_rows(ws_cap)
+        m, hdr_row = _cap_header_map(values)
+
+        CAP_SHEET_CACHE = {
+            "values": values,
+            "header_map": m,
+            "hdr_row": hdr_row,
+            "fetched_at": now,
+        }
+        return values, m, hdr_row
+
+
 def lookup_capacity(direction: str, date_iso: str, time_hm: str, station: str) -> int:
-    ws_cap = open_ws(SHEET_NAME_CAP)
-    values = _read_all_rows(ws_cap)
-    m, hdr_row = _cap_header_map(values)
+    # 使用快取機制，減少 Google Sheets API 調用
+    values, m, hdr_row = _get_cap_sheet_data()
     for key in CAP_REQ_HEADERS:
         if key not in m:
             raise HTTPException(409, f"capacity_header_missing:{key}")
@@ -849,6 +906,10 @@ def ops(req: OpsRequest):
             # 寫入 Google Sheet（關鍵操作）
             ws_main.append_row(newrow, value_input_option="USER_ENTERED")
             log.info(f"book appended booking_id={booking_id}")
+            # 清除快取，確保下次讀取時獲取最新資料
+            _invalidate_sheet_cache()
+            # 新增預約會影響容量，清除可預約班次表快取
+            _invalidate_cap_sheet_cache()
 
             # 立即回覆前端 —— 只給前端需要的東西，其他由前端自己維護
             response_data = {
