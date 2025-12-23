@@ -2700,6 +2700,10 @@ function initLiveLocation(mount) {
       let timeText = "--";
       let etaTime = null;
       
+      // 檢查是否已經發車（當前時間是否超過發車時間）
+      const now = new Date();
+      const hasDeparted = mainTripTime ? now >= mainTripTime : false;
+      
       if (index === 0 && mainTripTime) {
         // 第一站顯示發車時間（格式：發車時間:2025/12/23 10:00）
         etaTime = mainTripTime;
@@ -2718,11 +2722,10 @@ function initLiveLocation(mount) {
         // 已經過了但還沒標記為已抵達的站點
         timeLabel = "狀態";
         timeText = "已過站";
-      } else if (driverLocation && stopCoord) {
-        // 其他站點計算ETA
+      } else if (hasDeparted && driverLocation && stopCoord) {
+        // 只有發車後才計算ETA
         const eta = calculateETA(driverLocation.lat, driverLocation.lng, stopCoord.lat, stopCoord.lng);
         if (eta) {
-          const now = new Date();
           etaTime = new Date(now.getTime() + eta.minutes * 60 * 1000);
           const hours = String(etaTime.getHours()).padStart(2, '0');
           const minutes = String(etaTime.getMinutes()).padStart(2, '0');
@@ -2731,7 +2734,12 @@ function initLiveLocation(mount) {
         } else {
           timeLabel = "預計抵達";
         }
+      } else if (!hasDeparted) {
+        // 還沒發車，留空白
+        timeLabel = "";
+        timeText = "";
       } else {
+        // 其他情況（沒有司機位置或站點座標）
         timeLabel = "預計抵達";
       }
       
@@ -2748,11 +2756,14 @@ function initLiveLocation(mount) {
       
       const formattedStopName = formatStationName(stopName);
       
+      // 只有當 timeLabel 和 timeText 都有值時才顯示時間信息
+      const timeInfoHTML = (timeLabel && timeText) ? `<div style="font-size:13px;color:#666;">${timeLabel}: ${timeText}</div>` : '';
+      
       stationsHTML += `
         <div style="${stationStyle}">
           <div style="flex: 1;">
             <div style="font-size:15px;color:#333;font-weight:bold;margin-bottom:4px;">${formattedStopName}</div>
-            <div style="font-size:13px;color:#666;">${timeLabel}: ${timeText}</div>
+            ${timeInfoHTML}
           </div>
           ${isCompleted ? '<div style="color:#28a745;font-size:20px;">✓</div>' : (isPassed ? '<div style="color:#999999;font-size:20px;">→</div>' : '')}
         </div>
