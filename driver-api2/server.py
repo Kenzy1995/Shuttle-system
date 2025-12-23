@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+import re
 import time
 import logging
 from datetime import datetime, timedelta
@@ -98,6 +99,25 @@ def _parse_main_dt(raw: str) -> Optional[datetime]:
     if not raw:
         return None
     raw = raw.strip()
+    
+    # 標準化時間格式：將單數字小時補零（如 "0:50" → "00:50"）
+    # 處理 "YYYY/MM/DD H:MM" 或 "YYYY-MM-DD H:MM" 格式（H 是單數字小時）
+    # 匹配日期 + 空格 + 單數字小時的時間格式
+    # 例如：2025/12/24 0:50 或 2025-12-24 0:50:30
+    pattern = r'^(\d{4}[/-]\d{1,2}[/-]\d{1,2})\s+(\d{1}):(\d{2})(?::(\d{2}))?$'
+    match = re.match(pattern, raw)
+    if match:
+        date_part = match.group(1)
+        hour = match.group(2)  # 單數字小時（0-9）
+        minute = match.group(3)
+        second = match.group(4) if match.lastindex >= 4 and match.group(4) else None
+        # 補零小時（0 → 00, 1 → 01, ..., 9 → 09）
+        hour_padded = hour.zfill(2)
+        if second:
+            raw = f"{date_part} {hour_padded}:{minute}:{second}"
+        else:
+            raw = f"{date_part} {hour_padded}:{minute}"
+    
     for fmt in ("%Y/%m/%d %H:%M", "%Y-%m-%d %H:%M",
                 "%Y/%m/%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
         try:
