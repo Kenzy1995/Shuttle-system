@@ -2713,7 +2713,7 @@ function initLiveLocation(mount) {
       stationsHTML += `
         <div style="${stationStyle}">
           <div style="flex: 1;">
-            <div style="font-size:15px;color:#333;font-weight:${isCurrent ? '600' : '500'};margin-bottom:4px;">${formattedStopName}</div>
+            <div style="font-size:15px;color:#333;font-weight:bold;margin-bottom:4px;">${formattedStopName}</div>
             <div style="font-size:13px;color:#666;">${timeLabel}: ${timeText}</div>
           </div>
           ${isCompleted ? '<div style="color:#28a745;font-size:20px;">✓</div>' : (isPassed ? '<div style="color:#999999;font-size:20px;">→</div>' : '')}
