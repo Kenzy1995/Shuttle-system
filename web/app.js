@@ -61,6 +61,9 @@ function getCurrentLang() {
   return "zh";
 }
 
+/* ====== 日期時間工具函數（統一管理） ====== */
+// 這些函數被多處使用，統一放在這裡便於維護和優化
+
 function handleScroll() {
   const btn = document.getElementById("backToTop");
   if (!btn) return;
@@ -271,16 +274,6 @@ function showMarquee() {
   marqueeContainer.style.display = "block";
   restartMarqueeAnimation();
 }
-
-function restartMarqueeAnimation() {
-  const marqueeContent = document.getElementById("marqueeContent");
-  if (!marqueeContent) return;
-
-  marqueeContent.style.animation = "none";
-  void marqueeContent.offsetHeight; // 強迫 reflow
-  marqueeContent.style.animation = null;
-}
-
 
 function restartMarqueeAnimation() {
   const marqueeContent = document.getElementById("marqueeContent");
@@ -1312,130 +1305,89 @@ function buildTicketCard(row, { mask = false } = {}) {
     ? QR_ORIGIN + "/api/qr/" + encodeURIComponent(qrCodeContent)
     : "";
 
-  const card = document.createElement("div");
-  card.className = "ticket-card" + (expired ? " expired" : "");
+  // 使用模板字符串一次性構建 HTML，減少 DOM 操作
+  const statusPillClass = `status-pill ${expired ? "status-expired" : "status-" + statusCode}`;
+  const statusPillText = expired ? ts("expired") : ts(statusCode);
+  const rejectedTipBtn = statusCode === "rejected"
+    ? `<button class="badge-alert" title="${sanitize(t("rejectedTip"))}">!</button>`
+    : "";
+  
+  const qrImage = statusCode === "cancelled"
+    ? `<img src="/images/qr-placeholder.png" alt="QR placeholder" />`
+    : `<img src="${sanitize(qrUrl)}" alt="QR" />`;
 
-  // 頂部狀態欄：狀態 pill 和關閉按鈕在一行
-  const topBar = document.createElement("div");
-  topBar.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;";
-  
-  const leftGroup = document.createElement("div");
-  leftGroup.style.cssText = "display:flex;align-items:center;gap:8px;";
-  
-  const pill = document.createElement("div");
-  pill.className =
-    "status-pill " +
-    (expired ? "status-expired" : "status-" + statusCode);
-  pill.textContent = expired ? ts("expired") : ts(statusCode);
-  pill.style.cssText = "position:relative;left:0;top:0;";
-  leftGroup.appendChild(pill);
+  const cardHTML = `
+    <div class="ticket-card${expired ? " expired" : ""}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="${statusPillClass}" style="position:relative;left:0;top:0;">${sanitize(statusPillText)}</div>
+          ${rejectedTipBtn}
+        </div>
+        <button class="ticket-close" aria-label="close" style="position:relative;right:0;top:0;">✕</button>
+      </div>
+      <div class="ticket-header">
+        <h2>${sanitize(carDateTime)}</h2>
+      </div>
+      <div class="ticket-content">
+        <div class="ticket-qr">${qrImage}</div>
+        <div class="ticket-info">
+          <div class="ticket-field"><span class="ticket-label">${t("labelBookingId")}</span><span class="ticket-value">${sanitize(bookingId)}</span></div>
+          <div class="ticket-field"><span class="ticket-label">${t("labelDirection")}</span><span class="ticket-value">${sanitize(rb)}</span></div>
+          <div class="ticket-field"><span class="ticket-label">${t("labelPick")}</span><span class="ticket-value">${sanitize(pick)}</span></div>
+          <div class="ticket-field"><span class="ticket-label">${t("labelDrop")}</span><span class="ticket-value">${sanitize(drop)}</span></div>
+          <div class="ticket-field"><span class="ticket-label">${t("labelName")}</span><span class="ticket-value">${sanitize(name)}</span></div>
+          <div class="ticket-field"><span class="ticket-label">${t("labelPhone")}</span><span class="ticket-value">${sanitize(phone)}</span></div>
+          <div class="ticket-field"><span class="ticket-label">${t("labelEmail")}</span><span class="ticket-value">${sanitize(email)}</span></div>
+          <div class="ticket-field"><span class="ticket-label">${t("labelPassengersShort")}</span><span class="ticket-value">${sanitize(String(pax))}</span></div>
+        </div>
+      </div>
+      <div class="ticket-actions"></div>
+    </div>
+  `;
+
+  // 創建臨時容器來解析 HTML
+  const temp = document.createElement("div");
+  temp.innerHTML = cardHTML.trim();
+  const card = temp.firstElementChild;
+
+  // 設置事件處理器
+  const closeBtn = card.querySelector(".ticket-close");
+  if (closeBtn) {
+    closeBtn.onclick = () => closeCheckTicket();
+  }
 
   if (statusCode === "rejected") {
-    const tip = document.createElement("button");
-    tip.className = "badge-alert";
-    tip.title = t("rejectedTip");
-    tip.textContent = "!";
-    tip.onclick = () => showErrorCard(t("rejectedTip"));
-    leftGroup.appendChild(tip);
-  }
-  
-  topBar.appendChild(leftGroup);
-  
-  // 關閉按鈕（如果需要，由調用者添加）
-  const closeBtn = document.createElement("button");
-  closeBtn.className = "ticket-close";
-  closeBtn.innerHTML = "✕";
-  closeBtn.setAttribute("aria-label", "close");
-  closeBtn.style.cssText = "position:relative;right:0;top:0;";
-  closeBtn.onclick = () => {
-    // 關閉車票時，使用統一的關閉函數
-    closeCheckTicket();
-  };
-  topBar.appendChild(closeBtn);
-  
-  card.appendChild(topBar);
-
-  const header = document.createElement("div");
-  header.className = "ticket-header";
-  header.innerHTML = `<h2>${sanitize(carDateTime)}</h2>`;
-  card.appendChild(header);
-
-  const content = document.createElement("div");
-  content.className = "ticket-content";
-
-  const qr = document.createElement("div");
-  qr.className = "ticket-qr";
-  qr.innerHTML =
-    statusCode === "cancelled"
-      ? `<img src="/images/qr-placeholder.png" alt="QR placeholder" />`
-      : `<img src="${qrUrl}" alt="QR" />`;
-
-  const info = document.createElement("div");
-  info.className = "ticket-info";
-  info.innerHTML = `
-    <div class="ticket-field"><span class="ticket-label">${t(
-      "labelBookingId"
-    )}</span><span class="ticket-value">${sanitize(
-    bookingId
-  )}</span></div>
-    <div class="ticket-field"><span class="ticket-label">${t(
-      "labelDirection"
-    )}</span><span class="ticket-value">${sanitize(rb)}</span></div>
-    <div class="ticket-field"><span class="ticket-label">${t(
-      "labelPick"
-    )}</span><span class="ticket-value">${sanitize(pick)}</span></div>
-    <div class="ticket-field"><span class="ticket-label">${t(
-      "labelDrop"
-    )}</span><span class="ticket-value">${sanitize(drop)}</span></div>
-    <div class="ticket-field"><span class="ticket-label">${t(
-      "labelName"
-    )}</span><span class="ticket-value">${sanitize(name)}</span></div>
-    <div class="ticket-field"><span class="ticket-label">${t(
-      "labelPhone"
-    )}</span><span class="ticket-value">${sanitize(phone)}</span></div>
-    <div class="ticket-field"><span class="ticket-label">${t(
-      "labelEmail"
-    )}</span><span class="ticket-value">${sanitize(email)}</span></div>
-    <div class="ticket-field"><span class="ticket-label">${t(
-      "labelPassengersShort"
-    )}</span><span class="ticket-value">${sanitize(String(pax))}</span></div>
-  `;
-  content.appendChild(qr);
-  content.appendChild(info);
-  card.appendChild(content);
-
-  const actions = document.createElement("div");
-  actions.className = "ticket-actions";
-
-  if (statusCode !== "cancelled" && statusCode !== "rejected") {
-    const dlBtn = document.createElement("button");
-    dlBtn.className = "button";
-    dlBtn.textContent = ts("download");
-    dlBtn.onclick = () => {
-      if (!window.domtoimage) return;
-      domtoimage
-        .toPng(card, { bgcolor: "#fff", pixelRatio: 2 })
-        .then((dataUrl) => {
-          const a = document.createElement("a");
-          a.href = dataUrl;
-          a.download = `ticket_${sanitize(bookingId)}.png`;
-          a.click();
-        });
-    };
-    actions.appendChild(dlBtn);
+    const tipBtn = card.querySelector(".badge-alert");
+    if (tipBtn) {
+      tipBtn.onclick = () => showErrorCard(t("rejectedTip"));
+    }
   }
 
-  if (
-    !expired &&
-    statusCode !== "cancelled" &&
-    statusCode !== "rejected" &&
-    statusCode !== "boarded"
-  ) {
-    const mdBtn = document.createElement("button");
-    mdBtn.className = "button btn-ghost";
-    mdBtn.textContent = ts("modify");
-    mdBtn.onclick = () =>
-      openModifyPage({
+  const actions = card.querySelector(".ticket-actions");
+  if (actions) {
+    if (statusCode !== "cancelled" && statusCode !== "rejected") {
+      const dlBtn = document.createElement("button");
+      dlBtn.className = "button";
+      dlBtn.textContent = ts("download");
+      dlBtn.onclick = () => {
+        if (!window.domtoimage) return;
+        domtoimage
+          .toPng(card, { bgcolor: "#fff", pixelRatio: 2 })
+          .then((dataUrl) => {
+            const a = document.createElement("a");
+            a.href = dataUrl;
+            a.download = `ticket_${sanitize(bookingId)}.png`;
+            a.click();
+          });
+      };
+      actions.appendChild(dlBtn);
+    }
+
+    if (!expired && statusCode !== "cancelled" && statusCode !== "rejected" && statusCode !== "boarded") {
+      const mdBtn = document.createElement("button");
+      mdBtn.className = "button btn-ghost";
+      mdBtn.textContent = ts("modify");
+      mdBtn.onclick = () => openModifyPage({
         row,
         bookingId,
         rb,
@@ -1445,16 +1397,16 @@ function buildTicketCard(row, { mask = false } = {}) {
         time,
         pax
       });
-    actions.appendChild(mdBtn);
+      actions.appendChild(mdBtn);
 
-    const delBtn = document.createElement("button");
-    delBtn.className = "button btn-ghost";
-    delBtn.textContent = ts("remove");
-    delBtn.onclick = () => deleteOrder(bookingId);
-    actions.appendChild(delBtn);
+      const delBtn = document.createElement("button");
+      delBtn.className = "button btn-ghost";
+      delBtn.textContent = ts("remove");
+      delBtn.onclick = () => deleteOrder(bookingId);
+      actions.appendChild(delBtn);
+    }
   }
 
-  card.appendChild(actions);
   return card;
 }
 
@@ -3827,13 +3779,13 @@ function initLiveLocation(mount) {
       });
       
       firebaseConnected = true;
+      // Firebase 連接成功時，調整輪詢間隔（使用更長間隔）
+      // 保留輪詢作為備用機制，但使用更長間隔以減少資源消耗
+      startFallbackPolling();
       updateStatus("#28a745", "良好");
       
       // 更新刷新按鈕顯示狀態
       updateRefreshButtonVisibility();
-      
-      // 停止備用輪詢（如果正在運行）
-      stopFallbackPolling();
     } catch (e) {
       firebaseConnected = false;
       updateRefreshButtonVisibility();
@@ -3841,23 +3793,44 @@ function initLiveLocation(mount) {
     }
   };
   
-  // 備用定時輪詢機制（當 Firebase 連接失敗時使用）
-  const AUTO_REFRESH_MS = 3 * 60 * 1000; // 3分鐘
+  // 優化：根據 Firebase 連接狀態動態調整輪詢間隔
+  // Firebase 連接正常時使用較長間隔（5分鐘），斷線時使用較短間隔（1分鐘）
+  const getPollingInterval = () => {
+    if (firebaseConnected) {
+      return 5 * 60 * 1000; // Firebase 連接正常：5分鐘
+    } else {
+      return 1 * 60 * 1000; // Firebase 斷線：1分鐘（更頻繁檢查）
+    }
+  };
+  
   const startFallbackPolling = () => {
-    if (fallbackTimer) return; // 已經在運行
-    fallbackTimer = setInterval(async () => {
+    // 如果已經有定時器在運行，先清除
+    if (fallbackTimer) {
+      clearTimeout(fallbackTimer);
+      fallbackTimer = null;
+    }
+    
+    const poll = async () => {
       if (isInitialized && !firebaseConnected) {
         await fetchLocation();
         if (currentTripData) {
           await drawRoute(currentTripData);
         }
       }
-    }, AUTO_REFRESH_MS);
+      // 動態調整下一次輪詢間隔
+      const interval = getPollingInterval();
+      fallbackTimer = setTimeout(() => {
+        poll();
+      }, interval);
+    };
+    
+    // 立即執行一次，然後根據狀態設置間隔
+    poll();
   };
   
   const stopFallbackPolling = () => {
     if (fallbackTimer) {
-      clearInterval(fallbackTimer);
+      clearTimeout(fallbackTimer);
       fallbackTimer = null;
     }
   };
