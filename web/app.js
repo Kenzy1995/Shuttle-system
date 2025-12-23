@@ -241,14 +241,15 @@ function scrollToTop() {
 function showPage(id) {
   hardResetOverlays();
 
-  querySelector(".page")?.parentElement?.querySelectorAll(".page").forEach((p) => p.classList.remove("active")) || 
-  document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
+  // 優化：簡化 DOM 查詢，使用緩存
+  const pages = document.querySelectorAll(".page");
+  pages.forEach((p) => p.classList.remove("active"));
   const pageEl = getElement(id);
   if (pageEl) pageEl.classList.add("active");
 
-  document
-    .querySelectorAll(".nav-links button")
-    .forEach((b) => b.classList.remove("active"));
+  // 優化：使用緩存的查詢結果
+  const navButtons = document.querySelectorAll(".nav-links button");
+  navButtons.forEach((b) => b.classList.remove("active"));
   const navId =
     id === "reservation"
       ? "nav-reservation"
