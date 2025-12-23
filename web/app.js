@@ -27,48 +27,6 @@ function getLiveConfig() {
 }
 
 /* ====== 狀態與工具 ====== */
-/* ====== Timer 管理器（優化：統一管理所有 timer） ====== */
-const timerManager = {
-  timers: new Set(),
-  intervals: new Set(),
-  
-  setTimeout(callback, delay) {
-    const id = setTimeout(() => {
-      this.timers.delete(id);
-      callback();
-    }, delay);
-    this.timers.add(id);
-    return id;
-  },
-  
-  setInterval(callback, delay) {
-    const id = setInterval(callback, delay);
-    this.intervals.add(id);
-    return id;
-  },
-  
-  clearTimeout(id) {
-    if (this.timers.has(id)) {
-      clearTimeout(id);
-      this.timers.delete(id);
-    }
-  },
-  
-  clearInterval(id) {
-    if (this.intervals.has(id)) {
-      clearInterval(id);
-      this.intervals.delete(id);
-    }
-  },
-  
-  clearAll() {
-    this.timers.forEach(id => clearTimeout(id));
-    this.intervals.forEach(id => clearInterval(id));
-    this.timers.clear();
-    this.intervals.clear();
-  }
-};
-
 let allRows = [];
 let selectedDirection = "";
 let selectedDateRaw = "";
