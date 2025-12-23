@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 import re
 import time
+import math
 import logging
 from datetime import datetime, timedelta
 from threading import Lock
@@ -63,9 +64,6 @@ STATION_COORDS = {
 }
 
 # ========= 司機即時位置 (In-Memory) =========
-# 注意：若部署在 Serverless (Cloud Run) 且有多個實例，這裡的變數不會共享。
-# 但考量只有一位司機，且通常會在同一實例處理，或可接受短暫不一致。
-# 若需嚴格一致性，需寫入 Google Sheets 或 Redis。
 DRIVER_LOCATION_CACHE: Dict[str, Any] = {
     "lat": 0.0,
     "lng": 0.0,
@@ -173,7 +171,6 @@ def _parse_main_dt(raw: str) -> Optional[datetime]:
         except ValueError:
             continue
     
-    # 如果所有格式都失敗，記錄警告（但不在生產環境中頻繁記錄，避免日誌過多）
     logger.warning(f"無法解析主班次時間格式: {original_raw}")
     return None
 
@@ -192,12 +189,51 @@ def _safe_int(v: Any, default: int = 0) -> int:
 
 # ========= Google Sheets 基本操作 =========
 
+# Google Sheets 客戶端緩存（避免重複認證）
+_gc_cache: Optional[gspread.Client] = None
+_gc_lock = Lock()
+
+# Worksheet 對象緩存（避免重複打開）
+_ws_cache: Dict[str, gspread.Worksheet] = {}
+_ws_lock = Lock()
+
+def _get_gspread_client() -> gspread.Client:
+    """獲取或創建 gspread 客戶端（緩存單例）"""
+    global _gc_cache
+    if _gc_cache is None:
+        with _gc_lock:
+            if _gc_cache is None:
+                credentials, _ = google.auth.default(scopes=SCOPES)
+                _gc_cache = gspread.authorize(credentials)
+    return _gc_cache
+
+def _invalidate_ws_cache(sheet_name: Optional[str] = None) -> None:
+    """清除 worksheet 緩存"""
+    with _ws_lock:
+        if sheet_name is None:
+            # 清除所有緩存
+            _ws_cache.clear()
+        else:
+            # 只清除指定工作表的緩存
+            _ws_cache.pop(sheet_name, None)
+
 def open_ws(name: str) -> gspread.Worksheet:
-    """取得指定名稱的 Worksheet 物件。"""
-    credentials, _ = google.auth.default(scopes=SCOPES)
-    gc = gspread.authorize(credentials)
+    """取得指定名稱的 Worksheet 物件（使用緩存）"""
+    # 先檢查緩存
+    with _ws_lock:
+        if name in _ws_cache:
+            return _ws_cache[name]
+    
+    # 緩存未命中，創建新的 worksheet 對象
+    gc = _get_gspread_client()
     sh = gc.open_by_key(SPREADSHEET_ID)
-    return sh.worksheet(name)
+    ws = sh.worksheet(name)
+    
+    # 存入緩存
+    with _ws_lock:
+        _ws_cache[name] = ws
+    
+    return ws
 
 
 def _sheet_headers(
@@ -255,6 +291,16 @@ def _find_qrcode_row(
     # values[0] 是第 1 列，values[HEADER_ROW_MAIN] 才是第 3 列資料
     for i, row in enumerate(values[HEADER_ROW_MAIN:], start=HEADER_ROW_MAIN + 1):
         if ci < len(row) and (row[ci] or "").strip() == qrcode_value:
+            return i
+    return None
+
+def _find_booking_row(values: List[List[str]], hmap: Dict[str, int], booking_id: str) -> Optional[int]:
+    """在 values 中尋找 booking_id 對應的行號（1-based）。共用函數，避免重複代碼。"""
+    idx_booking = _col_index(hmap, "預約編號")
+    if idx_booking < 0:
+        return None
+    for i, row in enumerate(values[HEADER_ROW_MAIN:], start=HEADER_ROW_MAIN + 1):
+        if idx_booking < len(row) and (row[idx_booking] or "").strip() == booking_id:
             return i
     return None
 
@@ -319,6 +365,8 @@ def _invalidate_sheet_cache() -> None:
             "header_map": None,
             "fetched_at": None,
         }
+    # 同時清除對應的 worksheet 緩存，確保數據一致性
+    _invalidate_ws_cache(SHEET_NAME_MAIN)
 
 
 # ========= Pydantic Models =========
@@ -398,6 +446,269 @@ class DriverAllData(BaseModel):
 
 # ========= 資料運算邏輯（純函數，不打 API） =========
 
+def build_all_driver_data_optimized(
+    values: List[List[str]],
+    hmap: Dict[str, int],
+) -> Tuple[List[DriverTrip], List[DriverPassenger], List[DriverAllPassenger]]:
+    """
+    優化版：在一次遍歷中同時構建 trips、trip_passengers 和 all_passengers
+    減少數據遍歷次數，提高性能
+    """
+    # 預先計算所有需要的列索引
+    idx_main_dt = _col_index(hmap, "主班次時間")
+    if idx_main_dt < 0:
+        return [], [], []
+    
+    idx_booking = _col_index(hmap, "預約編號")
+    idx_name = _col_index(hmap, "姓名")
+    idx_phone = _col_index(hmap, "手機")
+    idx_room = _col_index(hmap, "房號")
+    idx_pick = _col_index(hmap, "上車地點")
+    idx_drop = _col_index(hmap, "下車地點")
+    idx_status = _col_index(hmap, "乘車狀態")
+    idx_dir = _col_index(hmap, "往返")
+    idx_qr = _col_index(hmap, "QRCode編碼")
+    idx_confirm_status = _col_index(hmap, "確認狀態")
+    idx_rid = _col_index(hmap, "預約編號")
+    idx_car_raw = _col_index(hmap, "車次")
+    idx_ride = _col_index(hmap, "乘車狀態")
+    
+    pax_col = hmap.get("確認人數", hmap.get("預約人數", 0))
+    idx_pax = pax_col - 1 if pax_col else -1
+    status_col = hmap.get("確認狀態")
+    idx_status_check = status_col - 1 if status_col else -1
+    
+    # 站點文字常數
+    STATION_NAMES = {
+        "hotel": "福泰大飯店 Forte Hotel",
+        "mrt": "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3",
+        "train": "南港火車站 Nangang Train Station",
+        "mall": "LaLaport Shopping Park"
+    }
+    hotel = STATION_NAMES["hotel"]
+    mrt = STATION_NAMES["mrt"]
+    train = STATION_NAMES["train"]
+    mall = STATION_NAMES["mall"]
+    
+    # 排序映射
+    SORT_GO_MAP = {hotel: 1, mrt: 2, train: 3, mall: 4}
+    SORT_BACK_MAP = {mrt: 1, train: 2, mall: 3}
+    DROPOFF_GO_MAP = {mrt: 1, train: 2, mall: 3}
+    DROPOFF_BACK_MAP = {mall: 1, train: 2, mrt: 3}
+    
+    now = _tz_now()
+    cutoff = now - timedelta(hours=1)
+    
+    # 結果容器
+    trips_by_dt: Dict[str, DriverTrip] = {}
+    trip_passengers_list: List[DriverPassenger] = []
+    all_passengers_base: List[Dict[str, Any]] = []
+    
+    # 單次遍歷處理所有數據
+    for row in values[HEADER_ROW_MAIN:]:
+        if not any(row):
+            continue
+        if idx_main_dt >= len(row):
+            continue
+        
+        main_raw = _get_cell(row, idx_main_dt)
+        if not main_raw:
+            continue
+        
+        # 排除已取消
+        if idx_status_check >= 0 and idx_status_check < len(row):
+            st = _get_cell(row, idx_status_check)
+            if "❌" in st or st == CANCELLED_TEXT:
+                continue
+        
+        dt = _parse_main_dt(main_raw)
+        if not dt:
+            continue
+        if dt < cutoff:
+            continue
+        
+        # 正規化 trip_id
+        normalized_trip_id = _normalize_main_dt_format(main_raw)
+        date_str = dt.strftime("%Y-%m-%d")
+        time_str = dt.strftime("%H:%M")
+        
+        # 構建 trips
+        if normalized_trip_id not in trips_by_dt:
+            trips_by_dt[normalized_trip_id] = DriverTrip(
+                trip_id=normalized_trip_id,
+                date=date_str,
+                time=time_str,
+                total_pax=0,
+            )
+        
+        if idx_pax >= 0 and idx_pax < len(row):
+            trips_by_dt[normalized_trip_id].total_pax += _safe_int(row[idx_pax], 0)
+        
+        # 構建 trip_passengers
+        booking_id = _get_cell(row, idx_booking)
+        name = _get_cell(row, idx_name)
+        phone = _get_cell(row, idx_phone)
+        room = _get_cell(row, idx_room) or "(餐客)"
+        ride_status = _get_cell(row, idx_status)
+        qrcode = _get_cell(row, idx_qr)
+        direction = _get_cell(row, idx_dir)
+        pick = _get_cell(row, idx_pick)
+        drop = _get_cell(row, idx_drop)
+        
+        pax = 1
+        if idx_pax >= 0 and idx_pax < len(row):
+            pax = _safe_int(row[idx_pax], 1)
+        
+        if pick:
+            trip_passengers_list.append(
+                DriverPassenger(
+                    trip_id=normalized_trip_id,
+                    station=pick,
+                    updown="上車",
+                    booking_id=booking_id,
+                    name=name,
+                    phone=phone,
+                    room=room,
+                    pax=pax,
+                    status=ride_status,
+                    direction=direction,
+                    qrcode=qrcode,
+                )
+            )
+        
+        if drop:
+            trip_passengers_list.append(
+                DriverPassenger(
+                    trip_id=normalized_trip_id,
+                    station=drop,
+                    updown="下車",
+                    booking_id=booking_id,
+                    name=name,
+                    phone=phone,
+                    room=room,
+                    pax=pax,
+                    status=ride_status,
+                    direction=direction,
+                    qrcode=qrcode,
+                )
+            )
+        
+        # 構建 all_passengers 基礎數據
+        rid = _get_cell(row, idx_rid)
+        car_raw = _get_cell(row, idx_car_raw)
+        phone_raw = _get_cell(row, idx_phone)
+        room_raw = _get_cell(row, idx_room)
+        qty_raw = _get_cell(row, idx_pax) if idx_pax >= 0 and idx_pax < len(row) else ""
+        ride_status_all = _get_cell(row, idx_ride)
+        
+        phone_text = phone_raw if phone_raw else ""
+        room_text = room_raw if room_raw else ""
+        qty = _safe_int(qty_raw, 1)
+        
+        up = pick
+        down = drop
+        
+        sort_go = SORT_GO_MAP.get(up, 99)
+        if up in SORT_BACK_MAP:
+            sort_back = SORT_BACK_MAP[up]
+        elif down == hotel:
+            sort_back = 4
+        else:
+            sort_back = 99
+        
+        station_sort = sort_go if direction == "去程" else sort_back
+        
+        hotel_go = "上" if (direction == "去程" and up == hotel) else ""
+        
+        if up == mrt or down == mrt:
+            mrt_col = "上" if up == mrt else "下"
+        else:
+            mrt_col = ""
+        
+        if up == train or down == train:
+            train_col = "上" if up == train else "下"
+        else:
+            train_col = ""
+        
+        if up == mall or down == mall:
+            mall_col = "上" if up == mall else "下"
+        else:
+            mall_col = ""
+        
+        hotel_back = "下" if (direction == "回程" and down == hotel) else ""
+        
+        if direction == "去程":
+            dropoff_order = DROPOFF_GO_MAP.get(down, 4)
+        elif direction == "回程":
+            dropoff_order = DROPOFF_BACK_MAP.get(up, 4)
+        else:
+            dropoff_order = 99
+        
+        all_passengers_base.append(
+            dict(
+                car_raw=car_raw,
+                main_dt_raw=main_raw,
+                main_dt=dt,
+                booking_id=rid,
+                ride_status=ride_status_all,
+                direction=direction,
+                station_sort=station_sort,
+                dropoff_order=dropoff_order,
+                name=name,
+                phone=phone_text,
+                room=room_text,
+                qty=qty,
+                hotel_go=hotel_go,
+                mrt=mrt_col,
+                train=train_col,
+                mall=mall_col,
+                hotel_back=hotel_back,
+            )
+        )
+    
+    # 排序 trips
+    trips = sorted(trips_by_dt.values(), key=lambda t: (t.date, t.time))
+    
+    # 排序 trip_passengers
+    def sort_key_passenger(p: DriverPassenger):
+        return (p.station, 0 if p.updown == "上車" else 1, p.booking_id)
+    trip_passengers = sorted(trip_passengers_list, key=sort_key_passenger)
+    
+    # 排序 all_passengers
+    def sort_key_all(row: Dict[str, Any]):
+        dir_val = row["direction"] or ""
+        dir_rank = 0 if dir_val == "去程" else 1
+        return (row["main_dt"], dir_rank, row["station_sort"], row["dropoff_order"])
+    
+    all_passengers_base.sort(key=sort_key_all)
+    
+    result_all: List[DriverAllPassenger] = []
+    for row in all_passengers_base:
+        dt = row["main_dt"]
+        depart_time = dt.strftime("%H:%M") if dt else ""
+        normalized_main_dt = _normalize_main_dt_format(row["main_dt_raw"])
+        result_all.append(
+            DriverAllPassenger(
+                booking_id=row["booking_id"],
+                main_datetime=normalized_main_dt,
+                depart_time=depart_time,
+                name=row["name"],
+                phone=row["phone"],
+                room=row["room"],
+                pax=row["qty"],
+                ride_status=row["ride_status"],
+                direction=row["direction"],
+                hotel_go=row["hotel_go"],
+                mrt=row["mrt"],
+                train=row["train"],
+                mall=row["mall"],
+                hotel_back=row["hotel_back"],
+            )
+        )
+    
+    return trips, trip_passengers, result_all
+
+
 def build_driver_trips(
     values: List[List[str]],
     hmap: Dict[str, int],
@@ -443,12 +754,8 @@ def build_driver_trips(
 
         dt = _parse_main_dt(main_raw)
         if not dt:
-            # 解析失敗，記錄警告（但避免日誌過多，只在必要時記錄）
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"build_driver_trips: 無法解析主班次時間，跳過該行: {main_raw}")
             continue
         if dt < cutoff:
-            # 時間過早，被過濾（正常情況，不記錄日誌）
             continue
 
         date_str = dt.strftime("%Y-%m-%d")
@@ -631,7 +938,6 @@ def build_driver_all_passengers(
     now = _tz_now()
     cutoff = now - timedelta(hours=1)  # NOW() - 1/24（與 build_driver_trips 保持一致）
 
-    # 優化：將字典映射提取到循環外，避免每次循環都重新創建
     SORT_GO_MAP = {hotel: 1, mrt: 2, train: 3, mall: 4}
     SORT_BACK_MAP = {mrt: 1, train: 2, mall: 3}
     DROPOFF_GO_MAP = {mrt: 1, train: 2, mall: 3}
@@ -651,13 +957,8 @@ def build_driver_all_passengers(
 
         dt = _parse_main_dt(main_raw)
         if not dt:
-            # 解析失敗，記錄警告（但避免日誌過多，只在必要時記錄）
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"build_driver_all_passengers: 無法解析主班次時間，跳過該行: {main_raw}")
             continue
         if dt < cutoff:
-            # 時間過早，被過濾（正常情況，不記錄日誌）
-            # 只有主班次時間 >= (NOW() - 1小時) 的才保留（與 build_driver_trips 保持一致）
             continue
 
         status_val = _get_cell(row, idx_status)
@@ -680,10 +981,7 @@ def build_driver_all_passengers(
         room_text = room_raw if room_raw else ""
         qty = _safe_int(qty_raw, 1)
 
-        # sort_go - 使用字典映射優化性能（已在循環外定義）
         sort_go = SORT_GO_MAP.get(up, 99)
-
-        # sort_back - 使用字典映射優化性能（已在循環外定義）
         if up in SORT_BACK_MAP:
             sort_back = SORT_BACK_MAP[up]
         elif down == hotel:
@@ -717,7 +1015,6 @@ def build_driver_all_passengers(
         # hotel_back
         hotel_back = "下" if (direction == "回程" and down == hotel) else ""
 
-        # dropoff_order - 使用字典映射優化性能（已在循環外定義）
         if direction == "去程":
             dropoff_order = DROPOFF_GO_MAP.get(down, 4)
         elif direction == "回程":
@@ -845,18 +1142,13 @@ def update_driver_location(loc: DriverLocation):
                 location_data["trip_id"] = loc.trip_id
             ref.set(location_data)
             
-            # 改進：記錄GPS位置歷史（用於路線追蹤）
-            # 優化策略：添加時間過濾和抽樣機制，減少資料量
             if loc.trip_id:
                 try:
                     # 獲取當前班次ID
                     current_trip_id = db.reference("/current_trip_id").get()
                     if current_trip_id == loc.trip_id:
-                        # 記錄GPS位置歷史到 /current_trip_path_history
                         path_history_ref = db.reference("/current_trip_path_history")
                         current_history = path_history_ref.get() or []
-                        
-                        # 優化：時間過濾 - 只保留最近60分鐘的GPS點
                         now_ts = int(time.time() * 1000)  # 當前時間戳（毫秒）
                         THIRTY_MINUTES_MS = 60 * 60 * 1000  # 60分鐘
                         current_history = [
@@ -864,7 +1156,6 @@ def update_driver_location(loc: DriverLocation):
                             if point.get("timestamp", 0) > (now_ts - THIRTY_MINUTES_MS)
                         ]
                         
-                        # 優化：抽樣機制 - 如果GPS更新頻率過高（< 5秒），只記錄部分點
                         should_record = True
                         if len(current_history) > 0:
                             last_point = current_history[-1]
@@ -884,7 +1175,6 @@ def update_driver_location(loc: DriverLocation):
                             }
                             current_history.append(new_point)
                             
-                            # 優化：限制總數量（保留最近500個點，因為已經有時間過濾）
                             MAX_HISTORY_POINTS = 500
                             if len(current_history) > MAX_HISTORY_POINTS:
                                 current_history = current_history[-MAX_HISTORY_POINTS:]
@@ -929,7 +1219,6 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     """
     計算兩點之間的距離（公尺），使用 Haversine 公式
     """
-    import math
     R = 6371000  # 地球半徑（公尺）
     phi1 = math.radians(lat1)
     phi2 = math.radians(lat2)
@@ -943,7 +1232,7 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     return R * c
 
 
-def check_station_arrival(lat: float, lng: float, trip_id: str):  # trip_id 保留用於未來擴展
+def check_station_arrival(lat: float, lng: float, trip_id: str):
     """
     優化版：檢查司機是否到達某個站點
     結合距離判斷和路線索引判斷，提高準確性
@@ -953,22 +1242,30 @@ def check_station_arrival(lat: float, lng: float, trip_id: str):  # trip_id 保�
         return
     
     try:
-        # 從Firebase讀取實際會停靠的站點列表（只包含有乘客的站點）
-        stations_info_ref = db.reference("/current_trip_stations")
-        stations_info = stations_info_ref.get()
+        # 批量讀取 Firebase 數據，減少讀取次數
+        root_ref = db.reference("/")
+        firebase_data = root_ref.get()
+        
+        if not firebase_data:
+            return
+        
+        # 從批量讀取的數據中提取所需信息
+        stations_info = firebase_data.get("current_trip_stations", {})
         if not stations_info or "stops" not in stations_info:
             return
         
-        # 獲取實際會停靠的站點名稱列表
         actual_stops_names = stations_info.get("stops", [])
         if not actual_stops_names:
             return
         
-        # 使用模組級常數 STATION_COORDS（已在文件頂部定義）
-        completed_stops_ref = db.reference("/current_trip_completed_stops")
-        completed_stops = completed_stops_ref.get() or []
+        completed_stops = firebase_data.get("current_trip_completed_stops", [])
+        route_data = firebase_data.get("current_trip_route", {})
+        route_path = route_data.get("path", []) if route_data else []
         
-        # 優化：根據站點類型調整距離閾值
+        # 獲取 completed_stops 的引用，用於後續更新
+        completed_stops_ref = db.reference("/current_trip_completed_stops")
+        
+        # 根據站點類型調整距離閾值
         def get_station_threshold(stop_name: str) -> float:
             """根據站點類型返回距離閾值（公尺）"""
             if "飯店" in stop_name or "Hotel" in stop_name:
@@ -979,13 +1276,6 @@ def check_station_arrival(lat: float, lng: float, trip_id: str):  # trip_id 保�
                 return 40  # 火車站可以更小
             else:
                 return 50  # 預設值
-        
-        # 優化：嘗試讀取路線資料，用於路線索引判斷
-        route_ref = db.reference("/current_trip_route")
-        route_data = route_ref.get()
-        route_path = route_data.get("path", []) if route_data else []
-        
-        # 只檢查實際會停靠的站點
         for stop_name in actual_stops_names:
             # 跳過已到達的站點
             if stop_name in completed_stops:
@@ -1049,7 +1339,6 @@ def check_station_arrival(lat: float, lng: float, trip_id: str):  # trip_id 保�
                 
                 break
     except Exception as e:
-        # 記錄錯誤以便調試，但不中斷主流程
         logger.warning(f"check_station_arrival error: {e}", exc_info=True)
 
 
@@ -1085,10 +1374,7 @@ def get_driver_location():
             # 優先使用環境變數，若無則嘗試預設 URL
             db_url = os.environ.get("FIREBASE_RTDB_URL")
             if not db_url:
-                # 嘗試根據專案 ID 猜測預設 URL
-                # Cloud Run 的專案 ID 通常可從環境變數 GOOGLE_CLOUD_PROJECT 取得
                 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
-                # 嘗試常見的 Firebase RTDB URL 格式
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
@@ -1101,7 +1387,6 @@ def get_driver_location():
             else:
                 return {"lat": 0, "lng": 0, "timestamp": 0, "status": "no_data_in_firebase"}
     except Exception as e:
-        # 回傳 500 但帶有詳細錯誤訊息，讓前端可以顯示
         return {
             "lat": 0, "lng": 0, "timestamp": 0, 
             "status": "error",
@@ -1109,7 +1394,6 @@ def get_driver_location():
             "hint": "Check Cloud Run logs or FIREBASE_RTDB_URL env var."
         }
 
-    # 只有在完全無法連線時才回傳空
     return {"lat": 0, "lng": 0, "timestamp": 0, "status": "firebase_not_initialized"}
 
 
@@ -1118,111 +1402,21 @@ def get_driver_location():
 @app.get("/api/driver/data", response_model=DriverAllData)
 def driver_get_all_data():
     """
-    整合端點：
+    整合端點（優化版）：
       - 讀取一次 Sheet（支援 5 秒快取）
-      - 產生三種資料：
+      - 使用優化函數在一次遍歷中產生三種資料：
           1. trips           → 班次列表
           2. trip_passengers → 所有班次乘客（每人拆上/下車兩筆，含 trip_id 可供前端過濾）
           3. passenger_list  → 出車總覽（全部乘客）
     """
     values, hmap = _get_sheet_data_main()
 
-    trips = build_driver_trips(values, hmap)
-    trip_passengers = build_driver_trip_passengers(values, hmap, trip_id=None)
-    passenger_list = build_driver_all_passengers(values, hmap)
+    trips, trip_passengers, passenger_list = build_all_driver_data_optimized(values, hmap)
 
     return DriverAllData(
         trips=trips,
         trip_passengers=trip_passengers,
         passenger_list=passenger_list,
-    )
-
-
-# ========= 調試端點：數據一致性測試 =========
-
-class DebugDataResponse(BaseModel):
-    """調試端點返回的數據統計信息"""
-    trips_count: int
-    passengers_count: int
-    trips_main_datetimes: List[str]
-    passengers_main_datetimes: List[str]
-    missing_in_passengers: List[str]  # 在班次中但不在乘客清單中的主班次時間
-    missing_in_trips: List[str]  # 在乘客清單中但不在班次中的主班次時間
-    filter_info: Dict[str, Any]
-    raw_data_stats: Dict[str, Any]
-
-@app.get("/api/driver/debug", response_model=DebugDataResponse)
-def driver_debug_data():
-    """
-    調試端點：返回班次清單和乘客清單的數據統計和比較信息
-    用於測試和驗證兩個列表的數據一致性
-    """
-    values, hmap = _get_sheet_data_main()
-    
-    # 構建數據
-    trips = build_driver_trips(values, hmap)
-    passenger_list = build_driver_all_passengers(values, hmap)
-    
-    # 提取主班次時間
-    trips_main_datetimes = [t.trip_id for t in trips]  # trip_id 就是主班次時間原始字串
-    passengers_main_datetimes = [p.main_datetime for p in passenger_list if p.main_datetime]
-    
-    # 轉換為集合以便比較
-    trips_set = set(trips_main_datetimes)
-    passengers_set = set(passengers_main_datetimes)
-    
-    # 找出差異
-    missing_in_passengers = sorted(list(trips_set - passengers_set))
-    missing_in_trips = sorted(list(passengers_set - trips_set))
-    
-    # 過濾條件信息
-    now = _tz_now()
-    cutoff = now - timedelta(hours=1)
-    filter_info = {
-        "now": now.strftime("%Y-%m-%d %H:%M:%S"),
-        "cutoff": cutoff.strftime("%Y-%m-%d %H:%M:%S"),
-        "filter_condition": "主班次時間 >= (NOW() - 1小時)"
-    }
-    
-    # 原始數據統計
-    total_rows = len(values) - HEADER_ROW_MAIN
-    idx_main_dt = _col_index(hmap, "主班次時間")
-    rows_with_main_dt = 0
-    rows_without_main_dt = 0
-    rows_cancelled = 0
-    idx_status = _col_index(hmap, "確認狀態")
-    
-    for row in values[HEADER_ROW_MAIN:]:
-        if not any(row):
-            continue
-        main_raw = _get_cell(row, idx_main_dt) if idx_main_dt >= 0 else ""
-        if main_raw:
-            rows_with_main_dt += 1
-            # 檢查是否已取消
-            if idx_status >= 0 and idx_status < len(row):
-                status_val = _get_cell(row, idx_status)
-                if "❌" in status_val:
-                    rows_cancelled += 1
-        else:
-            rows_without_main_dt += 1
-    
-    raw_data_stats = {
-        "total_rows": total_rows,
-        "rows_with_main_dt": rows_with_main_dt,
-        "rows_without_main_dt": rows_without_main_dt,
-        "rows_cancelled": rows_cancelled,
-        "rows_after_filter": rows_with_main_dt - rows_cancelled
-    }
-    
-    return DebugDataResponse(
-        trips_count=len(trips),
-        passengers_count=len(passenger_list),
-        trips_main_datetimes=sorted(trips_main_datetimes),
-        passengers_main_datetimes=sorted(passengers_main_datetimes),
-        missing_in_passengers=missing_in_passengers,
-        missing_in_trips=missing_in_trips,
-        filter_info=filter_info,
-        raw_data_stats=raw_data_stats,
     )
 
 
@@ -1252,7 +1446,7 @@ def driver_get_trip_passengers(
 @app.get("/api/driver/passenger_list", response_model=List[DriverAllPassenger])
 def driver_get_passenger_list():
     """
-    乘客清單（出車總覽）（舊端點，現在改為使用快取與共用邏輯）。
+    乘客清單（出車總覽）（舊端點，現在改為使用快取與共用邏輯）
     """
     values, hmap = _get_sheet_data_main()
     return build_driver_all_passengers(values, hmap)
@@ -1318,12 +1512,10 @@ def api_driver_checkin(req: DriverCheckinRequest):
             return ""
         return row[ci] or ""
 
-    # 以表格內容為準更新 booking_id（避免將來格式調整）
     sheet_booking_id = getv("預約編號").strip()
     if sheet_booking_id:
         booking_id = sheet_booking_id
 
-    # 取得主班次時間（需要在檢查「已上車」之前獲取，因為返回響應時需要用到）
     main_raw = getv("主班次時間").strip()
     if not main_raw:
         return DriverCheckinResponse(
@@ -1341,7 +1533,6 @@ def api_driver_checkin(req: DriverCheckinRequest):
             booking_id=booking_id or None,
         )
 
-    # 先檢查是否已經「已上車」→ 不重複核銷
     ride_status_current = getv("乘車狀態").strip()
     if ride_status_current and ("已上車" in ride_status_current):
         pax_str = getv("確認人數") or getv("預約人數") or "1"
@@ -1440,14 +1631,7 @@ def api_driver_checkin(req: DriverCheckinRequest):
 def api_driver_no_show(req: BookingIdRequest):
     values, hmap = _get_sheet_data_main()
     ws = open_ws(SHEET_NAME_MAIN)
-    idx_booking = _col_index(hmap, "預約編號")
-    if idx_booking < 0:
-        raise HTTPException(status_code=400, detail="找不到『預約編號』欄位")
-    target_rowno: Optional[int] = None
-    for i, row in enumerate(values[HEADER_ROW_MAIN:], start=HEADER_ROW_MAIN + 1):
-        if idx_booking < len(row) and (row[idx_booking] or "").strip() == req.booking_id:
-            target_rowno = i
-            break
+    target_rowno = _find_booking_row(values, hmap, req.booking_id)
     if not target_rowno:
         raise HTTPException(status_code=404, detail="找不到對應預約編號")
     from gspread.utils import rowcol_to_a1
@@ -1466,14 +1650,7 @@ def api_driver_no_show(req: BookingIdRequest):
 def api_driver_manual_boarding(req: BookingIdRequest):
     values, hmap = _get_sheet_data_main()
     ws = open_ws(SHEET_NAME_MAIN)
-    idx_booking = _col_index(hmap, "預約編號")
-    if idx_booking < 0:
-        raise HTTPException(status_code=400, detail="找不到『預約編號』欄位")
-    target_rowno: Optional[int] = None
-    for i, row in enumerate(values[HEADER_ROW_MAIN:], start=HEADER_ROW_MAIN + 1):
-        if idx_booking < len(row) and (row[idx_booking] or "").strip() == req.booking_id:
-            target_rowno = i
-            break
+    target_rowno = _find_booking_row(values, hmap, req.booking_id)
     if not target_rowno:
         raise HTTPException(status_code=404, detail="找不到對應預約編號")
     from gspread.utils import rowcol_to_a1
@@ -1572,6 +1749,9 @@ def api_driver_trip_status(req: TripStatusRequest):
         {"range": rowcol_to_a1(target_rowno, idx_last + 1), "values": [[now_text]]},
     ]
     ws.batch_update(data, value_input_option="USER_ENTERED")
+    # 清除對應的 worksheet 緩存，確保數據一致性
+    _invalidate_ws_cache("車次管理(櫃台)")
+    _invalidate_ws_cache("車次管理(備品)")
     return {"status": "success"}
 class QrInfoRequest(BaseModel):
     qrcode: str
@@ -1678,10 +1858,12 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                 {"range": rowcol_to_a1(target_rowno, idx_last + 1), "values": [[now_text]]},
             ]
             ws2.batch_update(update_data, value_input_option="USER_ENTERED")
+            # 清除對應的 worksheet 緩存，確保數據一致性
+            _invalidate_ws_cache("車次管理(櫃台)")
+            _invalidate_ws_cache("車次管理(備品)")
     except Exception:
         pass
     
-    # 檢查是否為櫃台人員：櫃台人員只更新Sheet，不寫入Firebase
     if req.driver_role == 'desk':
         return GoogleTripStartResponse(trip_id=trip_id, share_url=None, stops=None)
     
@@ -1693,10 +1875,7 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
         enabled = True  # 若讀取失敗，預設啟用（可依需求改為 False）
     if not enabled:
         return GoogleTripStartResponse(trip_id=trip_id, share_url=None, stops=None)
-    # 不再自動生成乘客地圖分享連結；由前端固定網址負責
-    # 從《車次管理(櫃台)》讀取該班次停靠站，並寫入 Firebase（route/stops）
     try:
-        # 如果上面已經打開了 ws2，重複使用；否則重新打開
         if ws2 is None:
             try:
                 ws2 = open_ws("車次管理(櫃台)")
@@ -1746,6 +1925,9 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                         {"range": rowcol_to_a1(target_rowno, idx_last + 1), "values": [[now_text]]},
                     ]
                     ws2.batch_update(update_data, value_input_option="USER_ENTERED")
+                    # 清除對應的 worksheet 緩存，確保數據一致性
+                    _invalidate_ws_cache("車次管理(櫃台)")
+                    _invalidate_ws_cache("車次管理(備品)")
             except Exception:
                 pass
         
@@ -1866,7 +2048,6 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                 pass
         except Exception:
             pass
-        # 將結果寫入 Firebase
         try:
             if not firebase_admin._apps:
                 # 使用 Application Default 或本地金鑰
@@ -1880,25 +2061,18 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                     project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
                     db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
                 firebase_admin.initialize_app(cred, {"databaseURL": db_url})
-            # 改進：不再保存到 /trip/{trip_id}/route，直接覆蓋 /current_trip_route
-            # 這樣可以避免累積歷史資料，每次都是覆蓋當前班次的路線
             payload = {"stops": stops}
             if polyline_obj:
                 payload["polyline"] = polyline_obj
-            # 寫入目前班次 ID、狀態、日期時間、路線和站點信息，供乘客端直接讀取
             try:
                 import time
                 db.reference("/current_trip_id").set(trip_id)
                 db.reference("/current_trip_status").set("active")
                 db.reference("/current_trip_datetime").set(req.main_datetime)
                 db.reference("/current_trip_route").set(payload)
-                # 寫入GPS系統總開關狀態
                 db.reference("/gps_system_enabled").set(enabled)
-                # 寫入發車時間戳（毫秒）
                 db.reference("/current_trip_start_time").set(int(time.time() * 1000))
-                # 初始化已到達站點列表
                 db.reference("/current_trip_completed_stops").set([])
-                # 寫入站點信息（哪些站點會停靠）
                 stations_info = {
                     "stops": stops_names,
                     "all_stations": STATIONS
@@ -1976,6 +2150,9 @@ def auto_complete_trip(trip_id: str = None, main_datetime: str = None):
                     {"range": rowcol_to_a1(target_rowno, idx_last + 1), "values": [[now_text]]},
                 ]
                 ws2.batch_update(update_data, value_input_option="USER_ENTERED")
+                # 清除對應的 worksheet 緩存，確保數據一致性
+                _invalidate_ws_cache("車次管理(櫃台)")
+                _invalidate_ws_cache("車次管理(備品)")
         except Exception:
             pass
     
@@ -1993,8 +2170,6 @@ def auto_complete_trip(trip_id: str = None, main_datetime: str = None):
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         
-        # 改進：清理當前班次的路徑歷史資料
-        # 在班次結束時，清除 /current_trip_path_history，避免累積歷史資料
         try:
             path_history_ref = db.reference("/current_trip_path_history")
             path_history_ref.set([])
