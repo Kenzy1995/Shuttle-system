@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 import urllib.parse
 import secrets  
+
 import qrcode
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -846,8 +847,12 @@ def ops(req: OpsRequest):
                     continue
                 if p.phone and p.phone != get(row, "手機"):
                     continue
-                if p.email and p.email != get(row, "信箱"):
-                    continue
+                # 信箱查詢使用大小寫不敏感比較
+                if p.email:
+                    row_email = get(row, "信箱").strip().lower()
+                    query_email = p.email.strip().lower()
+                    if query_email != row_email:
+                        continue
                 rec = {k: get(row, k) for k in hmap}
                 # override date/time fields with values derived from 車次-日期時間
                 if date_iso:
