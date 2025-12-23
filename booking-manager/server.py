@@ -863,11 +863,11 @@ def ops(req: OpsRequest):
         def setv(row_arr: List[str], col: str, v: Any):
             if col in hmap and 1 <= hmap[col] <= len(row_arr):
                 if isinstance(v, (int, float)):
-                  row_arr[hmap[col] - 1] = v
+                    row_arr[hmap[col] - 1] = v
                 elif isinstance(v, str):
-                  row_arr[hmap[col] - 1] = v
+                    row_arr[hmap[col] - 1] = v
                 else:
-                  row_arr[hmap[col] - 1] = str(v)
+                    row_arr[hmap[col] - 1] = str(v)
 
         def get_by_rowno(rowno: int, key: str) -> str:
             if key not in hmap:
