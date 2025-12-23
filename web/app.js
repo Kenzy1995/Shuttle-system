@@ -27,6 +27,48 @@ function getLiveConfig() {
 }
 
 /* ====== 狀態與工具 ====== */
+/* ====== Timer 管理器（優化：統一管理所有 timer） ====== */
+const timerManager = {
+  timers: new Set(),
+  intervals: new Set(),
+  
+  setTimeout(callback, delay) {
+    const id = setTimeout(() => {
+      this.timers.delete(id);
+      callback();
+    }, delay);
+    this.timers.add(id);
+    return id;
+  },
+  
+  setInterval(callback, delay) {
+    const id = setInterval(callback, delay);
+    this.intervals.add(id);
+    return id;
+  },
+  
+  clearTimeout(id) {
+    if (this.timers.has(id)) {
+      clearTimeout(id);
+      this.timers.delete(id);
+    }
+  },
+  
+  clearInterval(id) {
+    if (this.intervals.has(id)) {
+      clearInterval(id);
+      this.intervals.delete(id);
+    }
+  },
+  
+  clearAll() {
+    this.timers.forEach(id => clearTimeout(id));
+    this.intervals.forEach(id => clearInterval(id));
+    this.timers.clear();
+    this.intervals.clear();
+  }
+};
+
 let allRows = [];
 let selectedDirection = "";
 let selectedDateRaw = "";
@@ -46,46 +88,125 @@ let queryDateList = [];
 let currentQueryDate = "";
 let currentDateRows = [];
 
+/* ====== Timer 管理器（優化：統一管理所有定時器） ====== */
+const timerManager = {
+  _timers: new Set(),
+  _intervals: new Set(),
+  
+  setTimeout(callback, delay) {
+    const id = setTimeout(() => {
+      this._timers.delete(id);
+      callback();
+    }, delay);
+    this._timers.add(id);
+    return id;
+  },
+  
+  setInterval(callback, delay) {
+    const id = setInterval(callback, delay);
+    this._intervals.add(id);
+    return id;
+  },
+  
+  clearTimeout(id) {
+    if (this._timers.has(id)) {
+      clearTimeout(id);
+      this._timers.delete(id);
+    }
+  },
+  
+  clearInterval(id) {
+    if (this._intervals.has(id)) {
+      clearInterval(id);
+      this._intervals.delete(id);
+    }
+  },
+  
+  clearAll() {
+    this._timers.forEach(id => clearTimeout(id));
+    this._intervals.forEach(id => clearInterval(id));
+    this._timers.clear();
+    this._intervals.clear();
+  }
+};
+
 /* ====== DOM 元素緩存（優化：避免重複查詢） ====== */
 const domCache = {
-  // 常用元素緩存
-  backToTop: null,
-  marqueeContainer: null,
-  marqueeContent: null,
-  dialogOverlay: null,
-  dialogTitle: null,
-  dialogContent: null,
-  dialogCancelBtn: null,
-  dialogConfirmBtn: null,
-  loading: null,
-  loadingConfirm: null,
-  expiredOverlay: null,
-  navbar: null,
+  _elements: new Map(), // ID 緩存
+  _selectors: new Map(), // 選擇器緩存
   
   // 初始化緩存（在 DOM 加載完成後調用）
   init() {
-    this.backToTop = document.getElementById("backToTop");
-    this.marqueeContainer = document.getElementById("marqueeContainer");
-    this.marqueeContent = document.getElementById("marqueeContent");
-    this.dialogOverlay = document.getElementById("dialogOverlay");
-    this.dialogTitle = document.getElementById("dialogTitle");
-    this.dialogContent = document.getElementById("dialogContent");
-    this.dialogCancelBtn = document.getElementById("dialogCancelBtn");
-    this.dialogConfirmBtn = document.getElementById("dialogConfirmBtn");
-    this.loading = document.getElementById("loading");
-    this.loadingConfirm = document.getElementById("loadingConfirm");
-    this.expiredOverlay = document.getElementById("expiredOverlay");
-    this.navbar = document.querySelector(".navbar");
+    const commonIds = [
+      "backToTop", "marqueeContainer", "marqueeContent", "dialogOverlay",
+      "dialogTitle", "dialogContent", "dialogCancelBtn", "dialogConfirmBtn",
+      "loading", "loadingConfirm", "expiredOverlay", "initialLoading",
+      "homeHero", "step1", "step2", "step3", "step4", "step5", "step6",
+      "successCard", "passengers", "passengersErr", "passengersHint",
+      "identitySelect", "checkInDate", "checkOutDate", "diningDate",
+      "roomNumber", "name", "phone", "email", "scheduleResults"
+    ];
+    commonIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) this._elements.set(id, el);
+    });
+    
+    const commonSelectors = [".navbar"];
+    commonSelectors.forEach(selector => {
+      const el = document.querySelector(selector);
+      if (el) this._selectors.set(selector, el);
+    });
   },
   
   // 獲取元素（如果緩存中沒有，則查詢並緩存）
   get(id) {
-    if (!this[id]) {
-      this[id] = document.getElementById(id);
+    return this.getElement(id);
+  },
+  
+  // 通用獲取元素（自動緩存）
+  getElement(id) {
+    if (!this._elements.has(id)) {
+      const el = document.getElementById(id);
+      if (el) {
+        this._elements.set(id, el);
+      }
+      return el;
     }
-    return this[id];
+    return this._elements.get(id);
+  },
+  
+  // 通用查詢選擇器（自動緩存）
+  querySelector(selector) {
+    if (!this._selectors.has(selector)) {
+      const el = document.querySelector(selector);
+      if (el) {
+        this._selectors.set(selector, el);
+      }
+      return el;
+    }
+    return this._selectors.get(selector);
+  },
+  
+  // 清除緩存（用於動態內容）
+  clear(id) {
+    if (id) {
+      this._elements.delete(id);
+      this._selectors.delete(id);
+    } else {
+      this._elements.clear();
+      this._selectors.clear();
+    }
   }
 };
+
+// 包裝函數，方便全局使用
+function getElement(id) {
+  return domCache.getElement(id);
+}
+
+function querySelector(selector) {
+  return domCache.querySelector(selector);
+}
 
 /* ====== 小工具 ====== */
 
@@ -163,7 +284,8 @@ function showPage(id) {
   hardResetOverlays();
 
   document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
+  const pageEl = getElement(id);
+  if (pageEl) pageEl.classList.add("active");
 
   document
     .querySelectorAll(".nav-links button")
@@ -178,12 +300,13 @@ function showPage(id) {
       : id === "station"
       ? "nav-station"
       : "nav-contact";
-  const navEl = document.getElementById(navId);
+  const navEl = getElement(navId);
   if (navEl) navEl.classList.add("active");
 
-  document
-    .querySelectorAll(".mobile-tabbar button")
-    .forEach((b) => b.classList.remove("active"));
+  // 批量操作優化
+  requestAnimationFrame(() => {
+    document.querySelectorAll(".mobile-tabbar button").forEach((b) => b.classList.remove("active"));
+  });
   const mId =
     id === "reservation"
       ? "m-reservation"
@@ -194,7 +317,7 @@ function showPage(id) {
       : id === "station"
       ? "m-station"
       : "m-contact";
-  const mEl = document.getElementById(mId);
+  const mEl = getElement(mId);
   if (mEl) mEl.classList.add("active");
 
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -209,11 +332,11 @@ function showPage(id) {
   }, 500);
 
   if (id === "reservation") {
-    const homeHero = document.getElementById("homeHero");
+    const homeHero = getElement("homeHero");
     if (homeHero) homeHero.style.display = "";
     ["step1", "step2", "step3", "step4", "step5", "step6", "successCard"].forEach(
       (s) => {
-        const el = document.getElementById(s);
+        const el = getElement(s);
         if (el) el.style.display = "none";
       }
     );
@@ -263,7 +386,7 @@ function closeMarquee() {
 }
 
 function toggleCollapse(id) {
-  const el = document.getElementById(id);
+  const el = getElement(id);
   if (!el) return;
   el.classList.toggle("open");
   const icon = el.querySelector(".toggle-icon");
@@ -277,7 +400,7 @@ function hardResetOverlays() {
     loadingConfirm: domCache.get("loadingConfirm"),
     expiredOverlay: domCache.get("expiredOverlay"),
     dialogOverlay: domCache.get("dialogOverlay"),
-    successAnimation: document.getElementById("successAnimation")
+    successAnimation: getElement("successAnimation")
   };
   
   Object.entries(elements).forEach(([id, el]) => {
@@ -484,7 +607,7 @@ const nameRegex = /^[\u4e00-\u9fa5a-zA-Z\s]*$/;
 
 function validateName(input) {
   // 輸入時只清除錯誤提示，允許輸入任何文字，不過濾字符
-  const nameErr = document.getElementById("nameErr");
+  const nameErr = getElement("nameErr");
   if (nameErr) {
     nameErr.style.display = "none";
   }
@@ -496,7 +619,7 @@ function validateName(input) {
 
 function validateNameOnBlur(input) {
   const value = input.value || "";
-  const nameErr = document.getElementById("nameErr");
+  const nameErr = getElement("nameErr");
   
   // 檢查是否為空
   if (!value.trim()) {
@@ -523,7 +646,7 @@ function validateNameOnBlur(input) {
 
 function validatePhone(input) {
   const value = input.value || "";
-  const phoneErr = document.getElementById("phoneErr");
+  const phoneErr = getElement("phoneErr");
   if (!phoneRegex.test(value)) {
     phoneErr.textContent = t("errPhone");
     phoneErr.style.display = "block";
@@ -537,14 +660,14 @@ function validatePhone(input) {
 
 function validateEmail(input) {
   // 輸入時不驗證，只清除之前的錯誤
-  const emailErr = document.getElementById("emailErr");
+  const emailErr = getElement("emailErr");
   emailErr.style.display = "none";
   input.style.borderColor = "#ddd";
 }
 
 function validateEmailOnBlur(input) {
   const value = input.value || "";
-  const emailErr = document.getElementById("emailErr");
+  const emailErr = getElement("emailErr");
   if (!emailRegex.test(value)) {
     emailErr.textContent = t("errEmail");
     emailErr.style.display = "block";
@@ -558,7 +681,7 @@ function validateEmailOnBlur(input) {
 
 function validateRoom(input) {
   const value = input.value || "";
-  const roomErr = document.getElementById("roomErr");
+  const roomErr = getElement("roomErr");
   if (!roomRegex.test(value)) {
     roomErr.textContent = t("errRoom");
     roomErr.style.display = "block";
@@ -582,11 +705,11 @@ function getStationPriority(name) {
 
 /* ====== 初始化/頁面 ====== */
 function startBooking() {
-  const hero = document.getElementById("homeHero");
+  const hero = getElement("homeHero");
   if (hero) hero.style.display = "none";
   refreshData().then(() => {
     buildStep1();
-    const s1 = document.getElementById("step1");
+    const s1 = getElement("step1");
     if (s1) s1.style.display = "";
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
@@ -594,10 +717,10 @@ function startBooking() {
 
 function goStep(n) {
   ["step1", "step2", "step3", "step4", "step5", "step6"].forEach((id) => {
-    const el = document.getElementById(id);
+    const el = getElement(id);
     if (el) el.style.display = "none";
   });
-  const target = document.getElementById("step" + n);
+  const target = getElement("step" + n);
   if (target) target.style.display = "";
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -609,15 +732,15 @@ function restart() {
   selectedScheduleTime = "";
   selectedAvailableSeats = 0;
   hardResetOverlays();
-  const hero = document.getElementById("homeHero");
+  const hero = getElement("homeHero");
   if (hero) hero.style.display = "";
   ["directionList", "dateList", "stationList", "scheduleList"].forEach((id) => {
-    const el = document.getElementById(id);
+    const el = getElement(id);
     if (el) el.innerHTML = "";
   });
   ["step1", "step2", "step3", "step4", "step5", "step6", "successCard"].forEach(
     (id) => {
-      const el = document.getElementById(id);
+      const el = getElement(id);
       if (el) el.style.display = "none";
     }
   );
@@ -627,13 +750,14 @@ function restart() {
 
 /* ====== Step 1 ====== */
 function buildStep1() {
-  const list = document.getElementById("directionList");
+  const list = getElement("directionList");
   if (!list) return;
   list.innerHTML = "";
   const opts = [
     { valueZh: "去程", labelKey: "dirOutLabel" },
     { valueZh: "回程", labelKey: "dirInLabel" }
   ];
+  const fragment = document.createDocumentFragment();
   opts.forEach((opt) => {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -647,8 +771,9 @@ function buildStep1() {
       btn.classList.add("active");
       toStep2();
     };
-    list.appendChild(btn);
+    fragment.appendChild(btn);
   });
+  list.appendChild(fragment);
 }
 
 function toStep2() {
@@ -662,9 +787,10 @@ function toStep2() {
       .map((r) => fmtDateLabel(r["日期"]))
   );
   const sorted = [...dateSet].sort((a, b) => new Date(a) - new Date(b));
-  const list = document.getElementById("dateList");
+  const list = getElement("dateList");
   if (!list) return;
   list.innerHTML = "";
+  const fragment = document.createDocumentFragment();
   sorted.forEach((dateStr) => {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -678,8 +804,9 @@ function toStep2() {
       btn.classList.add("active");
       toStep3();
     };
-    list.appendChild(btn);
+    fragment.appendChild(btn);
   });
+  list.appendChild(fragment);
   goStep(2);
 }
 
@@ -689,7 +816,7 @@ function toStep3() {
     showErrorCard(t("labelDate"));
     return;
   }
-  const fixed = document.getElementById("fixedStation");
+  const fixed = getElement("fixedStation");
   if (fixed) fixed.value = "福泰大飯店 Forte Hotel";
 
   const stations = new Set(
@@ -701,9 +828,10 @@ function toStep3() {
       )
       .map((r) => String(r["站點"]).trim())
   );
-  const list = document.getElementById("stationList");
+  const list = getElement("stationList");
   if (!list) return;
   list.innerHTML = "";
+  const fragment = document.createDocumentFragment();
   [...stations].forEach((st) => {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -717,8 +845,9 @@ function toStep3() {
       btn.classList.add("active");
       toStep4();
     };
-    list.appendChild(btn);
+    fragment.appendChild(btn);
   });
+  list.appendChild(fragment);
   goStep(3);
 }
 
@@ -728,7 +857,7 @@ function toStep4() {
     showErrorCard(t("labelStation"));
     return;
   }
-  const list = document.getElementById("scheduleList");
+  const list = getElement("scheduleList");
   if (!list) return;
   list.innerHTML = "";
   const entries = allRows
@@ -747,6 +876,7 @@ function toStep4() {
     return;
   }
 
+  const fragment = document.createDocumentFragment();
   entries.forEach((r) => {
     const time = fmtTimeLabel(r["班次"] || r["車次"]);
     const availText = String(
@@ -760,7 +890,6 @@ function toStep4() {
 
     if (avail <= 0) {
       btn.classList.add("disabled");
-      // 「已額滿」如果之後也要多語系，可以另外在 TEXTS 加一個 key
       btn.innerHTML = `
         <span style="color:#999;font-weight:700">${time}</span>
         <span style="color:#999;font-size:13px">(已額滿)</span>
@@ -770,7 +899,6 @@ function toStep4() {
       const prefix = texts.paxHintPrefix || "";
       const suffix = texts.paxHintSuffix || "";
 
-      // 這樣不同語系就會自動換字
       const paxText = `${prefix}${avail}${suffix}`;
 
       btn.innerHTML = `
@@ -789,19 +917,20 @@ function toStep4() {
       };
     }
 
-    list.appendChild(btn);
+    fragment.appendChild(btn);
   });
+  list.appendChild(fragment);
   goStep(4);
 }
 
 /* ====== Step 5 ====== */
 function onIdentityChange() {
-  const v = document.getElementById("identitySelect").value;
+  const v = (getElement("identitySelect") || {}).value;
   const today = todayISO();
-  const hotelWrapper1 = document.getElementById("hotelDates");
-  const hotelWrapper2 = document.getElementById("hotelDates2");
-  const roomNumberDiv = document.getElementById("roomNumberDiv");
-  const diningDateDiv = document.getElementById("diningDateDiv");
+  const hotelWrapper1 = getElement("hotelDates");
+  const hotelWrapper2 = getElement("hotelDates2");
+  const roomNumberDiv = getElement("roomNumberDiv");
+  const diningDateDiv = getElement("diningDateDiv");
 
   if (hotelWrapper1) hotelWrapper1.style.display = v === "hotel" ? "block" : "none";
   if (hotelWrapper2) hotelWrapper2.style.display = v === "hotel" ? "block" : "none";
@@ -809,12 +938,12 @@ function onIdentityChange() {
   if (diningDateDiv) diningDateDiv.style.display = v === "dining" ? "block" : "none";
 
   if (v === "hotel") {
-    const ci = document.getElementById("checkInDate");
-    const co = document.getElementById("checkOutDate");
+    const ci = getElement("checkInDate");
+    const co = getElement("checkOutDate");
     if (ci && !ci.value) ci.value = today;
     if (co && !co.value) co.value = today;
   } else if (v === "dining") {
-    const din = document.getElementById("diningDate");
+    const din = getElement("diningDate");
     if (din && !din.value) din.value = today;
   }
 }
@@ -829,54 +958,85 @@ function toStep5() {
 }
 
 function validateStep5() {
-  const id = document.getElementById("identitySelect").value;
-  const name = (document.getElementById("guestName").value || "").trim();
-  const phone = (document.getElementById("guestPhone").value || "").trim();
-  const email = (document.getElementById("guestEmail").value || "").trim();
+  const idEl = getElement("identitySelect");
+  const id = idEl ? idEl.value : "";
+  const nameEl = getElement("guestName");
+  const name = (nameEl ? nameEl.value : "").trim();
+  const phoneEl = getElement("guestPhone");
+  const phone = (phoneEl ? phoneEl.value : "").trim();
+  const emailEl = getElement("guestEmail");
+  const email = (emailEl ? emailEl.value : "").trim();
 
   if (!id) {
-    document.getElementById("identityErr").style.display = "block";
+    const identityErr = getElement("identityErr");
+    if (identityErr) identityErr.style.display = "block";
     return false;
-  } else document.getElementById("identityErr").style.display = "none";
+  } else {
+    const identityErrEl = getElement("identityErr");
+    if (identityErrEl) identityErrEl.style.display = "none";
+  }
 
   if (!name) {
-    document.getElementById("nameErr").style.display = "block";
-    shake(document.getElementById("guestName"));
+    const nameErrEl = getElement("nameErr");
+    if (nameErrEl) nameErrEl.style.display = "block";
+    const guestNameEl = getElement("guestName");
+    if (guestNameEl) shake(guestNameEl);
     return false;
-  } else document.getElementById("nameErr").style.display = "none";
+  } else {
+    const nameErrEl = getElement("nameErr");
+    if (nameErrEl) nameErrEl.style.display = "none";
+  }
 
   if (!phoneRegex.test(phone)) {
-    document.getElementById("phoneErr").style.display = "block";
-    shake(document.getElementById("guestPhone"));
+    const phoneErrEl = getElement("phoneErr");
+    if (phoneErrEl) phoneErrEl.style.display = "block";
+    const guestPhoneEl = getElement("guestPhone");
+    if (guestPhoneEl) shake(guestPhoneEl);
     return false;
-  } else document.getElementById("phoneErr").style.display = "none";
+  } else {
+    const phoneErrEl = getElement("phoneErr");
+    if (phoneErrEl) phoneErrEl.style.display = "none";
+  }
 
   if (!emailRegex.test(email)) {
-    document.getElementById("emailErr").style.display = "block";
-    shake(document.getElementById("guestEmail"));
+    const emailErrEl = getElement("emailErr");
+    if (emailErrEl) emailErrEl.style.display = "block";
+    const guestEmailEl = getElement("guestEmail");
+    if (guestEmailEl) shake(guestEmailEl);
     return false;
-  } else document.getElementById("emailErr").style.display = "none";
+  } else {
+    const emailErrEl = getElement("emailErr");
+    if (emailErrEl) emailErrEl.style.display = "none";
+  }
 
   if (id === "hotel") {
-    const cin = document.getElementById("checkInDate").value;
-    const cout = document.getElementById("checkOutDate").value;
+    const checkInEl = getElement("checkInDate");
+    const checkOutEl = getElement("checkOutDate");
+    const cin = checkInEl ? checkInEl.value : "";
+    const cout = checkOutEl ? checkOutEl.value : "";
     if (!cin || !cout) {
       showErrorCard(t("labelCheckIn") + "/" + t("labelCheckOut"));
-      shake(document.getElementById("checkInDate"));
-      shake(document.getElementById("checkOutDate"));
+      if (checkInEl) shake(checkInEl);
+      if (checkOutEl) shake(checkOutEl);
       return false;
     }
-    const room = (document.getElementById("roomNumber").value || "").trim();
+    const roomEl = getElement("roomNumber");
+    const room = (roomEl ? roomEl.value : "").trim();
     if (!roomRegex.test(room)) {
-      document.getElementById("roomErr").style.display = "block";
-      shake(document.getElementById("roomNumber"));
+      const roomErrEl = getElement("roomErr");
+      if (roomErrEl) roomErrEl.style.display = "block";
+      if (roomEl) shake(roomEl);
       return false;
-    } else document.getElementById("roomErr").style.display = "none";
+    } else {
+      const roomErrEl = getElement("roomErr");
+      if (roomErrEl) roomErrEl.style.display = "none";
+    }
   } else {
-    const din = document.getElementById("diningDate").value;
+    const diningDateEl = getElement("diningDate");
+    const din = diningDateEl ? diningDateEl.value : "";
     if (!din) {
       showErrorCard(t("labelDiningDate"));
-      shake(document.getElementById("diningDate"));
+      if (diningDateEl) shake(diningDateEl);
       return false;
     }
   }
@@ -887,8 +1047,10 @@ function validateStep5() {
 function toStep6() {
   if (!validateStep5()) return;
 
-  document.getElementById("cf_direction").value = selectedDirection;
-  document.getElementById("cf_date").value = selectedDateRaw;
+  const cfDirectionEl = getElement("cf_direction");
+  if (cfDirectionEl) cfDirectionEl.value = selectedDirection;
+  const cfDateEl = getElement("cf_date");
+  if (cfDateEl) cfDateEl.value = selectedDateRaw;
 
   const pick =
     selectedDirection === "回程"
@@ -899,14 +1061,17 @@ function toStep6() {
       ? "福泰大飯店 Forte Hotel"
       : selectedStationRaw;
 
-  document.getElementById("cf_pick").value = pick;
-  document.getElementById("cf_drop").value = drop;
-  document.getElementById("cf_time").value = selectedScheduleTime;
-  document.getElementById("cf_name").value = (
-    document.getElementById("guestName").value || ""
-  ).trim();
+  const cfPickEl = getElement("cf_pick");
+  if (cfPickEl) cfPickEl.value = pick;
+  const cfDropEl = getElement("cf_drop");
+  if (cfDropEl) cfDropEl.value = drop;
+  const cfTimeEl = getElement("cf_time");
+  if (cfTimeEl) cfTimeEl.value = selectedScheduleTime;
+  const cfNameEl = getElement("cf_name");
+  const guestNameEl = getElement("guestName");
+  if (cfNameEl) cfNameEl.value = (guestNameEl ? guestNameEl.value : "").trim();
 
-  const sel = document.getElementById("passengers");
+  const sel = getElement("passengers");
   sel.innerHTML = "";
   const maxPassengers = Math.min(4, Math.max(0, selectedAvailableSeats));
   if (maxPassengers <= 0) {
@@ -925,25 +1090,26 @@ function toStep6() {
     }
     sel.value = "1";
   }
-  document.getElementById(
-    "passengersHint"
-  ).textContent = `此班次可預約：${selectedAvailableSeats} 人；單筆最多 4 人`;
+  const passengersHintEl = getElement("passengersHint");
+  if (passengersHintEl) {
+    passengersHintEl.textContent = `此班次可預約：${selectedAvailableSeats} 人；單筆最多 4 人`;
+  }
 
   ["step1", "step2", "step3", "step4", "step5"].forEach((id) => {
-    const el = document.getElementById(id);
+    const el = getElement(id);
     if (el) el.style.display = "none";
   });
-  const s6 = document.getElementById("step6");
+  const s6 = getElement("step6");
   if (s6) s6.style.display = "";
   window.scrollTo({ top: 0, behavior: "smooth" });
 
-  const errEl = document.getElementById("passengersErr");
+  const errEl = getElement("passengersErr");
   if (errEl) errEl.style.display = "none";
 }
 
 /* ====== 成功動畫 ====== */
 function showSuccessAnimation() {
-  const el = document.getElementById("successAnimation");
+  const el = getElement("successAnimation");
   if (!el) return;
   el.style.display = "flex";
   el.classList.add("show");
@@ -958,17 +1124,18 @@ let bookingSubmitting = false;
 async function submitBooking() {
   if (bookingSubmitting) return;
 
-  const pSel = document.getElementById("passengers");
+  const pSel = getElement("passengers");
   const p = Number(pSel?.value || 0);
   if (!p || p < 1 || p > 4) {
-    const errEl = document.getElementById("passengersErr");
+    const errEl = getElement("passengersErr");
     if (errEl) errEl.style.display = "block";
     return;
   }
-  const errEl = document.getElementById("passengersErr");
+  const errEl = getElement("passengersErr");
   if (errEl) errEl.style.display = "none";
 
-  const identity = document.getElementById("identitySelect").value;
+  const identityEl = getElement("identitySelect");
+  const identity = identityEl ? identityEl.value : "";
   const payload = {
     direction: selectedDirection,
     date: selectedDateRaw,
@@ -977,23 +1144,23 @@ async function submitBooking() {
     identity,
     checkIn:
       identity === "hotel"
-        ? document.getElementById("checkInDate").value || null
+        ? (getElement("checkInDate")?.value || null)
         : null,
     checkOut:
       identity === "hotel"
-        ? document.getElementById("checkOutDate").value || null
+        ? (getElement("checkOutDate")?.value || null)
         : null,
     diningDate:
       identity === "dining"
-        ? document.getElementById("diningDate").value || null
+        ? (getElement("diningDate")?.value || null)
         : null,
     roomNumber:
       identity === "hotel"
-        ? document.getElementById("roomNumber").value || null
+        ? (getElement("roomNumber")?.value || null)
         : null,
-    name: (document.getElementById("guestName").value || "").trim(),
-    phone: (document.getElementById("guestPhone").value || "").trim(),
-    email: (document.getElementById("guestEmail").value || "").trim(),
+    name: ((getElement("guestName")?.value || "")).trim(),
+    phone: ((getElement("guestPhone")?.value || "")).trim(),
+    email: ((getElement("guestEmail")?.value || "")).trim(),
     passengers: p,
     dropLocation:
       selectedDirection === "回程"
@@ -1007,7 +1174,7 @@ async function submitBooking() {
   };
 
   bookingSubmitting = true;
-  const step6 = document.getElementById("step6");
+  const step6 = getElement("step6");
   if (step6) step6.style.display = "none";
   showVerifyLoading(true);
 
@@ -1104,40 +1271,40 @@ async function submitBooking() {
 
 
 function mountTicketAndShow(ticket) {
-  const qrImg = document.getElementById("ticketQrImg");
+  const qrImg = getElement("ticketQrImg");
   if (qrImg) qrImg.src = ticket.qrUrl || "";
 
-  const bookingIdEl = document.getElementById("ticketBookingId");
+  const bookingIdEl = getElement("ticketBookingId");
   if (bookingIdEl) bookingIdEl.textContent = ticket.bookingId || "";
 
   // ✅ 修改這裡：將固定標題改為日期+班次
-  const titleEl = document.getElementById("ticketHeaderTitle");
+  const titleEl = getElement("ticketHeaderTitle");
   if (titleEl) {
     titleEl.textContent = formatTicketHeader(ticket.date, ticket.time);
   }
 
-  const directionEl = document.getElementById("ticketDirection");
+  const directionEl = getElement("ticketDirection");
   if (directionEl) directionEl.textContent = ticket.direction || "";
 
-  const pickEl = document.getElementById("ticketPick");
+  const pickEl = getElement("ticketPick");
   if (pickEl) pickEl.textContent = ticket.pickLocation || "";
 
-  const dropEl = document.getElementById("ticketDrop");
+  const dropEl = getElement("ticketDrop");
   if (dropEl) dropEl.textContent = ticket.dropLocation || "";
 
-  const nameEl = document.getElementById("ticketName");
+  const nameEl = getElement("ticketName");
   if (nameEl) nameEl.textContent = ticket.name || "";
 
-  const phoneEl = document.getElementById("ticketPhone");
+  const phoneEl = getElement("ticketPhone");
   if (phoneEl) phoneEl.textContent = ticket.phone || "";
 
-  const emailEl = document.getElementById("ticketEmail");
+  const emailEl = getElement("ticketEmail");
   if (emailEl) emailEl.textContent = ticket.email || "";
 
-  const paxEl = document.getElementById("ticketPassengers");
+  const paxEl = getElement("ticketPassengers");
   if (paxEl) paxEl.textContent = ticket.passengers + " " + t("labelPassengersShort");
 
-  const card = document.getElementById("successCard");
+  const card = getElement("successCard");
   if (card) card.style.display = "";
   window.scrollTo({ top: 0, behavior: "smooth" });
 
@@ -1147,19 +1314,19 @@ function mountTicketAndShow(ticket) {
 
 
 function closeTicketToHome() {
-  const card = document.getElementById("successCard");
+  const card = getElement("successCard");
   if (card) card.style.display = "none";
-  const hero = document.getElementById("homeHero");
+  const hero = getElement("homeHero");
   if (hero) hero.style.display = "";
   ["step1", "step2", "step3", "step4", "step5", "step6"].forEach((id) => {
-    const el = document.getElementById(id);
+    const el = getElement(id);
     if (el) el.style.display = "none";
   });
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 async function downloadTicket() {
-  const card = document.getElementById("ticketCard");
+  const card = getElement("ticketCard");
   if (!card) {
     showErrorCard("找不到票卡");
     return;
@@ -1184,7 +1351,7 @@ async function downloadTicket() {
     });
     const a = document.createElement("a");
     const bid =
-      (document.getElementById("ticketBookingId")?.textContent || "ticket").trim();
+      (getElement("ticketBookingId")?.textContent || "ticket").trim();
     a.href = dataUrl;
     a.download = `ticket_${bid}.png`;
     a.click();
@@ -1195,9 +1362,9 @@ async function downloadTicket() {
 
 /* ====== 查詢我的預約 ====== */
 function showCheckQueryForm() {
-  const qForm = document.getElementById("queryForm");
-  const dateStep = document.getElementById("checkDateStep");
-  const ticketStep = document.getElementById("checkTicketStep");
+  const qForm = getElement("queryForm");
+  const dateStep = getElement("checkDateStep");
+  const ticketStep = getElement("checkTicketStep");
   if (qForm) qForm.style.display = "flex";
   if (dateStep) dateStep.style.display = "none";
   if (ticketStep) ticketStep.style.display = "none";
@@ -1205,9 +1372,9 @@ function showCheckQueryForm() {
 }
 
 function showCheckDateStep() {
-  const qForm = document.getElementById("queryForm");
-  const dateStep = document.getElementById("checkDateStep");
-  const ticketStep = document.getElementById("checkTicketStep");
+  const qForm = getElement("queryForm");
+  const dateStep = getElement("checkDateStep");
+  const ticketStep = getElement("checkTicketStep");
   // 保持搜尋框可見，只顯示日期選擇頁面
   if (qForm) qForm.style.display = "flex";
   if (dateStep) dateStep.style.display = "block";
@@ -1216,9 +1383,9 @@ function showCheckDateStep() {
 }
 
 function showCheckTicketStep() {
-  const qForm = document.getElementById("queryForm");
-  const dateStep = document.getElementById("checkDateStep");
-  const ticketStep = document.getElementById("checkTicketStep");
+  const qForm = getElement("queryForm");
+  const dateStep = getElement("checkDateStep");
+  const ticketStep = getElement("checkTicketStep");
   if (qForm) qForm.style.display = "none";
   if (dateStep) dateStep.style.display = "none";
   if (ticketStep) ticketStep.style.display = "block";
@@ -1227,8 +1394,8 @@ function showCheckTicketStep() {
 
 function closeCheckTicket() {
   // 關閉車票頁面時，返回到日期選擇頁面（如果有查詢結果），否則返回到查詢表單
-  const checkTicketStep = document.getElementById("checkTicketStep");
-  const checkDateStep = document.getElementById("checkDateStep");
+  const checkTicketStep = getElement("checkTicketStep");
+  const checkDateStep = getElement("checkDateStep");
   if (checkTicketStep) checkTicketStep.style.display = "none";
   
   // 檢查是否有查詢結果
@@ -1472,10 +1639,13 @@ function buildTicketCard(row, { mask = false } = {}) {
 
 /* ====== 查詢/刪改 ====== */
 async function queryOrders() {
-  const id = (document.getElementById("qBookId").value || "").trim();
-  const phone = (document.getElementById("qPhone").value || "").trim();
-  const email = (document.getElementById("qEmail").value || "").trim();
-  const queryHint = document.getElementById("queryHint");
+  const qBookIdEl = getElement("qBookId");
+  const qPhoneEl = getElement("qPhone");
+  const qEmailEl = getElement("qEmail");
+  const id = (qBookIdEl ? qBookIdEl.value : "").trim();
+  const phone = (qPhoneEl ? qPhoneEl.value : "").trim();
+  const email = (qEmailEl ? qEmailEl.value : "").trim();
+  const queryHint = getElement("queryHint");
   if (!id && !phone && !email) {
     if (queryHint) shake(queryHint);
     return;
@@ -1517,7 +1687,7 @@ function buildDateListFromResults(rows) {
   queryDateList = Array.from(dateMap.entries()).sort(
     (a, b) => new Date(a[0]) - new Date(b[0])
   );
-  const wrap = document.getElementById("dateChoices");
+  const wrap = getElement("dateChoices");
   if (!wrap) return;
   wrap.innerHTML = "";
 
@@ -1537,6 +1707,7 @@ function buildDateListFromResults(rows) {
   const prefix = texts.dateCountPrefix || "";
   const suffix = texts.dateCountSuffix || "";
 
+  const fragment = document.createDocumentFragment();
   queryDateList.forEach(([date, count]) => {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -1550,8 +1721,9 @@ function buildDateListFromResults(rows) {
     `;
 
     btn.onclick = () => openTicketsForDate(date);
-    wrap.appendChild(btn);
+    fragment.appendChild(btn);
   });
+  wrap.appendChild(fragment);
 }
 
 
@@ -1594,18 +1766,20 @@ function openTicketsForDate(dateIso) {
     return (order[statusA] || 6) - (order[statusB] || 6);
   });
 
-  const mount = document.getElementById("checkTicketMount");
+  const mount = getElement("checkTicketMount");
   if (!mount) return;
   mount.innerHTML = "";
+  const fragment = document.createDocumentFragment();
   currentDateRows.forEach((row) =>
-    mount.appendChild(buildTicketCard(row, { mask: true }))
+    fragment.appendChild(buildTicketCard(row, { mask: true }))
   );
+  mount.appendChild(fragment);
   showCheckTicketStep();
 }
 
 function rerenderQueryPages() {
-  const dateStep = document.getElementById("checkDateStep");
-  const ticketStep = document.getElementById("checkTicketStep");
+  const dateStep = getElement("checkDateStep");
+  const ticketStep = getElement("checkTicketStep");
   if (dateStep && dateStep.style.display !== "none") {
     buildDateListFromResults(lastQueryResults);
   }
@@ -1638,9 +1812,12 @@ async function deleteOrder(bookingId) {
       if (j && j.status === "success") {
         showSuccessAnimation();
         setTimeout(async () => {
-          const id = (document.getElementById("qBookId").value || "").trim();
-          const phone = (document.getElementById("qPhone").value || "").trim();
-          const email = (document.getElementById("qEmail").value || "").trim();
+          const qBookIdEl = getElement("qBookId");
+          const qPhoneEl = getElement("qPhone");
+          const qEmailEl = getElement("qEmail");
+          const id = (qBookIdEl ? qBookIdEl.value : "").trim();
+          const phone = (qPhoneEl ? qPhoneEl.value : "").trim();
+          const email = (qEmailEl ? qEmailEl.value : "").trim();
           const queryRes = await fetch(OPS_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1679,20 +1856,20 @@ async function openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax 
   await refreshData();
   showPage("check");
 
-  const qForm = document.getElementById("queryForm");
-  const dateStep = document.getElementById("checkDateStep");
-  const ticketStep = document.getElementById("checkTicketStep");
+  const qForm = getElement("queryForm");
+  const dateStep = getElement("checkDateStep");
+  const ticketStep = getElement("checkTicketStep");
   if (qForm) qForm.style.display = "none";
   if (dateStep) dateStep.style.display = "none";
   if (ticketStep) ticketStep.style.display = "none";
 
   const holderId = "editHolder";
-  let holder = document.getElementById(holderId);
+  let holder = getElement(holderId);
   if (!holder) {
     holder = document.createElement("div");
     holder.id = holderId;
     holder.className = "card wizard-fixed";
-    const checkPage = document.getElementById("check");
+    const checkPage = getElement("check");
     if (checkPage) checkPage.appendChild(holder);
   }
 
@@ -1986,11 +2163,9 @@ async function openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax 
       }
 
       // 6️⃣ ✅ 修改成功：先重新查詢並更新列表
-      const id = (document.getElementById("qBookId").value || "").trim();
-      const phoneInput =
-        (document.getElementById("qPhone").value || "").trim();
-      const emailInput =
-        (document.getElementById("qEmail").value || "").trim();
+      const id = (getElement("qBookId")?.value || "").trim();
+      const phoneInput = (getElement("qPhone")?.value || "").trim();
+      const emailInput = (getElement("qEmail")?.value || "").trim();
 
       const queryRes = await fetch(OPS_URL, {
         method: "POST",
@@ -2080,7 +2255,7 @@ const SCHEDULE_CACHE_TTL = 5 * 60 * 1000; // 5 分鐘
 
 // 優化：班次資料快取 - 在本地快取班次資料，減少 API 調用
 async function loadScheduleData() {
-  const resultsEl = document.getElementById("scheduleResults");
+  const resultsEl = getElement("scheduleResults");
   if (!resultsEl) return;
 
   // 檢查快取
@@ -2172,7 +2347,7 @@ function clearScheduleCache() {
 }
 
 function renderScheduleFilters() {
-  const allWrap = document.getElementById("allFilter");
+  const allWrap = getElement("allFilter");
   if (!allWrap) return;
   allWrap.innerHTML = "";
   const allBtn = document.createElement("button");
@@ -2224,7 +2399,7 @@ function renderScheduleFilters() {
 }
 
 function renderFilterPills(containerId, items, selectedItem, onClick) {
-  const container = document.getElementById(containerId);
+  const container = getElement(containerId);
   if (!container) return;
   container.innerHTML = "";
 
@@ -2242,6 +2417,7 @@ function renderFilterPills(containerId, items, selectedItem, onClick) {
     items.sort();
   }
 
+  const fragment = document.createDocumentFragment();
   items.forEach((item) => {
     const pill = document.createElement("button");
     pill.type = "button";
@@ -2256,12 +2432,13 @@ function renderFilterPills(containerId, items, selectedItem, onClick) {
     }
 
     pill.onclick = () => onClick(item);
-    container.appendChild(pill);
+    fragment.appendChild(pill);
   });
+  container.appendChild(fragment);
 }
 
 function renderScheduleResults() {
-  const container = document.getElementById('scheduleResults');
+  const container = getElement('scheduleResults');
   if (!container) return;
 
   const filtered = scheduleData.rows.filter(row => {
@@ -2345,7 +2522,7 @@ async function loadSystemConfig() {
     showMarquee();
 
     // ========= 圖片牆處理 =========
-    const gallery = document.getElementById("imageGallery");
+    const gallery = getElement("imageGallery");
     if (gallery) {
       gallery.innerHTML = "";
       for (let i = 7; i <= 11; i++) {
@@ -2404,9 +2581,9 @@ function parseTripDateTime(dateStr, timeStr) {
 
 /* ====== 初始化 ====== */
 function resetQuery() {
-  const id = document.getElementById("qBookId");
-  const phone = document.getElementById("qPhone");
-  const email = document.getElementById("qEmail");
+  const id = getElement("qBookId");
+  const phone = getElement("qPhone");
+  const email = getElement("qEmail");
   if (id) id.value = "";
   if (phone) phone.value = "";
   if (email) email.value = "";
@@ -2419,10 +2596,10 @@ const FEATURE_TOGGLE = {
 
 // === 即時位置渲染 ===
 async function renderLiveLocationPlaceholder() {
-  const sec = document.querySelector('[data-feature="liveLocation"]');
+  const sec = querySelector('[data-feature="liveLocation"]');
   if (!sec) return;
 
-  const mount = document.getElementById("realtimeMount");
+  const mount = getElement("realtimeMount");
   if (!mount) return;
 
   // 檢查 GPS 系統總開關（從 booking-api 讀取，該 API 會從 Sheet 的「系統」E19 讀取）
@@ -3043,7 +3220,7 @@ function initLiveLocation(mount) {
         return;
       }
       // 檢查是否已經有載入中的 script 標籤
-      const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+      const existingScript = querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
       if (existingScript) {
         // 如果已有 script 標籤，等待它載入完成
         if (window.google && window.google.maps) {
@@ -4101,9 +4278,9 @@ function initLiveLocation(mount) {
 
 async function init() {
   const tday = todayISO();
-  const ci = document.getElementById('checkInDate');
-  const co = document.getElementById('checkOutDate');
-  const dining = document.getElementById('diningDate');
+  const ci = getElement('checkInDate');
+  const co = getElement('checkOutDate');
+  const dining = getElement('diningDate');
 
   if (ci) ci.value = tday;
   if (co) co.value = tday;
@@ -4134,7 +4311,7 @@ async function init() {
 
 // 隱藏初始載入遮罩的輔助函數
 function hideInitialLoading() {
-  const initialLoading = document.getElementById("initialLoading");
+  const initialLoading = getElement("initialLoading");
   if (initialLoading) {
     initialLoading.classList.remove("show");
   }
@@ -4153,7 +4330,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btns.length === 3) a.classList.add("has-three");
   });
   ["stopHotel", "stopMRT", "stopTrain", "stopLala"].forEach((id) => {
-    const el = document.getElementById(id);
+    const el = getElement(id);
     if (el) el.classList.remove("open");
   });
 
