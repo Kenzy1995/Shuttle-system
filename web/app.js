@@ -2228,11 +2228,29 @@ async function loadScheduleData() {
       const cacheData = JSON.parse(cached);
       const now = Date.now();
       if (cacheData.timestamp && (now - cacheData.timestamp) < SCHEDULE_CACHE_TTL) {
-        // 使用快取資料
-        scheduleData.rows = cacheData.rows || [];
-        scheduleData.directions = new Set(cacheData.directions || []);
-        scheduleData.dates = new Set(cacheData.dates || []);
-        scheduleData.stations = new Set(cacheData.stations || []);
+        // 輔助函數：檢查是否為 #N/A 或無效值
+        const isNA = (value) => {
+          if (!value) return true;
+          const str = String(value).trim().toUpperCase();
+          return str === '#N/A' || str === 'N/A' || str === '';
+        };
+
+        // 使用快取資料，但也要過濾掉 #N/A 值
+        scheduleData.rows = (cacheData.rows || []).filter(row => {
+          return !isNA(row.direction) && 
+                 !isNA(row.date) && 
+                 !isNA(row.time) && 
+                 !isNA(row.station);
+        });
+        scheduleData.directions = new Set(
+          (cacheData.directions || []).filter(dir => !isNA(dir))
+        );
+        scheduleData.dates = new Set(
+          (cacheData.dates || []).filter(date => !isNA(date))
+        );
+        scheduleData.stations = new Set(
+          (cacheData.stations || []).filter(station => !isNA(station))
+        );
         
         renderScheduleFilters();
         renderScheduleResults();
@@ -2264,6 +2282,13 @@ async function loadScheduleData() {
     const stationIndex = headers.indexOf("站點");
     const capacityIndex = headers.indexOf("可預約人數");
 
+    // 輔助函數：檢查是否為 #N/A 或無效值
+    const isNA = (value) => {
+      if (!value) return true;
+      const str = String(value).trim().toUpperCase();
+      return str === '#N/A' || str === 'N/A' || str === '';
+    };
+
     scheduleData.rows = rows
       .map((row) => ({
         direction: row[directionIndex] || "",
@@ -2272,13 +2297,30 @@ async function loadScheduleData() {
         station: row[stationIndex] || "",
         capacity: row[capacityIndex] || ""
       }))
-      .filter((row) => row.direction && row.date && row.time && row.station);
+      .filter((row) => {
+        // 過濾掉任何欄位為 #N/A 或空的資料行
+        return !isNA(row.direction) && 
+               !isNA(row.date) && 
+               !isNA(row.time) && 
+               !isNA(row.station);
+      });
 
+    // 建立 Set 時也要過濾掉 #N/A 值
     scheduleData.directions = new Set(
-      scheduleData.rows.map((r) => r.direction)
+      scheduleData.rows
+        .map((r) => r.direction)
+        .filter(dir => !isNA(dir))
     );
-    scheduleData.dates = new Set(scheduleData.rows.map((r) => r.date));
-    scheduleData.stations = new Set(scheduleData.rows.map((r) => r.station));
+    scheduleData.dates = new Set(
+      scheduleData.rows
+        .map((r) => r.date)
+        .filter(date => !isNA(date))
+    );
+    scheduleData.stations = new Set(
+      scheduleData.rows
+        .map((r) => r.station)
+        .filter(station => !isNA(station))
+    );
 
     // 更新快取
     try {
@@ -2366,9 +2408,19 @@ function renderFilterPills(containerId, items, selectedItem, onClick) {
   if (!container) return;
   container.innerHTML = "";
 
+  // 輔助函數：檢查是否為 #N/A 或無效值
+  const isNA = (value) => {
+    if (!value) return true;
+    const str = String(value).trim().toUpperCase();
+    return str === '#N/A' || str === 'N/A' || str === '';
+  };
+
+  // 過濾掉 #N/A 值
+  const validItems = items.filter(item => !isNA(item));
+
   // ✅ 站點用自訂排序：捷運 > 火車 > LALA
   if (containerId === "stationFilter") {
-    items.sort((a, b) => {
+    validItems.sort((a, b) => {
       const pa = getStationPriority(a);
       const pb = getStationPriority(b);
       if (pa !== pb) return pa - pb;
@@ -2377,11 +2429,11 @@ function renderFilterPills(containerId, items, selectedItem, onClick) {
     });
   } else {
     // 其他（方向、日期）維持原本字串排序
-    items.sort();
+    validItems.sort();
   }
 
   const fragment = document.createDocumentFragment();
-  items.forEach((item) => {
+  validItems.forEach((item) => {
     const pill = document.createElement("button");
     pill.type = "button";
     pill.className = "filter-pill" + (selectedItem === item ? " active" : "");
@@ -2425,27 +2477,45 @@ function renderScheduleResults() {
     return direction;
   }
 
+  // 輔助函數：檢查是否為 #N/A 或無效值
+  const isNA = (value) => {
+    if (!value) return true;
+    const str = String(value).trim().toUpperCase();
+    return str === '#N/A' || str === 'N/A' || str === '';
+  };
+
+  // 輔助函數：處理顯示值，如果是 #N/A 則顯示友好訊息
+  const formatValue = (value, defaultValue = '目前暫無可預約班次') => {
+    return isNA(value) ? defaultValue : sanitize(value);
+  };
+
   container.innerHTML = filtered.map(row => {
     // 只抓數字，例如「可預約 / Available：7」→ "7"
     const digits = onlyDigits(row.capacity);
     const capNumber = digits || row.capacity; // 如果沒有數字就 fallback 原字串
     
     // 檢查是否為 #N/A 或類似的無效值
-    const isNA = !capNumber || 
-                 String(capNumber).trim().toUpperCase() === '#N/A' || 
-                 String(capNumber).trim().toUpperCase() === 'N/A' ||
-                 String(capNumber).trim() === '';
-    const displayCapacity = isNA ? '目前暫無可預約班次' : `${sanitize(capLabel)}：${sanitize(capNumber)}`;
+    const capIsNA = isNA(capNumber);
+    const displayCapacity = capIsNA ? '目前暫無可預約班次' : `${sanitize(capLabel)}：${sanitize(capNumber)}`;
+
+    // 處理所有欄位的 #N/A 情況
+    // 方向需要先翻譯再處理 #N/A
+    const displayDirection = isNA(row.direction) 
+      ? '目前暫無可預約班次' 
+      : sanitize(translateDirection(row.direction));
+    const displayDate = formatValue(row.date, '目前暫無可預約班次');
+    const displayTime = formatValue(row.time, '目前暫無可預約班次');
+    const displayStation = formatValue(row.station, '目前暫無可預約班次');
 
     return `
       <div class="schedule-card">
         <div class="schedule-line">
-          <span class="schedule-direction">${sanitize(translateDirection(row.direction))}</span>
-          <span class="schedule-date">${sanitize(row.date)}</span>
-          <span class="schedule-time">${sanitize(row.time)}</span>
+          <span class="schedule-direction">${displayDirection}</span>
+          <span class="schedule-date">${displayDate}</span>
+          <span class="schedule-time">${displayTime}</span>
         </div>
         <div class="schedule-line">
-          <span class="schedule-station">${sanitize(row.station)}</span>
+          <span class="schedule-station">${displayStation}</span>
           <span class="schedule-capacity">${sanitize(displayCapacity)}</span>
         </div>
       </div>
