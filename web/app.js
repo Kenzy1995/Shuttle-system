@@ -2429,6 +2429,13 @@ function renderScheduleResults() {
     // 只抓數字，例如「可預約 / Available：7」→ "7"
     const digits = onlyDigits(row.capacity);
     const capNumber = digits || row.capacity; // 如果沒有數字就 fallback 原字串
+    
+    // 檢查是否為 #N/A 或類似的無效值
+    const isNA = !capNumber || 
+                 String(capNumber).trim().toUpperCase() === '#N/A' || 
+                 String(capNumber).trim().toUpperCase() === 'N/A' ||
+                 String(capNumber).trim() === '';
+    const displayCapacity = isNA ? '目前暫無可預約班次' : `${sanitize(capLabel)}：${sanitize(capNumber)}`;
 
     return `
       <div class="schedule-card">
@@ -2439,7 +2446,7 @@ function renderScheduleResults() {
         </div>
         <div class="schedule-line">
           <span class="schedule-station">${sanitize(row.station)}</span>
-          <span class="schedule-capacity">${sanitize(capLabel)}：${sanitize(capNumber)}</span>
+          <span class="schedule-capacity">${sanitize(displayCapacity)}</span>
         </div>
       </div>
     `;
@@ -2481,13 +2488,16 @@ async function loadSystemConfig() {
     marqueeData.text = marqueeText.trim();
     marqueeData.isLoaded = true;
 
-    // 立即顯示跑馬燈
-    showMarquee();
+    // 只有在有內容時才顯示跑馬燈
+    if (marqueeData.text && marqueeData.text.trim()) {
+      showMarquee();
+    }
 
     // ========= 圖片牆處理 =========
     const gallery = getElement("imageGallery");
     if (gallery) {
       gallery.innerHTML = "";
+      let hasImages = false;
       for (let i = 7; i <= 11; i++) {
         const row = data[i] || [];
         const imgUrl = row[3] || "";
@@ -2500,10 +2510,18 @@ async function loadSystemConfig() {
           img.className = "gallery-image";
           img.src = String(imgUrl).trim();
           gallery.appendChild(img);
+          hasImages = true;
         }
+      }
+      // 如果沒有圖片，隱藏圖片展示區
+      if (!hasImages) {
+        gallery.style.display = "none";
+      } else {
+        gallery.style.display = "";
       }
     }
   } catch (err) {
+    console.error("載入系統設定時發生錯誤:", err);
   }
 }
 
@@ -4254,22 +4272,26 @@ async function init() {
   // 1. 先套語系，避免一開始有文字還是舊語言
   applyI18N();
 
-  // 2. 載入系統設定（會順便把跑馬燈文字載入 + showMarquee）
-  await loadSystemConfig();
+  // 2. 立即隱藏初始載入遮罩，讓網頁先顯示出來
+  hideInitialLoading();
 
-  // 3. 顯示預約分頁（此時 marqueeData 已經有內容）
+  // 3. 顯示預約分頁
   showPage('reservation');
 
   // 4. 其他 UI 初始化
   handleScroll();
-  // 使用 try-catch 確保錯誤不會阻塞頁面
+
+  // 5. 在背景載入系統設定（跑馬燈、圖片展示），不阻塞頁面顯示
+  loadSystemConfig().catch(e => {
+    console.error("載入系統設定失敗:", e);
+  });
+
+  // 6. 在背景載入即時位置，不阻塞頁面顯示
   try {
     await renderLiveLocationPlaceholder();
   } catch (e) {
+    console.error("載入即時位置失敗:", e);
   }
-
-  // 5. 隱藏初始載入遮罩
-  hideInitialLoading();
 }
 
 // 隱藏初始載入遮罩的輔助函數
