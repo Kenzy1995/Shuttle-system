@@ -1045,13 +1045,18 @@ function toStep6() {
     sel.disabled = true;
   } else {
     sel.disabled = false;
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = t("selectPassengers") || "請選擇";
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    sel.appendChild(placeholder);
     for (let i = 1; i <= maxPassengers; i++) {
       const opt = document.createElement("option");
       opt.value = String(i);
       opt.textContent = String(i);
       sel.appendChild(opt);
     }
-    sel.value = "1";
   }
   const passengersHintEl = getElement("passengersHint");
   if (passengersHintEl) {
@@ -1068,6 +1073,11 @@ function toStep6() {
 
   const errEl = getElement("passengersErr");
   if (errEl) errEl.style.display = "none";
+  if (sel) {
+    sel.onchange = () => {
+      if (errEl) errEl.style.display = sel.value ? "none" : "block";
+    };
+  }
 }
 
 /* ====== 成功動畫 ====== */
@@ -1088,10 +1098,13 @@ async function submitBooking() {
   if (bookingSubmitting) return;
 
   const pSel = getElement("passengers");
-  const p = Number(pSel?.value || 0);
-  if (!p || p < 1 || p > 4) {
+  const pValue = pSel?.value || "";
+  const p = Number(pValue || 0);
+  if (!pValue || !p || p < 1 || p > 4) {
     const errEl = getElement("passengersErr");
     if (errEl) errEl.style.display = "block";
+    if (pSel) shake(pSel);
+    if (navigator.vibrate) navigator.vibrate(200);
     return;
   }
   const errEl = getElement("passengersErr");
