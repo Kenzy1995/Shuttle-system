@@ -12,6 +12,8 @@ import urllib.parse
 import secrets  
 
 import qrcode
+import firebase_admin
+from firebase_admin import credentials, db
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
@@ -57,6 +59,12 @@ CANCELLED_TEXT = "❌ 已取消 Cancelled"
 # ========== 快取設定 ==========
 # 目標：在 5 秒 TTL 內，所有讀取 API 都共用同一份 Sheet 資料，避免重複打 Google Sheets
 CACHE_TTL_SECONDS = 5
+
+# ========== 併發鎖設定 ==========
+# 目標：避免多筆同時預約/修改造成超賣（依日期+班次時間鎖）
+LOCK_WAIT_SECONDS = 12
+LOCK_STALE_SECONDS = 30
+LOCK_POLL_INTERVAL = 1.0
 
 # SHEET_CACHE 結構：
 # {
@@ -485,6 +493,102 @@ def _send_email_gmail(
         server.login(user, password)
         server.sendmail(EMAIL_FROM_ADDR, [to_email], msg.as_string())
 
+# ========== Firebase 併發鎖 ==========
+def _init_firebase():
+    """初始化 Firebase Admin SDK（用於併發鎖）"""
+    try:
+        if not firebase_admin._apps:
+            service_account_path = "service_account.json"
+            if os.path.exists(service_account_path):
+                cred = credentials.Certificate(service_account_path)
+            else:
+                cred = credentials.ApplicationDefault()
+            db_url = os.environ.get("FIREBASE_RTDB_URL")
+            if not db_url:
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
+                db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
+            firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+        return True
+    except Exception:
+        return False
+
+
+def _lock_id_for_capacity(date_iso: str, time_hm: str) -> str:
+    raw = f"{date_iso}|{_time_hm_from_any(time_hm)}"
+    h = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
+    return f"cap_{h}"
+
+
+def _acquire_capacity_lock(lock_id: str, timeout_s: int = LOCK_WAIT_SECONDS):
+    if not _init_firebase():
+        return None
+    ref = db.reference(f"/sheet_locks/{lock_id}")
+    holder = secrets.token_hex(8)
+    start = time.monotonic()
+    stale_ms = LOCK_STALE_SECONDS * 1000
+
+    while (time.monotonic() - start) < timeout_s:
+        now_ms = int(time.time() * 1000)
+
+        def txn(current):
+            if current is None:
+                return {"holder": holder, "ts": now_ms}
+            cur_ts = int(current.get("ts", 0)) if isinstance(current, dict) else 0
+            if cur_ts and (now_ms - cur_ts) > stale_ms:
+                return {"holder": holder, "ts": now_ms}
+            return current
+
+        try:
+            result = ref.transaction(txn)
+            if isinstance(result, dict) and result.get("holder") == holder:
+                return holder
+        except Exception:
+            pass
+
+        time.sleep(0.2)
+
+    return None
+
+
+def _release_capacity_lock(lock_id: str, holder: str):
+    if not holder:
+        return
+    if not _init_firebase():
+        return
+    ref = db.reference(f"/sheet_locks/{lock_id}")
+
+    def txn(current):
+        if isinstance(current, dict) and current.get("holder") == holder:
+            return None
+        return current
+
+    try:
+        ref.transaction(txn)
+    except Exception:
+        pass
+
+
+def _wait_capacity_recalc(
+    direction: str,
+    date_iso: str,
+    time_hm: str,
+    station: str,
+    expected_max: int,
+    timeout_s: int = LOCK_WAIT_SECONDS,
+):
+    start = time.monotonic()
+    last_seen = None
+    while (time.monotonic() - start) < timeout_s:
+        _invalidate_cap_sheet_cache()
+        try:
+            last_seen = lookup_capacity(direction, date_iso, time_hm, station)
+            if last_seen <= expected_max:
+                return True, last_seen
+        except HTTPException:
+            last_seen = None
+        time.sleep(LOCK_POLL_INTERVAL)
+    return False, last_seen
+
 def _compose_mail_text(info: Dict[str, str], lang: str, kind: str) -> Tuple[str, str]:
     """組合純文字郵件內容 - 雙語版本"""
     
@@ -885,31 +989,43 @@ def ops(req: OpsRequest):
             station_for_cap = _normalize_station_for_capacity(
                 p.direction, p.pickLocation, p.dropLocation
             )
-            rem = lookup_capacity(p.direction, p.date, time_hm, station_for_cap)
-            if int(p.passengers) > int(rem):
-                raise HTTPException(409, f"capacity_exceeded:{p.passengers}>{rem}")
+            lock_id = _lock_id_for_capacity(p.date, time_hm)
+            lock_holder = _acquire_capacity_lock(lock_id)
+            if not lock_holder:
+                raise HTTPException(503, "系統繁忙，請稍後再試")
+            rem = None
+            wrote = False
+            try:
+                rem = lookup_capacity(p.direction, p.date, time_hm, station_for_cap)
+                if int(p.passengers) > int(rem):
+                    raise HTTPException(409, f"capacity_exceeded:{p.passengers}>{rem}")
 
-            # 產生預約編號：以「今日日期」為準
-            today_iso = _today_iso_taipei()
-            booking_id = _generate_booking_id_day_rand6(ws_main, today_iso)
+                # 產生預約編號：以「今日日期」為準
+                today_iso = _today_iso_taipei()
+                booking_id = _generate_booking_id_day_rand6(ws_main, today_iso)
 
-            # QR 內容
-            em6 = _email_hash6(p.email)
-            qr_content = f"FT:{booking_id}:{em6}"
-            qr_url = f"{BASE_URL}/api/qr/{urllib.parse.quote(qr_content)}"
+                # QR 內容
+                em6 = _email_hash6(p.email)
+                qr_content = f"FT:{booking_id}:{em6}"
+                qr_url = f"{BASE_URL}/api/qr/{urllib.parse.quote(qr_content)}"
 
-            # 用 BookingProcessor 統一產生 row（包含主班次時間、車次-日期時間...）
-            newrow = booking_processor.prepare_booking_row(
-                p, booking_id, qr_content, headers, hmap
-            )
+                # 用 BookingProcessor 統一產生 row（包含主班次時間、車次-日期時間...）
+                newrow = booking_processor.prepare_booking_row(
+                    p, booking_id, qr_content, headers, hmap
+                )
 
-            # 寫入 Google Sheet（關鍵操作）
-            ws_main.append_row(newrow, value_input_option="USER_ENTERED")
-            log.info(f"book appended booking_id={booking_id}")
-            # 清除快取，確保下次讀取時獲取最新資料
-            _invalidate_sheet_cache()
-            # 新增預約會影響容量，清除可預約班次表快取
-            _invalidate_cap_sheet_cache()
+                # 寫入 Google Sheet（關鍵操作）
+                ws_main.append_row(newrow, value_input_option="USER_ENTERED")
+                wrote = True
+                log.info(f"book appended booking_id={booking_id}")
+                # 清除快取，確保下次讀取時獲取最新資料
+                _invalidate_sheet_cache()
+                # 新增預約會影響容量，清除可預約班次表快取
+                _invalidate_cap_sheet_cache()
+                expected_max = max(0, int(rem) - int(p.passengers))
+                _wait_capacity_recalc(p.direction, p.date, time_hm, station_for_cap, expected_max)
+            finally:
+                _release_capacity_lock(lock_id, lock_holder)
 
             # 立即回覆前端 —— 只給前端需要的東西，其他由前端自己維護
             response_data = {
@@ -1063,7 +1179,6 @@ def ops(req: OpsRequest):
 
             # 容量檢查
             station_for_cap_new = _normalize_station_for_capacity(new_dir, new_pick, new_drop)
-            rem = lookup_capacity(new_dir, new_date, new_time, station_for_cap_new)
 
             # 如果還是同一班次，只需檢查增加的差額
             same_trip = (
@@ -1078,126 +1193,152 @@ def ops(req: OpsRequest):
                 _normalize_station_for_capacity(old_dir, old_pick, old_drop),
             )
 
+            consume = 0
             if same_trip:
                 delta = new_pax - old_pax
-                if delta > 0 and delta > rem:
-                    raise HTTPException(409, f"capacity_exceeded_delta:{delta}>{rem}")
+                consume = delta if delta > 0 else 0
             else:
-                if new_pax > rem:
-                    raise HTTPException(409, f"capacity_exceeded:{new_pax}>{rem}")
+                consume = new_pax
 
-            # 開始組更新欄位
-            updates: Dict[str, str] = {}
-            time_hm = new_time
-            car_display = _display_trip_str(new_date, time_hm) if (new_date and time_hm) else None
+            lock_holder = None
+            lock_id = None
+            rem = None
+            wrote = False
+            if consume > 0:
+                lock_id = _lock_id_for_capacity(new_date, new_time)
+                lock_holder = _acquire_capacity_lock(lock_id)
+                if not lock_holder:
+                    raise HTTPException(503, "系統繁忙，請稍後再試")
 
-            # 更新 unified 車次-日期時間 + 主班次時間
-            if new_date and new_time:
-                date_obj = datetime.strptime(new_date, "%Y-%m-%d")
-                car_datetime = date_obj.strftime("%Y/%m/%d") + " " + new_time
-                updates["車次-日期時間"] = car_datetime
+            try:
+                rem = lookup_capacity(new_dir, new_date, new_time, station_for_cap_new)
+                if same_trip:
+                    delta = new_pax - old_pax
+                    if delta > 0 and delta > rem:
+                        raise HTTPException(409, f"capacity_exceeded_delta:{delta}>{rem}")
+                else:
+                    if new_pax > rem:
+                        raise HTTPException(409, f"capacity_exceeded:{new_pax}>{rem}")
 
-                main_departure = _compute_main_departure_datetime(
-                    new_dir,
-                    new_pick,
-                    new_date,
-                    new_time,
-                )
-                updates["主班次時間"] = main_departure
+                # 開始組更新欄位
+                updates: Dict[str, str] = {}
+                time_hm = new_time
+                car_display = _display_trip_str(new_date, time_hm) if (new_date and time_hm) else None
 
-            # 站點索引 / 涉及路段
-            pk_idx = dp_idx = None
-            seg_str = None
-            if new_pick and new_drop:
-                pk_idx, dp_idx, seg_str = _compute_indices_and_segments(new_pick, new_drop)
+                # 更新 unified 車次-日期時間 + 主班次時間
+                if new_date and new_time:
+                    date_obj = datetime.strptime(new_date, "%Y-%m-%d")
+                    car_datetime = date_obj.strftime("%Y/%m/%d") + " " + new_time
+                    updates["車次-日期時間"] = car_datetime
 
-            updates["預約狀態"] = BOOKED_TEXT
-            updates["預約人數"] = str(new_pax)
-
-            # 備註增加一條「已修改」
-            if "備註" in hmap:
-                current_note = ws_main.cell(rowno, hmap["備註"]).value or ""
-                new_note = f"{_tz_now_str()} 已修改"
-                updates["備註"] = f"{current_note}; {new_note}" if current_note else new_note
-
-            updates["往返"] = new_dir
-            updates["日期"] = new_date
-            if time_hm:
-                updates["班次"] = time_hm
-            if car_display:
-                updates["車次"] = car_display
-            updates["上車地點"] = new_pick
-            updates["下車地點"] = new_drop
-
-            if p.phone:
-                updates["手機"] = p.phone
-
-            # 信箱 & QRCode 一律用「最終 email」計算
-            old_email = get_by_rowno(rowno, "信箱")
-            final_email = p.email or old_email
-            qr_content: Optional[str] = None
-            if p.email:
-                updates["信箱"] = p.email
-            if final_email:
-                em6 = _email_hash6(final_email)
-                qr_content = f"FT:{p.booking_id}:{em6}"
-                updates["QRCode編碼"] = qr_content
-
-            if pk_idx is not None:
-                updates["上車索引"] = str(pk_idx)
-            if dp_idx is not None:
-                updates["下車索引"] = str(dp_idx)
-            if seg_str is not None:
-                updates["涉及路段範圍"] = seg_str
-
-            if "最後操作時間" in hmap:
-                updates["最後操作時間"] = _tz_now_str() + " 已修改"
-
-            # 寄信狀態改為處理中
-            updates["寄信狀態"] = "處理中"
-
-            # 寫回 Google Sheet（batch_update）
-            batch_updates = []
-            for col_name, value in updates.items():
-                if col_name in hmap:
-                    batch_updates.append(
-                        {
-                            "range": gspread.utils.rowcol_to_a1(rowno, hmap[col_name]),
-                            "values": [[value]],
-                        }
+                    main_departure = _compute_main_departure_datetime(
+                        new_dir,
+                        new_pick,
+                        new_date,
+                        new_time,
                     )
-            if batch_updates:
-                ws_main.batch_update(batch_updates, value_input_option="USER_ENTERED")
+                    updates["主班次時間"] = main_departure
 
-            log.info(f"modify updated booking_id={p.booking_id}")
-            # 清除快取，確保下次讀取時獲取最新資料
-            _invalidate_sheet_cache()
+                # 站點索引 / 涉及路段
+                pk_idx = dp_idx = None
+                seg_str = None
+                if new_pick and new_drop:
+                    pk_idx, dp_idx, seg_str = _compute_indices_and_segments(new_pick, new_drop)
 
-            # 立即回覆前端
-            response_data = {
-                "status": "success",
-                "bookingId": p.booking_id,
-                "booking_id": p.booking_id,
-            }
+                updates["預約狀態"] = BOOKED_TEXT
+                updates["預約人數"] = str(new_pax)
 
-            # 背景寄信
-            booking_info = {
-                "booking_id": p.booking_id,
-                "date": new_date,
-                "time": new_time,
-                "direction": new_dir,
-                "pick": new_pick,
-                "drop": new_drop,
-                "name": get_by_rowno(rowno, "姓名"),
-                "phone": p.phone or get_by_rowno(rowno, "手機"),
-                "email": final_email,
-                "pax": str(new_pax),
-                "qr_content": qr_content,
-                "qr_url": f"{BASE_URL}/api/qr/{urllib.parse.quote(qr_content)}" if qr_content else "",
-            }
-            async_process_after_modify(p.booking_id, booking_info, qr_content, p.lang)
+                # 備註增加一條「已修改」
+                if "備註" in hmap:
+                    current_note = ws_main.cell(rowno, hmap["備註"]).value or ""
+                    new_note = f"{_tz_now_str()} 已修改"
+                    updates["備註"] = f"{current_note}; {new_note}" if current_note else new_note
 
-            return response_data
+                updates["往返"] = new_dir
+                updates["日期"] = new_date
+                if time_hm:
+                    updates["班次"] = time_hm
+                if car_display:
+                    updates["車次"] = car_display
+                updates["上車地點"] = new_pick
+                updates["下車地點"] = new_drop
+
+                if p.phone:
+                    updates["手機"] = p.phone
+
+                # 信箱 & QRCode 一律用「最終 email」計算
+                old_email = get_by_rowno(rowno, "信箱")
+                final_email = p.email or old_email
+                qr_content: Optional[str] = None
+                if p.email:
+                    updates["信箱"] = p.email
+                if final_email:
+                    em6 = _email_hash6(final_email)
+                    qr_content = f"FT:{p.booking_id}:{em6}"
+                    updates["QRCode編碼"] = qr_content
+
+                if pk_idx is not None:
+                    updates["上車索引"] = str(pk_idx)
+                if dp_idx is not None:
+                    updates["下車索引"] = str(dp_idx)
+                if seg_str is not None:
+                    updates["涉及路段範圍"] = seg_str
+
+                if "最後操作時間" in hmap:
+                    updates["最後操作時間"] = _tz_now_str() + " 已修改"
+
+                # 寄信狀態改為處理中
+                updates["寄信狀態"] = "處理中"
+
+                # 寫回 Google Sheet（batch_update）
+                batch_updates = []
+                for col_name, value in updates.items():
+                    if col_name in hmap:
+                        batch_updates.append(
+                            {
+                                "range": gspread.utils.rowcol_to_a1(rowno, hmap[col_name]),
+                                "values": [[value]],
+                            }
+                        )
+                if batch_updates:
+                    ws_main.batch_update(batch_updates, value_input_option="USER_ENTERED")
+                    wrote = True
+
+                log.info(f"modify updated booking_id={p.booking_id}")
+                # 清除快取，確保下次讀取時獲取最新資料
+                _invalidate_sheet_cache()
+
+                # 立即回覆前端
+                response_data = {
+                    "status": "success",
+                    "bookingId": p.booking_id,
+                    "booking_id": p.booking_id,
+                }
+
+                # 背景寄信
+                booking_info = {
+                    "booking_id": p.booking_id,
+                    "date": new_date,
+                    "time": new_time,
+                    "direction": new_dir,
+                    "pick": new_pick,
+                    "drop": new_drop,
+                    "name": get_by_rowno(rowno, "姓名"),
+                    "phone": p.phone or get_by_rowno(rowno, "手機"),
+                    "email": final_email,
+                    "pax": str(new_pax),
+                    "qr_content": qr_content,
+                    "qr_url": f"{BASE_URL}/api/qr/{urllib.parse.quote(qr_content)}" if qr_content else "",
+                }
+                async_process_after_modify(p.booking_id, booking_info, qr_content, p.lang)
+                return response_data
+            finally:
+                if consume > 0 and rem is not None and wrote:
+                    _invalidate_cap_sheet_cache()
+                    expected_max = max(0, int(rem) - int(consume))
+                    _wait_capacity_recalc(new_dir, new_date, new_time, station_for_cap_new, expected_max)
+                if lock_holder:
+                    _release_capacity_lock(lock_id, lock_holder)
 
 
         # ===== 刪除（取消） =====
