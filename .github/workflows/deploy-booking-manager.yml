@@ -53,9 +53,7 @@ jobs:
           --cpu=2 \
           --max-instances=10 \
           --timeout=300s \
-          --set-env-vars SMTP_HOST=smtp.gmail.com,SMTP_PORT=587 \
-          --set-env-vars SMTP_USER=${{ secrets.SMTP_USER }},SMTP_PASS=${{ secrets.SMTP_PASS }} \
-          --set-env-vars FIREBASE_RTDB_URL=${{ secrets.FIREBASE_RTDB_URL }}
+          --set-env-vars SMTP_HOST=smtp.gmail.com,SMTP_PORT=587,SMTP_USER=${{ secrets.SMTP_USER }},SMTP_PASS=${{ secrets.SMTP_PASS }},FIREBASE_RTDB_URL=${{ secrets.FIREBASE_RTDB_URL }}
 
     - name: Show Service URL
       run: |
