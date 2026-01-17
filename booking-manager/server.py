@@ -62,7 +62,7 @@ CACHE_TTL_SECONDS = 5
 
 # ========== 併發鎖設定 ==========
 # 目標：避免多筆同時預約/修改造成超賣（依日期+班次時間鎖）
-LOCK_WAIT_SECONDS = 12
+LOCK_WAIT_SECONDS = 60
 LOCK_STALE_SECONDS = 30
 LOCK_POLL_INTERVAL = 1.0
 
