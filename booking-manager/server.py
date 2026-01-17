@@ -560,6 +560,8 @@ def _acquire_capacity_lock(lock_id: str, date_iso: str, time_hm: str, timeout_s:
         def txn(current):
             if current is None:
                 return {"holder": holder, "ts": now_ms, "date": lock_date, "time": lock_time}
+            if isinstance(current, dict) and current.get("released") is True:
+                return {"holder": holder, "ts": now_ms, "date": lock_date, "time": lock_time}
             cur_ts = int(current.get("ts", 0)) if isinstance(current, dict) else 0
             if cur_ts and (now_ms - cur_ts) > stale_ms:
                 return {"holder": holder, "ts": now_ms, "date": lock_date, "time": lock_time}
@@ -605,17 +607,21 @@ def _release_capacity_lock(lock_id: str, holder: str):
         return
     ref = db.reference(f"/sheet_locks/{lock_id}")
 
+    now_ms = int(time.time() * 1000)
+
     def txn(current):
         if isinstance(current, dict) and current.get("holder") == holder:
-            return None
+            current["released"] = True
+            current["released_by"] = holder
+            current["released_ts"] = now_ms
+            return current
+        if current is None:
+            return {"released": True, "released_by": holder, "released_ts": now_ms, "ts": 0}
         return current
 
     try:
         result = ref.transaction(txn)
-        now_ms = int(time.time() * 1000)
-        log.info(
-            f"[cap_lock] released lock_id={lock_id} holder={holder} ts={now_ms} txn_result={result}"
-        )
+        log.info(f"[cap_lock] released lock_id={lock_id} holder={holder} ts={now_ms} txn_result={result}")
         try:
             current = ref.get()
             log.info(f"[cap_lock] released_state lock_id={lock_id} current={current}")
