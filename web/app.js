@@ -1183,7 +1183,9 @@ async function submitBooking() {
       backendMsgStr.includes("capacity_not_numeric");
 
     if (!res.ok) {
-      if (isCapacityError) {
+      if (res.status === 503) {
+        showErrorCard(t("busyRetry"));
+      } else if (isCapacityError) {
         showErrorCard(t("overPaxOrMissing"));
       } else {
         showErrorCard(t("submitFailedPrefix") + `HTTP ${res.status}`);
@@ -2116,7 +2118,9 @@ async function openModifyPage({ row, bookingId, rb, date, pick, drop, time, pax 
 
       // 4️⃣ HTTP 錯誤
       if (!r.ok) {
-        if (isCapacityError) {
+        if (r.status === 503) {
+          showErrorCard(t("busyRetry"));
+        } else if (isCapacityError) {
           showErrorCard(t("overPaxOrMissing"));
         } else {
           showErrorCard(t("updateFailedPrefix") + `HTTP ${r.status}`);
