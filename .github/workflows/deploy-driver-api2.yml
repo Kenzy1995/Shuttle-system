@@ -52,7 +52,8 @@ jobs:
           --memory=1Gi \
           --cpu=1 \
           --max-instances=5 \
-          --timeout=120s
+          --timeout=120s \
+          --set-env-vars FIREBASE_RTDB_URL=${{ secrets.FIREBASE_RTDB_URL }}
 
     - name: Show Service URL
       run: |
