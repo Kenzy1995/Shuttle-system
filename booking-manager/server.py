@@ -519,23 +519,25 @@ def _lock_id_for_capacity(date_iso: str, time_hm: str) -> str:
     return f"cap_{h}"
 
 
-def _acquire_capacity_lock(lock_id: str, timeout_s: int = LOCK_WAIT_SECONDS):
+def _acquire_capacity_lock(lock_id: str, date_iso: str, time_hm: str, timeout_s: int = LOCK_WAIT_SECONDS):
     if not _init_firebase():
         return None
     ref = db.reference(f"/sheet_locks/{lock_id}")
     holder = secrets.token_hex(8)
     start = time.monotonic()
     stale_ms = LOCK_STALE_SECONDS * 1000
+    lock_date = (date_iso or "").strip()
+    lock_time = _time_hm_from_any(time_hm)
 
     while (time.monotonic() - start) < timeout_s:
         now_ms = int(time.time() * 1000)
 
         def txn(current):
             if current is None:
-                return {"holder": holder, "ts": now_ms}
+                return {"holder": holder, "ts": now_ms, "date": lock_date, "time": lock_time}
             cur_ts = int(current.get("ts", 0)) if isinstance(current, dict) else 0
             if cur_ts and (now_ms - cur_ts) > stale_ms:
-                return {"holder": holder, "ts": now_ms}
+                return {"holder": holder, "ts": now_ms, "date": lock_date, "time": lock_time}
             return current
 
         try:
@@ -990,7 +992,7 @@ def ops(req: OpsRequest):
                 p.direction, p.pickLocation, p.dropLocation
             )
             lock_id = _lock_id_for_capacity(p.date, time_hm)
-            lock_holder = _acquire_capacity_lock(lock_id)
+            lock_holder = _acquire_capacity_lock(lock_id, p.date, time_hm)
             if not lock_holder:
                 raise HTTPException(503, "系統繁忙，請稍後再試")
             rem = None
@@ -1206,7 +1208,7 @@ def ops(req: OpsRequest):
             wrote = False
             if consume > 0:
                 lock_id = _lock_id_for_capacity(new_date, new_time)
-                lock_holder = _acquire_capacity_lock(lock_id)
+                lock_holder = _acquire_capacity_lock(lock_id, new_date, new_time)
                 if not lock_holder:
                     raise HTTPException(503, "系統繁忙，請稍後再試")
 
