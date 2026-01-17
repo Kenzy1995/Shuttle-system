@@ -551,9 +551,11 @@ def _acquire_capacity_lock(lock_id: str, date_iso: str, time_hm: str, timeout_s:
     lock_date = (date_iso or "").strip()
     lock_time = _time_hm_from_any(time_hm)
     log.info(f"[cap_lock] wait_start lock_id={lock_id} date={lock_date} time={lock_time}")
+    poll_no = 0
 
     while (time.monotonic() - start) < timeout_s:
         now_ms = int(time.time() * 1000)
+        poll_no += 1
 
         def txn(current):
             if current is None:
@@ -571,8 +573,21 @@ def _acquire_capacity_lock(lock_id: str, date_iso: str, time_hm: str, timeout_s:
                     f"[cap_lock] acquired lock_id={lock_id} holder={holder} waited_ms={waited_ms} date={lock_date} time={lock_time}"
                 )
                 return holder
-        except Exception:
-            pass
+            if isinstance(result, dict):
+                seen_holder = result.get("holder")
+                seen_ts = result.get("ts")
+                seen_date = result.get("date")
+                seen_time = result.get("time")
+                log.info(
+                    f"[cap_lock] poll={poll_no} lock_id={lock_id} seen_holder={seen_holder} seen_ts={seen_ts} "
+                    f"seen_date={seen_date} seen_time={seen_time} now_ms={now_ms} stale_ms={stale_ms}"
+                )
+            else:
+                log.info(f"[cap_lock] poll={poll_no} lock_id={lock_id} seen_non_dict={result} now_ms={now_ms}")
+        except Exception as e:
+            log.warning(
+                f"[cap_lock] poll_error lock_id={lock_id} holder={holder} poll={poll_no} type={type(e).__name__} msg={e}"
+            )
 
         time.sleep(0.2)
 
@@ -596,10 +611,22 @@ def _release_capacity_lock(lock_id: str, holder: str):
         return current
 
     try:
-        ref.transaction(txn)
-    except Exception:
-        pass
-    log.info(f"[cap_lock] released lock_id={lock_id} holder={holder}")
+        result = ref.transaction(txn)
+        now_ms = int(time.time() * 1000)
+        log.info(
+            f"[cap_lock] released lock_id={lock_id} holder={holder} ts={now_ms} txn_result={result}"
+        )
+        try:
+            current = ref.get()
+            log.info(f"[cap_lock] released_state lock_id={lock_id} current={current}")
+        except Exception as e:
+            log.warning(
+                f"[cap_lock] released_state_error lock_id={lock_id} holder={holder} type={type(e).__name__} msg={e}"
+            )
+    except Exception as e:
+        log.warning(
+            f"[cap_lock] release_error lock_id={lock_id} holder={holder} type={type(e).__name__} msg={e}"
+        )
 
 
 def _finalize_capacity_lock(
