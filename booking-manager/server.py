@@ -630,7 +630,9 @@ def _wait_capacity_recalc(
         except Exception as e:
             # Avoid 500 on transient Sheets API errors (e.g. 429 quota)
             last_seen = None
-            log.warning(f"[cap_wait] poll_error={e}")
+            log.warning(
+                f"[cap_wait] poll_error type={type(e).__name__} msg={e} dir={direction} date={date_iso} time={time_hm} station={station}"
+            )
             time.sleep(max(LOCK_POLL_INTERVAL, 5.0))
             continue
         time.sleep(LOCK_POLL_INTERVAL)
