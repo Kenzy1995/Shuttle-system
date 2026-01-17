@@ -416,7 +416,7 @@ function sanitize(s) {
   }[c]));
 }
 
-function showErrorCard(message) {
+function showErrorCard(message, options = {}) {
   const overlay = domCache.get("dialogOverlay");
   const title = domCache.get("dialogTitle");
   const content = domCache.get("dialogContent");
@@ -428,8 +428,13 @@ function showErrorCard(message) {
   content.innerHTML = `<p>${sanitize(message || t("errorGeneric"))}</p>`;
   cancelBtn.style.display = "none";
   confirmBtn.disabled = false;
-  confirmBtn.textContent = t("ok");
-  confirmBtn.onclick = () => overlay.classList.remove("show");
+  confirmBtn.textContent = options.confirmText || t("ok");
+  confirmBtn.onclick = () => {
+    overlay.classList.remove("show");
+    if (typeof options.onConfirm === "function") {
+      options.onConfirm();
+    }
+  };
   overlay.classList.add("show");
 }
 
@@ -1186,7 +1191,10 @@ async function submitBooking() {
       if (res.status === 503) {
         showErrorCard(t("busyRetry"));
       } else if (isCapacityError) {
-        showErrorCard(t("overPaxOrMissing"));
+        showErrorCard(t("overPaxOrMissing"), {
+          confirmText: t("backToHome"),
+          onConfirm: () => restart()
+        });
       } else {
         showErrorCard(t("submitFailedPrefix") + `HTTP ${res.status}`);
       }
@@ -1196,7 +1204,10 @@ async function submitBooking() {
 
     if (!result || result.status !== "success") {
       if (isCapacityError) {
-        showErrorCard(t("overPaxOrMissing"));
+        showErrorCard(t("overPaxOrMissing"), {
+          confirmText: t("backToHome"),
+          onConfirm: () => restart()
+        });
       } else {
         showErrorCard(
           (result && (result.detail || result.message)) || t("errorGeneric")
@@ -1236,7 +1247,10 @@ async function submitBooking() {
         errMsg.includes("capacity_header_missing") ||
         errMsg.includes("capacity_not_numeric"));
     if (maybeCapacity) {
-      showErrorCard(t("overPaxOrMissing"));
+      showErrorCard(t("overPaxOrMissing"), {
+        confirmText: t("backToHome"),
+        onConfirm: () => restart()
+      });
     } else {
       showErrorCard(t("submitFailedPrefix") + (err.message || ""));
     }
