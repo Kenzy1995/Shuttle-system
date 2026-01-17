@@ -6,6 +6,7 @@ gspread>=5.7
 google-auth>=2.23
 google-auth-httplib2>=0.2.0
 google-api-python-client>=2.124.0
+firebase-admin>=6.4
 
 pydantic>=2.6
 pydantic-core>=2.16
