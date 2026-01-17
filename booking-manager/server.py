@@ -974,6 +974,74 @@ def ops(req: OpsRequest):
     data = req.data or {}
     log.info(f"OPS action={action} payload={data}")
     try:
+        # ===== 查詢（使用快取，不需要開啟主表 Worksheet） =====
+        if action == "query":
+            p = QueryPayload(**data)
+            if not (p.booking_id or p.phone or p.email):
+                raise HTTPException(400, "至少提供 booking_id / phone / email 其中一項")
+            # 使用快取機制，減少 Google Sheets API 調用
+            all_values, hmap = _get_sheet_data_main()
+            if not all_values:
+                return []
+            def get(row: List[str], key: str) -> str:
+                return row[hmap[key] - 1] if key in hmap and len(row) >= hmap[key] else ""
+            now = datetime.now()
+            one_month_ago = now - timedelta(days=31)
+            results: List[Dict[str, str]] = []
+            for row in all_values[HEADER_ROW_MAIN:]:
+                # Always derive date/time from unified 車次-日期時間 column if available
+                car_dt_str = get(row, "車次-日期時間")
+                date_iso: str = ""
+                time_hm: str = ""
+                if car_dt_str:
+                    try:
+                        parts = car_dt_str.strip().split()
+                        if parts:
+                            date_iso = parts[0].replace("/", "-")
+                            if len(parts) > 1:
+                                time_hm = _time_hm_from_any(parts[1])
+                        else:
+                            date_iso = ""
+                    except Exception:
+                        # fallback to legacy columns
+                        date_iso = get(row, "日期")
+                        time_hm = _time_hm_from_any(get(row, "班次"))
+                else:
+                    date_iso = get(row, "日期")
+                    time_hm = _time_hm_from_any(get(row, "班次"))
+                # parse date to filter range; if invalid, use current time to avoid filtering out
+                try:
+                    d = datetime.strptime(date_iso, "%Y-%m-%d")
+                except Exception:
+                    d = now
+                if d < one_month_ago:
+                    continue
+                # filter by id/phone/email
+                if p.booking_id and p.booking_id != get(row, "預約編號"):
+                    continue
+                if p.phone and p.phone != get(row, "手機"):
+                    continue
+                # 信箱查詢使用大小寫不敏感比較
+                if p.email:
+                    row_email = get(row, "信箱").strip().lower()
+                    query_email = p.email.strip().lower()
+                    if query_email != row_email:
+                        continue
+                rec = {k: get(row, k) for k in hmap}
+                # override date/time fields with values derived from 車次-日期時間
+                if date_iso:
+                    rec["日期"] = date_iso
+                if time_hm:
+                    rec["班次"] = time_hm
+                    # update 車次欄以新的顯示格式
+                    rec["車次"] = _display_trip_str(date_iso, time_hm)
+                # 如果櫃檯審核為 n 則將預約狀態標為「已拒絕」
+                if rec.get("櫃台審核", "").lower() == "n":
+                    rec["預約狀態"] = "已拒絕"
+                results.append(rec)
+            log.info(f"query results count={len(results)}")
+            return results
+
         ws_main = open_ws(SHEET_NAME_MAIN)
         hmap = header_map_main(ws_main)
         headers = _sheet_headers(ws_main, HEADER_ROW_MAIN)
@@ -987,10 +1055,24 @@ def ops(req: OpsRequest):
                 else:
                     row_arr[hmap[col] - 1] = str(v)
 
+        row_cache: Dict[int, List[str]] = {}
+
+        def _get_row_values(rowno: int) -> List[str]:
+            if rowno not in row_cache:
+                try:
+                    row_cache[rowno] = ws_main.row_values(rowno) or []
+                except Exception:
+                    row_cache[rowno] = []
+            return row_cache[rowno]
+
         def get_by_rowno(rowno: int, key: str) -> str:
             if key not in hmap:
                 return ""
-            return ws_main.cell(rowno, hmap[key]).value or ""
+            row = _get_row_values(rowno)
+            idx = hmap[key] - 1
+            if idx < 0 or idx >= len(row):
+                return ""
+            return row[idx] or ""
 
         # ===== 新增預約 =====
         if action == "book":
@@ -1075,74 +1157,6 @@ def ops(req: OpsRequest):
             return response_data
 
 
-        # ===== 查詢 =====
-        elif action == "query":
-            p = QueryPayload(**data)
-            if not (p.booking_id or p.phone or p.email):
-                raise HTTPException(400, "至少提供 booking_id / phone / email 其中一項")
-            # 使用快取機制，減少 Google Sheets API 調用
-            all_values, hmap = _get_sheet_data_main()
-            if not all_values:
-                return []
-            def get(row: List[str], key: str) -> str:
-                return row[hmap[key] - 1] if key in hmap and len(row) >= hmap[key] else ""
-            now = datetime.now()
-            one_month_ago = now - timedelta(days=31)
-            results: List[Dict[str, str]] = []
-            for row in all_values[HEADER_ROW_MAIN:]:
-                # Always derive date/time from unified 車次-日期時間 column if available
-                car_dt_str = get(row, "車次-日期時間")
-                date_iso: str = ""
-                time_hm: str = ""
-                if car_dt_str:
-                    try:
-                        parts = car_dt_str.strip().split()
-                        if parts:
-                            date_iso = parts[0].replace("/", "-")
-                            if len(parts) > 1:
-                                time_hm = _time_hm_from_any(parts[1])
-                        else:
-                            date_iso = ""
-                    except Exception:
-                        # fallback to legacy columns
-                        date_iso = get(row, "日期")
-                        time_hm = _time_hm_from_any(get(row, "班次"))
-                else:
-                    date_iso = get(row, "日期")
-                    time_hm = _time_hm_from_any(get(row, "班次"))
-                # parse date to filter range; if invalid, use current time to avoid filtering out
-                try:
-                    d = datetime.strptime(date_iso, "%Y-%m-%d")
-                except Exception:
-                    d = now
-                if d < one_month_ago:
-                    continue
-                # filter by id/phone/email
-                if p.booking_id and p.booking_id != get(row, "預約編號"):
-                    continue
-                if p.phone and p.phone != get(row, "手機"):
-                    continue
-                # 信箱查詢使用大小寫不敏感比較
-                if p.email:
-                    row_email = get(row, "信箱").strip().lower()
-                    query_email = p.email.strip().lower()
-                    if query_email != row_email:
-                        continue
-                rec = {k: get(row, k) for k in hmap}
-                # override date/time fields with values derived from 車次-日期時間
-                if date_iso:
-                    rec["日期"] = date_iso
-                if time_hm:
-                    rec["班次"] = time_hm
-                    # update 車次欄以新的顯示格式
-                    rec["車次"] = _display_trip_str(date_iso, time_hm)
-                # 如果櫃檯審核為 n 則將預約狀態標為「已拒絕」
-                if rec.get("櫃台審核", "").lower() == "n":
-                    rec["預約狀態"] = "已拒絕"
-                results.append(rec)
-            log.info(f"query results count={len(results)}")
-            return results
-
         # ===== 修改 =====
         elif action == "modify":
             p = ModifyPayload(**data)
@@ -1225,14 +1239,15 @@ def ops(req: OpsRequest):
                     raise HTTPException(503, "系統繁忙，請稍後再試")
 
             try:
-                rem = lookup_capacity(new_dir, new_date, new_time, station_for_cap_new)
-                if same_trip:
-                    delta = new_pax - old_pax
-                    if delta > 0 and delta > rem:
-                        raise HTTPException(409, f"capacity_exceeded_delta:{delta}>{rem}")
-                else:
-                    if new_pax > rem:
-                        raise HTTPException(409, f"capacity_exceeded:{new_pax}>{rem}")
+                if consume > 0:
+                    rem = lookup_capacity(new_dir, new_date, new_time, station_for_cap_new)
+                    if same_trip:
+                        delta = new_pax - old_pax
+                        if delta > 0 and delta > rem:
+                            raise HTTPException(409, f"capacity_exceeded_delta:{delta}>{rem}")
+                    else:
+                        if new_pax > rem:
+                            raise HTTPException(409, f"capacity_exceeded:{new_pax}>{rem}")
 
                 # 開始組更新欄位
                 updates: Dict[str, str] = {}
