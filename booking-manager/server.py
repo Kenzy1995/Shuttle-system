@@ -316,18 +316,20 @@ def _find_rows_by_pred(ws: gspread.Worksheet, headers: List[str], start_row: int
 def _generate_booking_id_rtdb(today_iso: str) -> str:
     """
     產生 booking_id（日期 + 序號），使用 Firebase RTDB 交易確保原子性
-    格式：MMDD + 序號（至少 2 位，不足補 0；超過 99 自動擴位）
+    格式：YYMMDD + 序號（至少 2 位，不足補 0；超過 99 自動擴位）
     """
     if not _init_firebase():
         raise RuntimeError("firebase_init_failed")
     date_key = (today_iso or "").strip()
-    # MMDD
+    # YYMMDD
     parts = date_key.split("-")
-    mmdd = ""
+    yymmdd = ""
     if len(parts) == 3:
-        mmdd = f"{int(parts[1]):02d}{int(parts[2]):02d}"
+        yy = int(parts[0]) % 100
+        yymmdd = f"{yy:02d}{int(parts[1]):02d}{int(parts[2]):02d}"
     else:
-        mmdd = date_key.replace("-", "")[-4:]
+        compact = date_key.replace("-", "")
+        yymmdd = compact[-6:] if len(compact) >= 6 else compact
     ref = db.reference(f"/booking_seq/{date_key}")
 
     def txn(current):
@@ -339,7 +341,7 @@ def _generate_booking_id_rtdb(today_iso: str) -> str:
         seq_int = int(seq or 0)
     except Exception:
         seq_int = 0
-    return f"{mmdd}{seq_int:02d}"
+    return f"{yymmdd}{seq_int:02d}"
 
 
 # ========== 容量檢查 ==========
