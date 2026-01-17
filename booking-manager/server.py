@@ -558,6 +558,7 @@ def _acquire_capacity_lock(lock_id: str, date_iso: str, time_hm: str, timeout_s:
     stale_ms = LOCK_STALE_SECONDS * 1000
     lock_date = (date_iso or "").strip()
     lock_time = _time_hm_from_any(time_hm)
+    log.info(f"[cap_lock] wait_start lock_id={lock_id} date={lock_date} time={lock_time}")
 
     while (time.monotonic() - start) < timeout_s:
         now_ms = int(time.time() * 1000)
@@ -573,12 +574,20 @@ def _acquire_capacity_lock(lock_id: str, date_iso: str, time_hm: str, timeout_s:
         try:
             result = ref.transaction(txn)
             if isinstance(result, dict) and result.get("holder") == holder:
+                waited_ms = int((time.monotonic() - start) * 1000)
+                log.info(
+                    f"[cap_lock] acquired lock_id={lock_id} holder={holder} waited_ms={waited_ms} date={lock_date} time={lock_time}"
+                )
                 return holder
         except Exception:
             pass
 
         time.sleep(0.2)
 
+    waited_ms = int((time.monotonic() - start) * 1000)
+    log.warning(
+        f"[cap_lock] timeout lock_id={lock_id} holder={holder} waited_ms={waited_ms} date={lock_date} time={lock_time}"
+    )
     return None
 
 
@@ -598,6 +607,7 @@ def _release_capacity_lock(lock_id: str, holder: str):
         ref.transaction(txn)
     except Exception:
         pass
+    log.info(f"[cap_lock] released lock_id={lock_id} holder={holder}")
 
 
 def _wait_capacity_recalc(
