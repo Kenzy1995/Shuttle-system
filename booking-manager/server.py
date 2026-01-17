@@ -64,7 +64,7 @@ CACHE_TTL_SECONDS = 5
 # 目標：避免多筆同時預約/修改造成超賣（依日期+班次時間鎖）
 LOCK_WAIT_SECONDS = 60
 LOCK_STALE_SECONDS = 30
-LOCK_POLL_INTERVAL = 2.0
+LOCK_POLL_INTERVAL = 3.0
 
 # SHEET_CACHE 結構：
 # {
@@ -369,6 +369,10 @@ def _cap_header_map(values: List[List[str]]) -> Tuple[Dict[str,int], int]:
             m[name] = idx
     return m, hdr_row
 
+def _col_letter(col_idx: int) -> str:
+    # gspread utils: rowcol_to_a1(1, col) -> "A1"
+    return gspread.utils.rowcol_to_a1(1, col_idx).replace("1", "")
+
 def _normalize_text(s: str) -> str:
     return " ".join((s or "").replace("　"," ").split())
 
@@ -402,18 +406,44 @@ def _get_cap_sheet_data() -> Tuple[List[List[str]], Dict[str, int], int]:
             # 使用快取
             return cached_values, cached_hmap, cached_hdr_row
 
-        # 重新讀取 Sheet
+        # 重新讀取 Sheet（只讀必要範圍）
         ws_cap = open_ws(SHEET_NAME_CAP)
-        values = _read_all_rows(ws_cap)
-        m, hdr_row = _cap_header_map(values)
+        try:
+            # 先讀取前 10 列的標題範圍（避免整張表）
+            head_chunk = ws_cap.get("A1:AZ10")
+            hdr_row = _find_cap_header_row(head_chunk)
+            headers = [c.strip() for c in (head_chunk[hdr_row - 1] if len(head_chunk) >= hdr_row else [])]
+            m_full: Dict[str, int] = {}
+            for idx, name in enumerate(headers, start=1):
+                if name in CAP_REQ_HEADERS and name not in m_full:
+                    m_full[name] = idx
+
+            # 如果必要欄位不齊，fallback 讀整張表
+            if any(key not in m_full for key in CAP_REQ_HEADERS):
+                raise ValueError("cap headers not found in head chunk")
+
+            min_idx = min(m_full[k] for k in CAP_REQ_HEADERS)
+            max_idx = max(m_full[k] for k in CAP_REQ_HEADERS)
+            start_col = _col_letter(min_idx)
+            end_col = _col_letter(max_idx)
+            # 從標題列一路讀到最後一列（僅必要欄位區間）
+            values = ws_cap.get(f"{start_col}{hdr_row}:{end_col}{ws_cap.row_count}")
+
+            shift = min_idx - 1
+            m = {k: (m_full[k] - shift) for k in CAP_REQ_HEADERS}
+            hdr_row_local = 1
+        except Exception:
+            values = _read_all_rows(ws_cap)
+            m, hdr_row = _cap_header_map(values)
+            hdr_row_local = hdr_row
 
         CAP_SHEET_CACHE = {
             "values": values,
             "header_map": m,
-            "hdr_row": hdr_row,
+            "hdr_row": hdr_row_local,
             "fetched_at": now,
         }
-        return values, m, hdr_row
+        return values, m, hdr_row_local
 
 
 def lookup_capacity(direction: str, date_iso: str, time_hm: str, station: str) -> int:
@@ -597,6 +627,12 @@ def _wait_capacity_recalc(
                 return True, last_seen
         except HTTPException:
             last_seen = None
+        except Exception as e:
+            # Avoid 500 on transient Sheets API errors (e.g. 429 quota)
+            last_seen = None
+            log.warning(f"[cap_wait] poll_error={e}")
+            time.sleep(max(LOCK_POLL_INTERVAL, 5.0))
+            continue
         time.sleep(LOCK_POLL_INTERVAL)
     log.warning(
         f"[cap_wait] timeout polls={polls} last_seen={last_seen} expected_max={expected_max}"
