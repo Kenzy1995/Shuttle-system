@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 import urllib.parse
 import secrets  
+
 import qrcode
 import firebase_admin
 from firebase_admin import credentials, db
@@ -579,15 +580,27 @@ def _wait_capacity_recalc(
 ):
     start = time.monotonic()
     last_seen = None
+    polls = 0
+    log.info(
+        f"[cap_wait] start dir={direction} date={date_iso} time={time_hm} station={station} expected_max={expected_max}"
+    )
     while (time.monotonic() - start) < timeout_s:
         _invalidate_cap_sheet_cache()
         try:
             last_seen = lookup_capacity(direction, date_iso, time_hm, station)
+            polls += 1
+            log.info(f"[cap_wait] poll={polls} last_seen={last_seen} expected_max={expected_max}")
             if last_seen <= expected_max:
+                log.info(
+                    f"[cap_wait] done polls={polls} last_seen={last_seen} expected_max={expected_max}"
+                )
                 return True, last_seen
         except HTTPException:
             last_seen = None
         time.sleep(LOCK_POLL_INTERVAL)
+    log.warning(
+        f"[cap_wait] timeout polls={polls} last_seen={last_seen} expected_max={expected_max}"
+    )
     return False, last_seen
 
 def _compose_mail_text(info: Dict[str, str], lang: str, kind: str) -> Tuple[str, str]:
