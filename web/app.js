@@ -3763,6 +3763,33 @@ function initLiveLocation(mount) {
         if (overlayEl) overlayEl.style.display = "none";
         return;
       }
+
+      // 若已結束班次且距離最後班次超過 24 小時，則不顯示歷史
+      let lastTripTooOld = false;
+      if (data.last_trip_datetime) {
+        try {
+          const parts = data.last_trip_datetime.split(' ');
+          if (parts.length >= 2) {
+            const datePart = parts[0].replace(/\//g, '-');
+            const timePart = parts[1];
+            const lastTripTime = new Date(`${datePart}T${timePart}:00`);
+            const now = Date.now();
+            const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+            if (lastTripTime.getTime() < (now - TWENTY_FOUR_HOURS_MS)) {
+              lastTripTooOld = true;
+            }
+          }
+        } catch (e) {
+        }
+      }
+
+      if (lastTripTooOld) {
+        if (infoPanel) infoPanel.style.display = "none";
+        if (noTripOverlay) noTripOverlay.style.display = "flex";
+        if (endedOverlay) endedOverlay.style.display = "none";
+        if (overlayEl) overlayEl.style.display = "none";
+        return;
+      }
       
       // 檢查班次狀態
       // 方案 3：前端過期檢查（額外保障）
