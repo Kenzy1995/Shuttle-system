@@ -42,6 +42,10 @@ jobs:
         docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE }}
 
     - name: Deploy to Cloud Run
+      env:
+        SMTP_USER: ${{ secrets.SMTP_USER }}
+        SMTP_PASS: ${{ secrets.SMTP_PASS }}
+        FIREBASE_RTDB_URL: ${{ secrets.FIREBASE_RTDB_URL }}
       run: |
         gcloud run deploy ${{ env.SERVICE }} \
           --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE }} \
@@ -53,7 +57,7 @@ jobs:
           --cpu=2 \
           --max-instances=10 \
           --timeout=300s \
-          --set-env-vars SMTP_HOST=smtp.gmail.com,SMTP_PORT=587,SMTP_USER=${{ secrets.SMTP_USER }},SMTP_PASS=${{ secrets.SMTP_PASS }},FIREBASE_RTDB_URL=${{ secrets.FIREBASE_RTDB_URL }}
+          --set-env-vars "SMTP_HOST=smtp.gmail.com,SMTP_PORT=587,SMTP_USER=$SMTP_USER,SMTP_PASS=$SMTP_PASS,FIREBASE_RTDB_URL=$FIREBASE_RTDB_URL"
 
     - name: Show Service URL
       run: |
