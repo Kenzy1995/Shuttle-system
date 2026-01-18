@@ -216,7 +216,7 @@ function handleScroll() {
     scrollThreshold = window.innerHeight || document.documentElement.clientHeight || 300;
   }
   
-  const shouldShow = y > scrollThreshold;
+  const shouldShow = isMobile ? true : y > scrollThreshold;
   
   // 強制更新 display 狀態，確保手機版也能正確觸發
   // 直接操作 style.display，確保樣式優先級最高
@@ -1039,16 +1039,7 @@ function bookingSlotsRenderTable() {
             <table>
               <thead>
                 <tr>
-                  <th class="time-col" rowspan="2">${t("labelScheduleOnly")}</th>
-                  ${colCount > 0 ? `
-                  <th class="direction" colspan="${colCount}">
-                    <div class="direction-header">
-                      <span class="direction-badge">${directionKey === "outbound" ? t("dirOutShort") : t("dirInShort")}</span>
-                    </div>
-                  </th>
-                  ` : ""}
-                </tr>
-                <tr>
+                  <th class="time-col">${t("labelScheduleOnly")}</th>
                   ${showOutbound || showInbound ? `
                   ${showMrt ? `<th class="station">${t("stationMrtLong")}</th>` : ""}
                   ${showTrain ? `<th class="station">${t("stationTrainLong")}</th>` : ""}
