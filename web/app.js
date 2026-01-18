@@ -764,6 +764,11 @@ function toStep2() {
     showErrorCard(t("labelDirection"));
     return;
   }
+  const step2Title = getElement("step2TitleText");
+  if (step2Title) {
+    step2Title.textContent =
+      selectedDirection === "回程" ? t("step2TitleInbound") : t("step2TitleOutbound");
+  }
   bookingSlotsLoadData();
   goStep(2);
 }
@@ -847,6 +852,11 @@ function bookingSlotsLoadData() {
   }
 
   const directionKey = bookingSlotsGetDirectionKey();
+  const step2Title = getElement("step2TitleText");
+  if (step2Title) {
+    step2Title.textContent =
+      directionKey === "inbound" ? t("step2TitleInbound") : t("step2TitleOutbound");
+  }
   const rows = allRows.filter(
     (r) => String(r["去程 / 回程"]).trim() === selectedDirection
   );
@@ -930,12 +940,7 @@ function bookingSlotsFilterByDate() {
 
 function bookingSlotsFilterByDirection(direction) {
   const directionKey = bookingSlotsGetDirectionKey();
-  if (direction !== directionKey) {
-    bookingSlotsUpdateFilterButtons("direction", directionKey);
-    return;
-  }
-  bookingSlotsData.currentFilter.direction = direction;
-  bookingSlotsUpdateFilterButtons("direction", direction);
+  bookingSlotsData.currentFilter.direction = directionKey;
   bookingSlotsApplyFilters();
 }
 
@@ -1045,9 +1050,9 @@ function bookingSlotsRenderTable() {
                 </tr>
                 <tr>
                   ${showOutbound || showInbound ? `
-                  ${showMrt ? `<th class="station">${t("stationMrt")}</th>` : ""}
-                  ${showTrain ? `<th class="station">${t("stationTrain")}</th>` : ""}
-                  ${showLala ? `<th class="station">${t("stationLala")}</th>` : ""}
+                  ${showMrt ? `<th class="station">${t("stationMrtLong")}</th>` : ""}
+                  ${showTrain ? `<th class="station">${t("stationTrainLong")}</th>` : ""}
+                  ${showLala ? `<th class="station">${t("stationLalaLong")}</th>` : ""}
                   ` : ""}
                 </tr>
               </thead>
