@@ -41,6 +41,9 @@ let marqueeData = {
 };
 let marqueeClosed = false;
 
+// 是否啟用入住/退房/用餐日期（目前先關閉，保留代碼）
+const ENABLE_BOOKING_DATES = false;
+
 // 查詢分頁狀態
 let queryDateList = [];
 let currentQueryDate = "";
@@ -195,13 +198,11 @@ function handleScroll() {
   if (!btn) return;
   
   // 支援多種滾動位置獲取方式，確保手機版也能正常運作
-  // 優先使用 window.scrollY，這是標準的滾動位置 API
-  const y = window.scrollY !== undefined ? window.scrollY : (
-    document.documentElement.scrollTop || 
-    document.body.scrollTop || 
-    window.pageYOffset || 
-    0
-  );
+  // 優先使用 scrollingElement（手機瀏覽器更穩定）
+  const scrollEl = document.scrollingElement || document.documentElement || document.body;
+  const y = (scrollEl && typeof scrollEl.scrollTop === "number")
+    ? scrollEl.scrollTop
+    : (window.scrollY !== undefined ? window.scrollY : window.pageYOffset || 0);
   
   // 手機版使用更小的滾動閾值（因為畫面高度較小）
   const isMobile = window.innerWidth <= 768;
@@ -906,10 +907,20 @@ function onIdentityChange() {
   const roomNumberDiv = getElement("roomNumberDiv");
   const diningDateDiv = getElement("diningDateDiv");
 
-  if (hotelWrapper1) hotelWrapper1.style.display = v === "hotel" ? "block" : "none";
-  if (hotelWrapper2) hotelWrapper2.style.display = v === "hotel" ? "block" : "none";
+  if (hotelWrapper1) hotelWrapper1.style.display = ENABLE_BOOKING_DATES && v === "hotel" ? "block" : "none";
+  if (hotelWrapper2) hotelWrapper2.style.display = ENABLE_BOOKING_DATES && v === "hotel" ? "block" : "none";
   if (roomNumberDiv) roomNumberDiv.style.display = v === "hotel" ? "block" : "none";
-  if (diningDateDiv) diningDateDiv.style.display = v === "dining" ? "block" : "none";
+  if (diningDateDiv) diningDateDiv.style.display = ENABLE_BOOKING_DATES && v === "dining" ? "block" : "none";
+
+  if (!ENABLE_BOOKING_DATES) {
+    const ci = getElement("checkInDate");
+    const co = getElement("checkOutDate");
+    const din = getElement("diningDate");
+    if (ci) ci.value = "";
+    if (co) co.value = "";
+    if (din) din.value = "";
+    return;
+  }
 
   if (v === "hotel") {
     const ci = getElement("checkInDate");
@@ -988,7 +999,7 @@ function validateStep5() {
     const checkOutEl = getElement("checkOutDate");
     const cin = checkInEl ? checkInEl.value : "";
     const cout = checkOutEl ? checkOutEl.value : "";
-    if (!cin || !cout) {
+    if (ENABLE_BOOKING_DATES && (!cin || !cout)) {
       showErrorCard(t("labelCheckIn") + "/" + t("labelCheckOut"));
       if (checkInEl) shake(checkInEl);
       if (checkOutEl) shake(checkOutEl);
@@ -1008,7 +1019,7 @@ function validateStep5() {
   } else {
     const diningDateEl = getElement("diningDate");
     const din = diningDateEl ? diningDateEl.value : "";
-    if (!din) {
+    if (ENABLE_BOOKING_DATES && !din) {
       showErrorCard(t("labelDiningDate"));
       if (diningDateEl) shake(diningDateEl);
       return false;
