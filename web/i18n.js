@@ -786,6 +786,16 @@ function onLanguageChange(lang) {
     renderScheduleResults();
   }
 
+  // ✅ 預約班次列表：語言切換時重新渲染表格標題/站點
+  if (
+    typeof bookingSlotsRenderTable === "function" &&
+    window.bookingSlotsData &&
+    bookingSlotsData.filteredTimeSlots &&
+    bookingSlotsData.filteredTimeSlots.length
+  ) {
+    bookingSlotsRenderTable();
+  }
+
   // ✅ 跑馬燈：語言切換時重新渲染一次（如果有文案）
   if (typeof showMarquee === "function" && marqueeData.isLoaded) {
     showMarquee();
