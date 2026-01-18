@@ -427,6 +427,12 @@
       border-radius: 0;
       box-shadow: var(--shadow);
     }
+    #bookingTimeSlots .booking-hint {
+      padding: 0 16px 8px;
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.6;
+    }
     #bookingTimeSlots .filter-section {
       display: flex;
       flex-wrap: wrap;
@@ -446,10 +452,11 @@
       letter-spacing: 0.5px;
     }
     #bookingTimeSlots .filter-select {
-      padding: 8px 12px;
+      appearance: none;
+      padding: 8px 32px 8px 12px;
       border: 1px solid #ddd;
       border-radius: 10px;
-      background: #fff;
+      background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="10" viewBox="0 0 24 24" fill="none" stroke="%23666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>') no-repeat right 10px center/14px;
       color: var(--text);
       font-size: 14px;
       font-weight: 700;
@@ -541,7 +548,9 @@
       font-size: 13px;
       color: var(--text);
       border-bottom: 2px solid #e7e7e7;
+      border-right: 1px solid #eee;
     }
+    #bookingTimeSlots th:last-child { border-right: none; }
     #bookingTimeSlots th.time-col {
       width: 90px;
     }
@@ -558,11 +567,13 @@
     #bookingTimeSlots td {
       padding: 8px 10px;
       border-bottom: 1px solid #eee;
+      border-right: 1px solid #eee;
       font-size: 13px;
       vertical-align: middle;
       text-align: center;
       color: var(--text);
     }
+    #bookingTimeSlots td:last-child { border-right: none; }
     #bookingTimeSlots td.station-cell {
       text-align: center;
       font-weight: 800;
@@ -579,16 +590,24 @@
       text-align: center;
       border: none;
       cursor: pointer;
+      transition: transform 0.06s ease, box-shadow 0.2s ease, filter 0.2s ease;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.12);
     }
+    #bookingTimeSlots .station-value:active { transform: scale(0.96); }
+    #bookingTimeSlots .station-value:focus-visible { outline: 2px solid #111; outline-offset: 2px; }
     #bookingTimeSlots .station-value.unavailable {
       background: #ef4444;
       color: #fff;
       cursor: not-allowed;
+      min-width: 56px;
+      font-size: 13px;
     }
     #bookingTimeSlots .station-value.soldout {
       background: #9e9e9e;
       color: #fff;
       cursor: not-allowed;
+      min-width: 56px;
+      font-size: 13px;
     }
     #bookingTimeSlots .direction-badge {
       padding: 4px 10px;
@@ -717,7 +736,7 @@
     <!-- Step 2：班次/站點 -->
     <section id="step2" class="card wizard-fixed" style="display:none">
       <h2 id="step2TitleText" data-i18n="step2TitleOutbound">去程選擇班次</h2>
-      <div class="hint">
+      <div class="booking-hint">
         <div data-i18n="boardingStationHint">1.上車站點:福泰大飯店 Forte Hotel</div>
         <div style="color:#b00020;font-weight:800" data-i18n="selectDropoffHint">2.請選擇下車站點</div>
       </div>
@@ -734,9 +753,9 @@
               <label class="filter-label" data-i18n="filterStationLabel">站點 / STATION</label>
               <div class="filter-buttons">
                 <button class="filter-btn" data-filter="all" data-filter-type="station" onclick="bookingSlotsFilterByStation('all')" data-i18n="all">全部</button>
-                <button class="filter-btn" data-filter="mrt" data-filter-type="station" onclick="bookingSlotsFilterByStation('mrt')" data-i18n="stationMrt">捷運站</button>
-                <button class="filter-btn" data-filter="train" data-filter-type="station" onclick="bookingSlotsFilterByStation('train')" data-i18n="stationTrain">火車站</button>
-                <button class="filter-btn" data-filter="lala" data-filter-type="station" onclick="bookingSlotsFilterByStation('lala')" data-i18n="stationLala">LaLaport</button>
+                <button class="filter-btn" data-filter="mrt" data-filter-type="station" onclick="bookingSlotsFilterByStation('mrt')" data-i18n="stationMrtLong">南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3</button>
+                <button class="filter-btn" data-filter="train" data-filter-type="station" onclick="bookingSlotsFilterByStation('train')" data-i18n="stationTrainLong">南港火車站 Nangang Train Station</button>
+                <button class="filter-btn" data-filter="lala" data-filter-type="station" onclick="bookingSlotsFilterByStation('lala')" data-i18n="stationLalaLong">LaLaport Shopping Park</button>
               </div>
             </div>
           </div>
@@ -764,10 +783,8 @@
         <div class="field"><label class="label" data-i18n="labelPick">上車站點</label><input id="cf_pick" class="readonly" readonly/></div>
         <div class="field"><label class="label" data-i18n="labelDrop">下車站點</label><input id="cf_drop" class="readonly" readonly/></div>
         <div class="field"><label class="label" data-i18n="labelScheduleOnly">班次</label><input id="cf_time" class="readonly" readonly/></div>
-        <div class="field"><label class="label" data-i18n="labelName">姓名</label><input id="cf_name" class="readonly" readonly/></div>
       </div>
       <div style="height:12px"></div>
-      <h3 style="margin:0 0 10px;font-size:16px;font-weight:800;text-align:left" data-i18n="step5Title">旅客資料填寫</h3>
       <div class="field">
         <label class="label" data-i18n="labelIdentity">請選擇您的身分<span style="color:#b00020">*</span></label>
         <select id="identitySelect" class="select" onchange="onIdentityChange()">
