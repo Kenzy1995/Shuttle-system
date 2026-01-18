@@ -417,7 +417,7 @@
   <div id="initialLoading" class="overlay show">
     <div>
       <div class="spinner"></div>
-      <div style="text-align:center;color:var(--primary);font-weight:700;font-size:18px">Loading...</div>
+      <div style="text-align:center;color:var(--primary);font-weight:700;font-size:18px" data-i18n="loading">資料讀取中…</div>
     </div>
   </div>
 
@@ -443,7 +443,7 @@
 
     <div class="nav-right">
       <div class="lang-wrap">
-        <span>Language</span>
+        <span data-i18n="languageLabel">Language</span>
         <select id="languageSelect" onchange="onLanguageChange(this.value)">
           <option value="zh" selected>🇹🇼 中文</option>
           <option value="en">🇺🇸 English</option>
@@ -465,7 +465,7 @@
   </nav>
 
   <!-- 回到頂端 -->
-  <button id="backToTop" title="Back to top" onclick="scrollToTop()">↑</button>
+  <button id="backToTop" title="Back to top" data-i18n-title="backToTopTitle" onclick="scrollToTop()">↑</button>
 
   <!-- 預約流程 -->
   <main id="reservation" class="page active">
@@ -626,10 +626,10 @@
           <div style="display:flex;align-items:center;gap:8px;">
             <div class="status-pill status-booked" id="successStatusPill" style="position:relative;left:0;top:0;">✔️ 已預約</div>
           </div>
-          <button class="ticket-close" onclick="closeTicketToHome()" aria-label="close" style="position:relative;right:0;top:0;">✕</button>
+          <button class="ticket-close" onclick="closeTicketToHome()" aria-label="close" data-i18n-aria-label="closeLabel" style="position:relative;right:0;top:0;">✕</button>
         </div>
         <div class="ticket-header">
-          <h2 id="ticketHeaderTitle">接駁車票</h2>
+          <h2 id="ticketHeaderTitle" data-i18n="ticketTitle">接駁車票</h2>
         </div>
         <div class="ticket-content">
           <div class="ticket-qr"><img id="ticketQrImg" src="" alt="QR Code"/></div>
@@ -686,7 +686,7 @@
     <!-- 查詢後：票卡頁 -->
     <div id="checkTicketStep" class="card wizard-fixed ticket-page" style="display:none">
       <div style="position:relative">
-        <button class="ticket-close" onclick="closeCheckTicket()" aria-label="close">✕</button>
+        <button class="ticket-close" onclick="closeCheckTicket()" aria-label="close" data-i18n-aria-label="closeLabel">✕</button>
         <div class="ticket-header">
           <h2 data-i18n="ticketTitle">接駁車票</h2>
         </div>
