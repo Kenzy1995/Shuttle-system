@@ -3,6 +3,24 @@ const TEXTS = {
   zh: {
     confirm: "確定",
     cancel: "取消",
+    languageLabel: "語言",
+    backToTopTitle: "回到頂端",
+    closeLabel: "關閉",
+    soldOut: "已額滿",
+    noScheduleData: "目前暫無可預約班次",
+    ticketNotFound: "找不到票卡",
+    downloadFailedPrefix: "下載失敗：",
+    serverResponseParseFailed: "無法解析伺服器回應",
+    serverResponseFormatError: "伺服器回應格式錯誤",
+    missingMapKey: "缺少地圖 key",
+    domToImageNotFound: "找不到轉圖元件",
+    rtStatusFailed: "連線失敗",
+    rtStatusParseError: "資料解析錯誤",
+    rtStatusError: "錯誤",
+    rtStatusUpdateFailed: "更新失敗",
+    mapsLoadFailed: "Google Maps API 載入失敗",
+    mapsInitTimeout: "Google Maps API 初始化超時",
+    mapsNotReady: "Google Maps API 尚未完全載入",
     title: "飯店服務-免費接駁車預約",
     brand: "飯店服務",
     navReservation: "立即預約",
@@ -87,19 +105,21 @@ const TEXTS = {
     phoneHint: "請輸入正確的手機號碼（可填寫非台灣手機號碼）",
 
     // 停靠站點
-    stopsInfoTitle: "接駁車資訊",
+    stopsInfoTitle: "接駁車資訊 / Shuttle Info",
     stopsInfoText: `<p><strong>※房客、用餐客人可享免費預約接駁，非房客或用餐客人預約接駁須收費每位NT$200/單趟，每趟次可搭乘19名旅客，座位有限，約滿為止。</strong></p>
-                    <p><strong>※本飯店保有彈性調整發車時段，發車與否及車輛型式之權利。 車種介紹： 依預約人數安排白色20人中巴(車牌PAB-311)或鐵灰 色福斯九人座(車牌BLD-0361)</strong></p>`,
+                    <p><strong>※本飯店保有彈性調整發車時段，發車與否及車輛型式之權利。車種介紹：依預約人數安排白色20人中巴(車牌PAB-311)或鐵灰色福斯九人座(車牌BLD-0361)</strong></p>
+                    <p><strong>※ Hotel and dining guests ride free with reservation. Non-guests will be charged NT$200 per person per one-way ride. Max 19 passengers per trip; seats are limited.</strong></p>
+                    <p><strong>※ We may adjust departure times and vehicle type. Vehicles: 20-seat white minibus (PAB-311) or 9-seat grey Volkswagen (BLD-0361), depending on reservations.</strong></p>`,
     stopHotelTitle: "福泰大飯店發車-側門出口 / Forte Hotel Xizhi Departure - Side Entrance",
     stopMRTTitle: "南港展覽館捷運站-3號出口 / Nangang Exhibition Center - MRT Exit 3",
     stopTrainTitle: "南港火車站 / Nangang Train Station",
-    stopLalaTitle: "LaLaport Shopping Park",
-    stopMRTDesc: "捷運南港展覽館 3 號出口 - 汽機車臨停接送區。",
-    stopMRTDesc2: "停靠時間：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
-    stopTrainDesc: "南港火車站靠興中路一側上下客點(南港車站東側臨停接送區)",
-    stopTrainDesc2: "停靠時間:08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
-    stopLalaDesc: "南港展覽館1號出口大客車臨停區/小客車臨停區(視車種有不同停靠區)",
-    stopLalaDesc2: "停靠時間：12:15 / 14:45 / 17:20 / 18:50 / 21:15",
+    stopLalaTitle: "LaLaport 購物園區 / LaLaport Shopping Park",
+    stopMRTDesc: "捷運南港展覽館 3 號出口 - 汽機車臨停接送區。MRT Nangang Exhibition Center Exit 3 — Motor Vehicle Pick-up and Drop-off Area.",
+    stopMRTDesc2: "停靠時間：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05 / Stop Times: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+    stopTrainDesc: "南港火車站靠興中路一側上下客點（南港車站東側臨停接送區）。Nangang Station, Xingzhong Rd. side (East-side temporary pick-up/drop-off area).",
+    stopTrainDesc2: "停靠時間：08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10 / Stop Times: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+    stopLalaDesc: "南港展覽館 1 號出口大客車臨停區 / 小客車臨停區（視車種有不同停靠區）。Nangang Exhibition Hall Exit 1 (bus/van temporary stops vary by vehicle).",
+    stopLalaDesc2: "停靠時間：12:15 / 14:45 / 17:20 / 18:50 / 21:15 / Stop Times: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
 
     // 對話框
     errorTitle: "提交失敗",
@@ -127,6 +147,24 @@ const TEXTS = {
     rtTripEnded: "班次: {datetime} 已結束"
   },
   en: {
+    languageLabel: "Language",
+    backToTopTitle: "Back to top",
+    closeLabel: "Close",
+    soldOut: "Sold out",
+    noScheduleData: "No available schedules at the moment",
+    ticketNotFound: "Ticket not found",
+    downloadFailedPrefix: "Download failed: ",
+    serverResponseParseFailed: "Failed to parse server response",
+    serverResponseFormatError: "Invalid server response format",
+    missingMapKey: "Missing map key",
+    domToImageNotFound: "Image export not available",
+    rtStatusFailed: "Connection failed",
+    rtStatusParseError: "Parse error",
+    rtStatusError: "Error",
+    rtStatusUpdateFailed: "Update failed",
+    mapsLoadFailed: "Google Maps API failed to load",
+    mapsInitTimeout: "Google Maps API init timed out",
+    mapsNotReady: "Google Maps API not ready",
     title: "Hotel Service - Free Shuttle Booking",
     brand: "Hotel Service",
     navReservation: "Book Now",
@@ -142,7 +180,7 @@ const TEXTS = {
     step5Title: "Passenger Details",
     step6Title: "Confirm Trip",
     labelDirection: "Select direction",
-    directionHint: "Outbound departs hotel. Inbound ends at hotel.",
+    directionHint: "Departure starts from the hotel. Return ends at the hotel.",
     labelDate: "Select date",
     labelFixedStation: "Fixed Stop",
     labelStation: "Select stop",
@@ -202,23 +240,25 @@ const TEXTS = {
     dateCountSuffix: " booking(s)",
     scheduleTitle: "Find Available Schedules",
     noSchedules: "No matching schedules",
-    dirOutLabel: "Outbound (from hotel)",
-    dirInLabel: "Inbound (to hotel)",
+    dirOutLabel: "Departure",
+    dirInLabel: "Return",
     realtimeTitle: "Live location",
     all: "ALL",
-    stopsInfoTitle: "Shuttle Info",
-    stopsInfoText: `<p><strong>※ Hotel and dining guests ride free with reservation. Non-guests will be charged NT$200 per person per one-way ride. Max 19 passengers per trip; seats are limited.</strong></p>
+    stopsInfoTitle: "接駁車資訊 / Shuttle Info",
+    stopsInfoText: `<p><strong>※房客、用餐客人可享免費預約接駁，非房客或用餐客人預約接駁須收費每位NT$200/單趟，每趟次可搭乘19名旅客，座位有限，約滿為止。</strong></p>
+                    <p><strong>※本飯店保有彈性調整發車時段，發車與否及車輛型式之權利。車種介紹：依預約人數安排白色20人中巴(車牌PAB-311)或鐵灰色福斯九人座(車牌BLD-0361)</strong></p>
+                    <p><strong>※ Hotel and dining guests ride free with reservation. Non-guests will be charged NT$200 per person per one-way ride. Max 19 passengers per trip; seats are limited.</strong></p>
                     <p><strong>※ We may adjust departure times and vehicle type. Vehicles: 20-seat white minibus (PAB-311) or 9-seat grey Volkswagen (BLD-0361), depending on reservations.</strong></p>`,
     stopHotelTitle: "福泰大飯店發車-側門出口 / Forte Hotel Xizhi Departure - Side Entrance",
     stopMRTTitle: "南港展覽館捷運站-3號出口 / Nangang Exhibition Center - MRT Exit 3",
     stopTrainTitle: "南港火車站 / Nangang Train Station",
-    stopLalaTitle: "LaLaport Shopping Park",
-    stopMRTDesc: "MRT Nangang Exhibition Center Exit 3 — Motor Vehicle Pick-up and Drop-off Area.",
-    stopMRTDesc2: "Stop Times: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
-    stopTrainDesc: "Nangang Station, Xingzhong Rd. side (East-side temporary pick-up/drop-off area)",
-    stopTrainDesc2: "Stop Times: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
-    stopLalaDesc: "Nangang Exhibition Hall Exit 1 (bus/van temporary stops vary by vehicle)",
-    stopLalaDesc2: "Stop Times: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
+    stopLalaTitle: "LaLaport 購物園區 / LaLaport Shopping Park",
+    stopMRTDesc: "捷運南港展覽館 3 號出口 - 汽機車臨停接送區。MRT Nangang Exhibition Center Exit 3 — Motor Vehicle Pick-up and Drop-off Area.",
+    stopMRTDesc2: "停靠時間：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05 / Stop Times: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+    stopTrainDesc: "南港火車站靠興中路一側上下客點（南港車站東側臨停接送區）。Nangang Station, Xingzhong Rd. side (East-side temporary pick-up/drop-off area).",
+    stopTrainDesc2: "停靠時間：08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10 / Stop Times: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+    stopLalaDesc: "南港展覽館 1 號出口大客車臨停區 / 小客車臨停區（視車種有不同停靠區）。Nangang Exhibition Hall Exit 1 (bus/van temporary stops vary by vehicle).",
+    stopLalaDesc2: "停靠時間：12:15 / 14:45 / 17:20 / 18:50 / 21:15 / Stop Times: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
     errorTitle: "Submission failed",
     errorGeneric: "Operation failed. Please try again later.",
     ok: "OK",
@@ -246,6 +286,24 @@ const TEXTS = {
     rtTripEnded: "Trip: {datetime} ended"
   },
   ja: {
+    languageLabel: "言語",
+    backToTopTitle: "トップへ戻る",
+    closeLabel: "閉じる",
+    soldOut: "満席",
+    noScheduleData: "現在予約可能な便がありません",
+    ticketNotFound: "チケットが見つかりません",
+    downloadFailedPrefix: "ダウンロード失敗：",
+    serverResponseParseFailed: "サーバー応答の解析に失敗しました",
+    serverResponseFormatError: "サーバー応答形式が不正です",
+    missingMapKey: "地図キーが不足しています",
+    domToImageNotFound: "画像の出力機能が利用できません",
+    rtStatusFailed: "接続失敗",
+    rtStatusParseError: "データ解析エラー",
+    rtStatusError: "エラー",
+    rtStatusUpdateFailed: "更新失敗",
+    mapsLoadFailed: "Google Maps API の読み込みに失敗しました",
+    mapsInitTimeout: "Google Maps API の初期化がタイムアウトしました",
+    mapsNotReady: "Google Maps API がまだ完全に読み込まれていません",
     title: "ホテルサービス-無料シャトル予約",
     brand: "ホテルサービス",
     navReservation: "今すぐ予約",
@@ -325,19 +383,21 @@ const TEXTS = {
     dirInLabel: "復路（ホテル行き）",
     realtimeTitle: "リアルタイム位置",
     all: "すべて",
-    stopsInfoTitle: "シャトル案内",
-    stopsInfoText: `<p><strong>※ 宿泊客・レストラン客は予約により無料で乗車できます。非宿泊・非利用の場合は1名片道NT$200を頂戴します。1便最大19名、席数に限りがあります。</strong></p>
-                    <p><strong>※ 出発時刻や車両は変更となる場合があります。予約状況により、白い20人乗りミニバス(PAB-311)または鉄灰色の9人乗りフォルクスワーゲン(BLD-0361)を手配します。</strong></p>`,
-    stopHotelTitle: "フォルテホテル発-側門出口 / Forte Hotel Xizhi Departure - Side Entrance",
-    stopMRTTitle: "南港展示館MRT3番出口 / Nangang Exhibition Center - MRT Exit 3",
-    stopTrainTitle: "南港駅 / Nangang Train Station",
-    stopLalaTitle: "LaLaportショッピングパーク / LaLaport Shopping Park",
-    stopMRTDesc: "MRT南港展示館3番出口 - 車・バイク一時停車送迎エリア。",
-    stopMRTDesc2: "停車時刻：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
-    stopTrainDesc: "南港駅 興中路側の乗降場所（南港駅東側の一時停車送迎エリア）",
-    stopTrainDesc2: "停車時刻：08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
-    stopLalaDesc: "南港展示館1番出口 大型/小型車一時停車エリア（車種により停車位置が異なります）",
-    stopLalaDesc2: "停車時刻：12:15 / 14:45 / 17:20 / 18:50 / 21:15",
+    stopsInfoTitle: "接駁車資訊 / Shuttle Info",
+    stopsInfoText: `<p><strong>※房客、用餐客人可享免費預約接駁，非房客或用餐客人預約接駁須收費每位NT$200/單趟，每趟次可搭乘19名旅客，座位有限，約滿為止。</strong></p>
+                    <p><strong>※本飯店保有彈性調整發車時段，發車與否及車輛型式之權利。車種介紹：依預約人數安排白色20人中巴(車牌PAB-311)或鐵灰色福斯九人座(車牌BLD-0361)</strong></p>
+                    <p><strong>※ Hotel and dining guests ride free with reservation. Non-guests will be charged NT$200 per person per one-way ride. Max 19 passengers per trip; seats are limited.</strong></p>
+                    <p><strong>※ We may adjust departure times and vehicle type. Vehicles: 20-seat white minibus (PAB-311) or 9-seat grey Volkswagen (BLD-0361), depending on reservations.</strong></p>`,
+    stopHotelTitle: "福泰大飯店發車-側門出口 / Forte Hotel Xizhi Departure - Side Entrance",
+    stopMRTTitle: "南港展覽館捷運站-3號出口 / Nangang Exhibition Center - MRT Exit 3",
+    stopTrainTitle: "南港火車站 / Nangang Train Station",
+    stopLalaTitle: "LaLaport 購物園區 / LaLaport Shopping Park",
+    stopMRTDesc: "捷運南港展覽館 3 號出口 - 汽機車臨停接送區。MRT Nangang Exhibition Center Exit 3 — Motor Vehicle Pick-up and Drop-off Area.",
+    stopMRTDesc2: "停靠時間：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05 / Stop Times: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+    stopTrainDesc: "南港火車站靠興中路一側上下客點（南港車站東側臨停接送區）。Nangang Station, Xingzhong Rd. side (East-side temporary pick-up/drop-off area).",
+    stopTrainDesc2: "停靠時間：08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10 / Stop Times: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+    stopLalaDesc: "南港展覽館 1 號出口大客車臨停區 / 小客車臨停區（視車種有不同停靠區）。Nangang Exhibition Hall Exit 1 (bus/van temporary stops vary by vehicle).",
+    stopLalaDesc2: "停靠時間：12:15 / 14:45 / 17:20 / 18:50 / 21:15 / Stop Times: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
     errorTitle: "送信失敗",
     errorGeneric: "操作に失敗しました。しばらくしてからお試しください。",
     ok: "OK",
@@ -365,6 +425,24 @@ const TEXTS = {
     rtTripEnded: "便: {datetime} 終了"
   },
   ko: {
+    languageLabel: "언어",
+    backToTopTitle: "맨 위로",
+    closeLabel: "닫기",
+    soldOut: "매진",
+    noScheduleData: "현재 예약 가능한 편이 없습니다",
+    ticketNotFound: "티켓을 찾을 수 없습니다",
+    downloadFailedPrefix: "다운로드 실패: ",
+    serverResponseParseFailed: "서버 응답을 해석할 수 없습니다",
+    serverResponseFormatError: "서버 응답 형식이 올바르지 않습니다",
+    missingMapKey: "지도 키가 없습니다",
+    domToImageNotFound: "이미지 내보내기를 사용할 수 없습니다",
+    rtStatusFailed: "연결 실패",
+    rtStatusParseError: "데이터 해석 오류",
+    rtStatusError: "오류",
+    rtStatusUpdateFailed: "업데이트 실패",
+    mapsLoadFailed: "Google Maps API 로드 실패",
+    mapsInitTimeout: "Google Maps API 초기화 시간 초과",
+    mapsNotReady: "Google Maps API가 아직 준비되지 않았습니다",
     title: "호텔 서비스-무료 셔틀 예약",
     brand: "호텔 서비스",
     navReservation: "바로 예약",
@@ -444,19 +522,21 @@ const TEXTS = {
     dirInLabel: "오는편(호텔 도착)",
     realtimeTitle: "실시간 위치",
     all: "전체",
-    stopsInfoTitle: "셔틀 정보",
-    stopsInfoText: `<p><strong>※ 숙박/식사 고객은 예약 시 무료 탑승. 비고객은 1인 편도 NT$200. 회당 최대 19명, 좌석 한정.</strong></p>
-                    <p><strong>※ 출발 시간과 차량은 변동될 수 있습니다. 예약 인원에 따라 20인승 백색 미니버스(PAB-311) 또는 9인승 회색 폭스바겐(BLD-0361)을 배차합니다.</strong></p>`,
-    stopHotelTitle: "포르테 호텔 출발 - 측문 출구 / Forte Hotel Xizhi Departure - Side Entrance",
-    stopMRTTitle: "난강 전람관 MRT 3번 출구 / Nangang Exhibition Center - MRT Exit 3",
-    stopTrainTitle: "난강역 / Nangang Train Station",
-    stopLalaTitle: "라라포트 쇼핑파크 / LaLaport Shopping Park",
-    stopMRTDesc: "MRT 난강 전람관 3번 출구 — 차량 임시 승하차 구역.",
-    stopMRTDesc2: "시간: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
-    stopTrainDesc: "난강역 흥중로 측 승하차 (동측 임시 승하차 구역)",
-    stopTrainDesc2: "시간: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
-    stopLalaDesc: "난강 전람관 1번 출구 대형/소형차 임시 정차 구역(차종에 따라 다름)",
-    stopLalaDesc2: "시간: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
+    stopsInfoTitle: "接駁車資訊 / Shuttle Info",
+    stopsInfoText: `<p><strong>※房客、用餐客人可享免費預約接駁，非房客或用餐客人預約接駁須收費每位NT$200/單趟，每趟次可搭乘19名旅客，座位有限，約滿為止。</strong></p>
+                    <p><strong>※本飯店保有彈性調整發車時段，發車與否及車輛型式之權利。車種介紹：依預約人數安排白色20人中巴(車牌PAB-311)或鐵灰色福斯九人座(車牌BLD-0361)</strong></p>
+                    <p><strong>※ Hotel and dining guests ride free with reservation. Non-guests will be charged NT$200 per person per one-way ride. Max 19 passengers per trip; seats are limited.</strong></p>
+                    <p><strong>※ We may adjust departure times and vehicle type. Vehicles: 20-seat white minibus (PAB-311) or 9-seat grey Volkswagen (BLD-0361), depending on reservations.</strong></p>`,
+    stopHotelTitle: "福泰大飯店發車-側門出口 / Forte Hotel Xizhi Departure - Side Entrance",
+    stopMRTTitle: "南港展覽館捷運站-3號出口 / Nangang Exhibition Center - MRT Exit 3",
+    stopTrainTitle: "南港火車站 / Nangang Train Station",
+    stopLalaTitle: "LaLaport 購物園區 / LaLaport Shopping Park",
+    stopMRTDesc: "捷運南港展覽館 3 號出口 - 汽機車臨停接送區。MRT Nangang Exhibition Center Exit 3 — Motor Vehicle Pick-up and Drop-off Area.",
+    stopMRTDesc2: "停靠時間：08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05 / Stop Times: 08:35 / 10:05 / 12:05 / 14:35 / 17:05 / 18:35 / 21:05",
+    stopTrainDesc: "南港火車站靠興中路一側上下客點（南港車站東側臨停接送區）。Nangang Station, Xingzhong Rd. side (East-side temporary pick-up/drop-off area).",
+    stopTrainDesc2: "停靠時間：08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10 / Stop Times: 08:40 / 10:10 / 12:10 / 14:40 / 17:10 / 18:40 / 21:10",
+    stopLalaDesc: "南港展覽館 1 號出口大客車臨停區 / 小客車臨停區（視車種有不同停靠區）。Nangang Exhibition Hall Exit 1 (bus/van temporary stops vary by vehicle).",
+    stopLalaDesc2: "停靠時間：12:15 / 14:45 / 17:20 / 18:50 / 21:15 / Stop Times: 12:15 / 14:45 / 17:20 / 18:50 / 21:15",
     errorTitle: "제출 실패",
     errorGeneric: "작업에 실패했습니다. 잠시 후 다시 시도하세요.",
     ok: "확인",
@@ -562,6 +642,20 @@ function applyI18N() {
     if (v != null) el.innerHTML = v;
   });
 
+  // 支援 title 屬性
+  document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+    const k = el.getAttribute("data-i18n-title");
+    const v = t(k);
+    if (v != null) el.setAttribute("title", v);
+  });
+
+  // 支援 aria-label 屬性
+  document.querySelectorAll("[data-i18n-aria-label]").forEach((el) => {
+    const k = el.getAttribute("data-i18n-aria-label");
+    const v = t(k);
+    if (v != null) el.setAttribute("aria-label", v);
+  });
+
   const pill = document.getElementById("successStatusPill");
   if (pill) pill.textContent = ts("booked");
 }
@@ -587,6 +681,11 @@ function onLanguageChange(lang) {
     typeof buildStep1 === "function"
   ) {
     buildStep1();
+  }
+
+  // ✅ Step 6 / 票卡：語言切換時更新動態內容
+  if (typeof updateStep6I18N === "function") {
+    updateStep6I18N();
   }
 
   // ✅ 班次查詢頁：去程 / 回程 / 其他文字即時更新
