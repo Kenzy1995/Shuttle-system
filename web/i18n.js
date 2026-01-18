@@ -47,6 +47,7 @@ const TEXTS = {
     filterDateLabel: "日期",
     filterDirectionLabel: "方向",
     filterStationLabel: "站點",
+    allStations: "全部站點",
     allDates: "全部班次",
     totalSlotsLabel: "總時段數：",
     dirOutShort: "去程",
@@ -213,6 +214,7 @@ const TEXTS = {
     filterDateLabel: "Date",
     filterDirectionLabel: "Direction",
     filterStationLabel: "Station",
+    allStations: "All stations",
     allDates: "All schedules",
     totalSlotsLabel: "Total slots:",
     dirOutShort: "Departure",
@@ -374,6 +376,7 @@ const TEXTS = {
     filterDateLabel: "日付",
     filterDirectionLabel: "方向",
     filterStationLabel: "停留所",
+    allStations: "全停留所",
     allDates: "全便",
     totalSlotsLabel: "総時段数：",
     dirOutShort: "往路",
@@ -535,6 +538,7 @@ const TEXTS = {
     filterDateLabel: "날짜",
     filterDirectionLabel: "방향",
     filterStationLabel: "정차역",
+    allStations: "전체 정차역",
     allDates: "전체 편",
     totalSlotsLabel: "총 시각 수:",
     dirOutShort: "가는편",
@@ -793,6 +797,9 @@ function onLanguageChange(lang) {
     bookingSlotsData.filteredTimeSlots &&
     bookingSlotsData.filteredTimeSlots.length
   ) {
+    if (typeof bookingSlotsInitStationFilter === "function") {
+      bookingSlotsInitStationFilter();
+    }
     bookingSlotsRenderTable();
   }
 
