@@ -539,9 +539,19 @@
       </div>
     </section>
 
-    <!-- Step 5：旅客資料 -->
-    <section id="step5" class="card wizard-fixed" style="display:none">
-      <h2 data-i18n="step5Title">旅客資料填寫</h2>
+    <!-- Step 5+6：確認與送出（合併） -->
+    <section id="step6" class="card wizard-fixed" style="display:none">
+      <h2 data-i18n="step6Title">確認班次資訊</h2>
+      <div class="grid">
+        <div class="field"><label class="label" data-i18n="labelDirection">方向</label><input id="cf_direction" class="readonly" readonly/></div>
+        <div class="field"><label class="label" data-i18n="labelDate">日期</label><input id="cf_date" class="readonly" readonly/></div>
+        <div class="field"><label class="label" data-i18n="labelPick">上車站點</label><input id="cf_pick" class="readonly" readonly/></div>
+        <div class="field"><label class="label" data-i18n="labelDrop">下車站點</label><input id="cf_drop" class="readonly" readonly/></div>
+        <div class="field"><label class="label" data-i18n="labelScheduleOnly">班次</label><input id="cf_time" class="readonly" readonly/></div>
+        <div class="field"><label class="label" data-i18n="labelName">姓名</label><input id="cf_name" class="readonly" readonly/></div>
+      </div>
+      <div style="height:12px"></div>
+      <h3 style="margin:0 0 10px;font-size:16px;font-weight:800;text-align:left" data-i18n="step5Title">旅客資料填寫</h3>
       <div class="field">
         <label class="label" data-i18n="labelIdentity">請選擇您的身分<span style="color:#b00020">*</span></label>
         <select id="identitySelect" class="select" onchange="onIdentityChange()">
@@ -588,25 +598,6 @@
         <input id="guestEmail" type="email" class="input" placeholder="name@example.com" oninput="validateEmail(this)" onblur="validateEmailOnBlur(this)" />
         <div id="emailErr" class="error" data-i18n="errEmail">請填寫正確的郵箱</div>
       </div>
-
-      <div class="actions">
-        <button class="button btn-ghost" onclick="goStep(4)" data-i18n="back">返回</button>
-        <button class="button btn-ghost" onclick="restart()" data-i18n="requery">重新查詢</button>
-        <button class="button" type="button" onclick="toStep6()" data-i18n="next">下一步</button>
-      </div>
-    </section>
-
-    <!-- Step 6：確認與送出 -->
-    <section id="step6" class="card wizard-fixed" style="display:none">
-      <h2 data-i18n="step6Title">確認班次資訊</h2>
-      <div class="grid">
-        <div class="field"><label class="label" data-i18n="labelDirection">方向</label><input id="cf_direction" class="readonly" readonly/></div>
-        <div class="field"><label class="label" data-i18n="labelDate">日期</label><input id="cf_date" class="readonly" readonly/></div>
-        <div class="field"><label class="label" data-i18n="labelPick">上車站點</label><input id="cf_pick" class="readonly" readonly/></div>
-        <div class="field"><label class="label" data-i18n="labelDrop">下車站點</label><input id="cf_drop" class="readonly" readonly/></div>
-        <div class="field"><label class="label" data-i18n="labelScheduleOnly">班次</label><input id="cf_time" class="readonly" readonly/></div>
-        <div class="field"><label class="label" data-i18n="labelName">姓名</label><input id="cf_name" class="readonly" readonly/></div>
-      </div>
       <div class="field">
         <label class="label" data-i18n="labelPassengers">預約人數（請選擇）<span style="color:#b00020">*</span></label>
         <select id="passengers" class="select"></select>
@@ -614,7 +605,7 @@
         <div id="passengersErr" class="error" data-i18n="errPassengers">請選擇正確的人數（不可超過可預約人數或4人）</div>
       </div>
       <div class="actions row">
-        <button class="button btn-ghost" onclick="goStep(5)" data-i18n="back">返回</button>
+        <button class="button btn-ghost" onclick="goStep(4)" data-i18n="back">返回</button>
         <button class="button" onclick="submitBooking()" data-i18n="submit">提交預約</button>
       </div>
     </section>
