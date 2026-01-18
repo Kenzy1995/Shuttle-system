@@ -414,7 +414,7 @@
     }
     #bookingTimeSlots .filters {
       background: var(--card);
-      padding: 7px 16px;
+      padding: 7px 20px;
       border-bottom: 1px solid #e7e7e7;
       display: flex;
       flex-wrap: wrap;
@@ -428,7 +428,7 @@
       box-shadow: var(--shadow);
     }
     #bookingTimeSlots .booking-hint {
-      padding: 0 16px 8px;
+      padding: 0 20px 8px;
       font-size: 15px;
       font-weight: 800;
       line-height: 1.6;
@@ -735,6 +735,9 @@
 
     <!-- Step 2：班次/站點 -->
     <section id="step2" class="card wizard-fixed" style="display:none">
+      <div style="margin-bottom:12px">
+        <img src="/images/各站點橫幅.png" class="station-info-img" alt="stations banner" />
+      </div>
       <h2 id="step2TitleText" data-i18n="step2TitleOutbound">去程選擇班次</h2>
       <div class="booking-hint">
         <div data-i18n="boardingStationHint">1.上車站點:福泰大飯店 Forte Hotel</div>
@@ -753,9 +756,9 @@
               <label class="filter-label" data-i18n="filterStationLabel">站點 / STATION</label>
               <div class="filter-buttons">
                 <button class="filter-btn" data-filter="all" data-filter-type="station" onclick="bookingSlotsFilterByStation('all')" data-i18n="all">全部</button>
-                <button class="filter-btn" data-filter="mrt" data-filter-type="station" onclick="bookingSlotsFilterByStation('mrt')" data-i18n="stationMrtLong">南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3</button>
-                <button class="filter-btn" data-filter="train" data-filter-type="station" onclick="bookingSlotsFilterByStation('train')" data-i18n="stationTrainLong">南港火車站 Nangang Train Station</button>
-                <button class="filter-btn" data-filter="lala" data-filter-type="station" onclick="bookingSlotsFilterByStation('lala')" data-i18n="stationLalaLong">LaLaport Shopping Park</button>
+                <button class="filter-btn" data-filter="mrt" data-filter-type="station" onclick="bookingSlotsFilterByStation('mrt')" data-i18n="stationMrt">捷運站</button>
+                <button class="filter-btn" data-filter="train" data-filter-type="station" onclick="bookingSlotsFilterByStation('train')" data-i18n="stationTrain">火車站</button>
+                <button class="filter-btn" data-filter="lala" data-filter-type="station" onclick="bookingSlotsFilterByStation('lala')" data-i18n="stationLala">LaLaport</button>
               </div>
             </div>
           </div>
