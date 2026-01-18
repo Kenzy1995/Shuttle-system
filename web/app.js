@@ -709,7 +709,16 @@ function restart() {
   hardResetOverlays();
   const hero = getElement("homeHero");
   if (hero) hero.style.display = "";
-  ["directionList", "dateList", "stationList", "scheduleList"].forEach((id) => {
+  [
+    "directionList",
+    "dateList",
+    "stationList",
+    "scheduleList",
+    "bookingAllFilter",
+    "bookingDateFilter",
+    "bookingStationFilter",
+    "bookingSlotsResults"
+  ].forEach((id) => {
     const el = getElement(id);
     if (el) el.innerHTML = "";
   });
@@ -756,146 +765,157 @@ function toStep2() {
     showErrorCard(t("labelDirection"));
     return;
   }
-  const dateSet = new Set(
-    allRows
-      .filter((r) => String(r["去程 / 回程"]).trim() === selectedDirection)
-      .map((r) => fmtDateLabel(r["日期"]))
-  );
-  const sorted = [...dateSet].sort((a, b) => new Date(a) - new Date(b));
-  const list = getElement("dateList");
-  if (!list) return;
-  list.innerHTML = "";
-  const fragment = document.createDocumentFragment();
-  sorted.forEach((dateStr) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "opt-btn";
-    btn.textContent = dateStr;
-    btn.onclick = () => {
-      selectedDateRaw = dateStr;
-      list.querySelectorAll(".opt-btn").forEach((b) =>
-        b.classList.remove("active")
-      );
-      btn.classList.add("active");
-      toStep3();
-    };
-    fragment.appendChild(btn);
-  });
-  list.appendChild(fragment);
+  buildBookingSlotsData();
   goStep(2);
 }
 
-/* ====== Step 3 ====== */
-function toStep3() {
-  if (!selectedDateRaw) {
-    showErrorCard(t("labelDate"));
-    return;
-  }
-  const fixed = getElement("fixedStation");
-  if (fixed) fixed.value = "福泰大飯店 Forte Hotel";
+/* ====== Step 2：班次/站點列表 ====== */
+let bookingSlotsData = {
+  rows: [],
+  dates: new Set(),
+  stations: new Set(),
+  selectedDate: null,
+  selectedStation: null
+};
 
-  const stations = new Set(
-    allRows
-      .filter(
-        (r) =>
-          String(r["去程 / 回程"]).trim() === selectedDirection &&
-          fmtDateLabel(r["日期"]) === selectedDateRaw
-      )
-      .map((r) => String(r["站點"]).trim())
-  );
-  const list = getElement("stationList");
-  if (!list) return;
-  list.innerHTML = "";
-  const fragment = document.createDocumentFragment();
-  [...stations].forEach((st) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "opt-btn";
-    btn.textContent = st;
-    btn.onclick = () => {
-      selectedStationRaw = st;
-      list.querySelectorAll(".opt-btn").forEach((b) =>
-        b.classList.remove("active")
-      );
-      btn.classList.add("active");
-      toStep4();
-    };
-    fragment.appendChild(btn);
-  });
-  list.appendChild(fragment);
-  goStep(3);
+function buildBookingSlotsData() {
+  const rawRows = allRows
+    .filter((r) => String(r["去程 / 回程"]).trim() === selectedDirection)
+    .map((r) => {
+      const date = fmtDateLabel(r["日期"]);
+      const time = fmtTimeLabel(r["班次"] || r["車次"]);
+      const station = String(r["站點"] || "").trim();
+      const capacityRaw = String(
+        r["可預約人數"] || r["可約人數 / Available"] || ""
+      ).trim();
+      const capacity = Number(onlyDigits(capacityRaw)) || 0;
+      return { date, time, station, capacity };
+    })
+    .filter((r) => r.date && r.time && r.station);
+
+  bookingSlotsData.rows = rawRows;
+  bookingSlotsData.dates = new Set(rawRows.map((r) => r.date));
+  bookingSlotsData.stations = new Set(rawRows.map((r) => r.station));
+  bookingSlotsData.selectedDate = null;
+  bookingSlotsData.selectedStation = null;
+
+  renderBookingSlotFilters();
+  renderBookingSlotResults();
 }
 
-/* ====== Step 4 ====== */
-function toStep4() {
-  if (!selectedStationRaw) {
-    showErrorCard(t("labelStation"));
-    return;
-  }
-  const list = getElement("scheduleList");
-  if (!list) return;
-  list.innerHTML = "";
-  const entries = allRows
-    .filter(
-      (r) =>
-        String(r["去程 / 回程"]).trim() === selectedDirection &&
-        fmtDateLabel(r["日期"]) === selectedDateRaw &&
-        String(r["站點"]).trim() === selectedStationRaw
-    )
-    .sort((a, b) =>
-      fmtTimeLabel(a["班次"]).localeCompare(fmtTimeLabel(b["班次"]))
-    );
+function renderBookingSlotFilters() {
+  const allWrap = getElement("bookingAllFilter");
+  if (!allWrap) return;
+  allWrap.innerHTML = "";
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.className = "filter-pill";
+  allBtn.textContent = t("all");
+  allBtn.onclick = () => {
+    bookingSlotsData.selectedDate = null;
+    bookingSlotsData.selectedStation = null;
+    renderBookingSlotFilters();
+    renderBookingSlotResults();
+  };
+  allWrap.appendChild(allBtn);
 
-  if (entries.length === 0) {
-    showExpiredOverlay(true);
-    return;
-  }
-
-  const fragment = document.createDocumentFragment();
-  entries.forEach((r) => {
-    const time = fmtTimeLabel(r["班次"] || r["車次"]);
-    const availText = String(
-      r["可預約人數"] || r["可約人數 / Available"] || ""
-    ).trim();
-    const avail = Number(onlyDigits(availText)) || 0;
-
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "opt-btn";
-
-    if (avail <= 0) {
-      btn.classList.add("disabled");
-      btn.innerHTML = `
-        <span style="color:#999;font-weight:700">${time}</span>
-        <span style="color:#999;font-size:13px">(${t("soldOut")})</span>
-      `;
-    } else {
-      const texts = TEXTS[currentLang] || TEXTS.zh;
-      const prefix = texts.paxHintPrefix || "";
-      const suffix = texts.paxHintSuffix || "";
-
-      const paxText = `${prefix}${avail}${suffix}`;
-
-      btn.innerHTML = `
-        <span style="color:var(--primary);font-weight:700">${time}</span>
-        <span style="color:#777;font-size:13px">(${paxText})</span>
-      `;
-
-      btn.onclick = () => {
-        selectedScheduleTime = time;
-        selectedAvailableSeats = avail;
-        list.querySelectorAll(".opt-btn").forEach((b) =>
-          b.classList.remove("active")
-        );
-        btn.classList.add("active");
-        toStep6();
-      };
+  renderFilterPills(
+    "bookingDateFilter",
+    [...bookingSlotsData.dates],
+    bookingSlotsData.selectedDate,
+    (date) => {
+      bookingSlotsData.selectedDate =
+        bookingSlotsData.selectedDate === date ? null : date;
+      renderBookingSlotFilters();
+      renderBookingSlotResults();
     }
+  );
+  renderFilterPills(
+    "bookingStationFilter",
+    [...bookingSlotsData.stations],
+    bookingSlotsData.selectedStation,
+    (station) => {
+      bookingSlotsData.selectedStation =
+        bookingSlotsData.selectedStation === station ? null : station;
+      renderBookingSlotFilters();
+      renderBookingSlotResults();
+    }
+  );
+}
 
-    fragment.appendChild(btn);
+function renderBookingSlotResults() {
+  const container = getElement("bookingSlotsResults");
+  if (!container) return;
+
+  const filtered = bookingSlotsData.rows.filter((row) => {
+    if (bookingSlotsData.selectedDate && row.date !== bookingSlotsData.selectedDate) return false;
+    if (bookingSlotsData.selectedStation && row.station !== bookingSlotsData.selectedStation) return false;
+    return true;
   });
-  list.appendChild(fragment);
-  goStep(4);
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="empty-state">${t("noSchedules")}</div>`;
+    return;
+  }
+
+  const grouped = new Map();
+  filtered.forEach((row) => {
+    if (!grouped.has(row.date)) grouped.set(row.date, []);
+    grouped.get(row.date).push(row);
+  });
+
+  const sortedDates = [...grouped.keys()].sort((a, b) => new Date(a) - new Date(b));
+
+  const html = sortedDates.map((date) => {
+    const rows = grouped.get(date) || [];
+    rows.sort((a, b) => a.time.localeCompare(b.time));
+    const body = rows.map((row) => {
+      const disabled = row.capacity <= 0;
+      const btnText = disabled ? t("soldOut") : String(row.capacity);
+      const btnClass = disabled ? "slot-capacity-btn disabled" : "slot-capacity-btn";
+      const stationAttr = encodeURIComponent(row.station);
+      return `
+        <tr>
+          <td class="time">${row.time}</td>
+          <td class="station">${sanitize(row.station)}</td>
+          <td class="capacity">
+            <button class="${btnClass}" ${disabled ? "disabled" : ""} data-date="${row.date}" data-time="${row.time}" data-station="${stationAttr}" data-capacity="${row.capacity}">
+              ${btnText}
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    return `
+      <div class="slot-date-card">
+        <div class="slot-date-header">${date}</div>
+        <table class="slot-table">
+          <thead>
+            <tr>
+              <th>${t("labelScheduleOnly")}</th>
+              <th>${t("labelStation")}</th>
+              <th style="text-align:right">${t("scheduleCapacityLabel")}</th>
+            </tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    `;
+  }).join("");
+
+  container.innerHTML = `<div class="booking-slots">${html}</div>`;
+
+  container.querySelectorAll(".slot-capacity-btn:not(.disabled)").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      selectedDateRaw = btn.getAttribute("data-date") || "";
+      selectedScheduleTime = btn.getAttribute("data-time") || "";
+      const stRaw = btn.getAttribute("data-station") || "";
+      selectedStationRaw = decodeURIComponent(stRaw);
+      selectedAvailableSeats = Number(btn.getAttribute("data-capacity") || "0") || 0;
+      toStep6();
+    });
+  });
 }
 
 /* ====== Step 5 ====== */
@@ -2520,7 +2540,7 @@ function renderFilterPills(containerId, items, selectedItem, onClick) {
   const validItems = items.filter(item => !isNA(item));
 
   // ✅ 站點用自訂排序：捷運 > 火車 > LALA
-  if (containerId === "stationFilter") {
+  if (containerId === "stationFilter" || containerId === "bookingStationFilter") {
     validItems.sort((a, b) => {
       const pa = getStationPriority(a);
       const pb = getStationPriority(b);
