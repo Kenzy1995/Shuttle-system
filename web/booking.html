@@ -265,20 +265,14 @@
     .mobile-tabbar button.active{opacity:1;text-decoration:underline}
 
     /* 回到頂端按鈕 */
-    #backToTop{
-      position:fixed;right:18px;bottom:24px;z-index:10000;display:none;width:44px;height:44px;border:none;border-radius:50%;cursor:pointer;background:#0009;color:#fff;font-size:22px;line-height:44px;text-align:center;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 8px rgba(0,0,0,0.3)
+    #scrollToTop{
+      position:fixed;right:18px;bottom:24px;z-index:10000;display:none;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent;
     }
-    #backToTop:hover{filter:brightness(1.2)}
-    #backToTop:active{transform:scale(0.95);background:#000c}
-    @media (max-width: 768px){ 
-      #backToTop{ 
-        bottom:96px;
+    @media (max-width: 768px){
+      #scrollToTop{
+        bottom:64px;
         right:12px;
-        width:40px;
-        height:40px;
-        font-size:20px;
-        line-height:40px;
-      } 
+      }
     }
 
     /* 成功動畫（3秒） */
@@ -435,10 +429,10 @@
     @media (max-width: 768px) {
       #bookingTimeSlots .filters { gap: 10px; }
       #bookingTimeSlots .filter-section { gap: 10px; }
-      #bookingTimeSlots .filter-group { margin-bottom: 8px; }
+      #bookingTimeSlots .filter-group { margin-bottom: 4px; }
     }
     #bookingTimeSlots .booking-hint {
-      padding: 0 24px;
+      padding: 0 24px 0 calc(24px + 2em);
       margin: 20px 0 22px;
       font-size: 16px;
       font-weight: 800;
@@ -450,7 +444,7 @@
     #bookingTimeSlots .filter-section {
       display: flex;
       flex-wrap: wrap;
-      gap: 28px;
+      gap: 34px;
       align-items: center;
     }
     #bookingTimeSlots .filter-group {
@@ -732,7 +726,32 @@
   </nav>
 
   <!-- 回到頂端 -->
-  <button id="backToTop" title="Back to top" data-i18n-title="backToTopTitle" onclick="scrollToTop()">↑</button>
+  <button
+    id="scrollToTop"
+    title="Back to top"
+    data-i18n-title="backToTopTitle"
+    onclick="scrollToTop()"
+    style="
+      width: 60px;
+      height: 60px;
+      background: #e5e7eb;
+      border: none;
+      border-radius: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      position: relative;
+    "
+    onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 12px 35px rgba(0, 0, 0, 0.15)'; this.style.background='#d1d5db';"
+    onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 8px 25px rgba(0, 0, 0, 0.1)'; this.style.background='#e5e7eb';"
+  >
+    <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; stroke: #6b7280; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; fill: none; position: relative; z-index: 1;">
+      <polyline points="18 15 12 9 6 15"></polyline>
+    </svg>
+  </button>
 
   <!-- 預約流程 -->
   <main id="reservation" class="page active">
@@ -791,7 +810,7 @@
               </div>
             </div>
           </div>
-          <div class="filter-stats">
+          <div class="filter-stats" style="display:none">
             <span class="stat-label" data-i18n="totalSlotsLabel">總時段數：</span>
             <span class="stat-value" id="bookingSlots-totalSlots">0</span>
           </div>
