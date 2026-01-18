@@ -272,6 +272,13 @@
       #scrollToTop{
         bottom:64px;
         right:12px;
+        width:48px;
+        height:48px;
+        background: color-mix(in srgb, var(--primary) 50%, transparent) !important;
+      }
+      #scrollToTop svg{
+        width:20px;
+        height:20px;
       }
     }
 
@@ -427,9 +434,9 @@
       box-shadow: var(--shadow);
     }
     @media (max-width: 768px) {
-      #bookingTimeSlots .filters { gap: 4px; padding: 8px 16px; }
-      #bookingTimeSlots .filter-section { gap: 4px; row-gap: 4px; }
-      #bookingTimeSlots .filter-group { margin-bottom: 0; gap: 4px; }
+      #bookingTimeSlots .filters { gap: 4000px; padding: 8px 16px; }
+      #bookingTimeSlots .filter-section { gap: 400px; row-gap: 4000px; }
+      #bookingTimeSlots .filter-group { margin-bottom: 0; gap: 4000px; }
     }
     #bookingTimeSlots .booking-hint {
       padding: 0 24px 0 calc(24px + 2em);
