@@ -216,7 +216,7 @@ function handleScroll() {
     scrollThreshold = window.innerHeight || document.documentElement.clientHeight || 300;
   }
   
-  const shouldShow = isMobile ? true : y > scrollThreshold;
+  const shouldShow = y > scrollThreshold;
   
   // 強制更新 display 狀態，確保手機版也能正確觸發
   // 直接操作 style.display，確保樣式優先級最高
