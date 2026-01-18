@@ -707,6 +707,17 @@ def _wait_capacity_recalc(
 def _compose_mail_text(info: Dict[str, str], lang: str, kind: str) -> Tuple[str, str]:
     """組合純文字郵件內容 - 雙語版本"""
     
+    direction_map = {
+        "zh": {"去程": "去程", "回程": "回程"},
+        "en": {"去程": "Departure", "回程": "Return"},
+        "ja": {"去程": "往路", "回程": "復路"},
+        "ko": {"去程": "가는편", "回程": "오는편"},
+    }
+    raw_direction = info.get("direction", "")
+    second_lang = lang if lang in ["en", "ja", "ko"] else "en"
+    direction_zh = direction_map.get("zh", {}).get(raw_direction, raw_direction)
+    direction_second = direction_map.get(second_lang, {}).get(raw_direction, raw_direction)
+
     subjects = {
         "book": {
             "zh": "汐止福泰大飯店接駁車預約確認",
@@ -742,7 +753,7 @@ def _compose_mail_text(info: Dict[str, str], lang: str, kind: str) -> Tuple[str,
 預約編號：{info.get('booking_id','')}
 預約班次：{info.get('date','')} {info.get('time','')} (GMT+8)
 預約人數：{info.get('pax','')}
-往返方向：{info.get('direction','')}
+往返方向：{direction_zh}
 上車站點：{info.get('pick','')}
 下車站點：{info.get('drop','')}
 手機：{info.get('phone','')}
@@ -765,7 +776,7 @@ Your shuttle reservation details:
 Reservation Number: {info.get('booking_id','')}
 Reservation Time: {info.get('date','')} {info.get('time','')} (GMT+8)
 Number of Guests: {info.get('pax','')}
-Direction: {info.get('direction','')}
+Direction: {direction_second}
 Pickup Location: {info.get('pick','')}
 Dropoff Location: {info.get('drop','')}
 Phone: {info.get('phone','')}
@@ -786,7 +797,7 @@ Forte Hotel Xizhi
 予約番号：{info.get('booking_id','')}
 便：{info.get('date','')} {info.get('time','')} (GMT+8)
 人数：{info.get('pax','')}
-方向：{info.get('direction','')}
+方向：{direction_second}
 乗車：{info.get('pick','')}
 降車：{info.get('drop','')}
 電話：{info.get('phone','')}
@@ -806,7 +817,7 @@ Forte Hotel Xizhi
 예약번호: {info.get('booking_id','')}
 시간: {info.get('date','')} {info.get('time','')} (GMT+8)
 인원: {info.get('pax','')}
-방향: {info.get('direction','')}
+방향: {direction_second}
 승차: {info.get('pick','')}
 하차: {info.get('drop','')}
 전화: {info.get('phone','')}
@@ -821,7 +832,6 @@ Forte Hotel Xizhi
     }
     
     # 選擇第二語言內容（如果語言是中文，則使用英文作為第二語言）
-    second_lang = lang if lang in ["en", "ja", "ko"] else "en"
     second_content = second_content_map.get(second_lang, second_content_map["en"])
     
     # 組合雙語內容，中間用分隔線隔開
