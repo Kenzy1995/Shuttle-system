@@ -424,7 +424,7 @@
       position: sticky;
       top: 0;
       z-index: 5;
-      border-radius: 12px;
+      border-radius: 0;
       box-shadow: var(--shadow);
     }
     #bookingTimeSlots .filter-section {
@@ -716,8 +716,11 @@
 
     <!-- Step 2：班次/站點 -->
     <section id="step2" class="card wizard-fixed" style="display:none">
-      <h2 data-i18n="step2Title">選擇班次</h2>
-      <div class="hint" data-i18n="slotHint">點選可預約人數以選擇班次</div>
+      <h2 id="step2TitleText" data-i18n="step2TitleOutbound">去程選擇班次</h2>
+      <div class="hint">
+        <div data-i18n="boardingStationHint">1.上車站點:福泰大飯店 Forte Hotel</div>
+        <div style="color:#b00020;font-weight:800" data-i18n="selectDropoffHint">2.請選擇下車站點</div>
+      </div>
       <div id="bookingTimeSlots">
         <div class="filters">
           <div class="filter-section">
@@ -726,14 +729,6 @@
               <select class="filter-select" id="bookingSlots-dateFilter" onchange="bookingSlotsFilterByDate()">
                 <option value="all" data-i18n="allDates">全部日期</option>
               </select>
-            </div>
-            <div class="filter-group">
-              <label class="filter-label" data-i18n="filterDirectionLabel">方向 / DIRECTION</label>
-              <div class="filter-buttons">
-                <button class="filter-btn" data-filter="all" data-filter-type="direction" onclick="bookingSlotsFilterByDirection('all')" data-i18n="all">全部</button>
-                <button class="filter-btn" data-filter="outbound" data-filter-type="direction" onclick="bookingSlotsFilterByDirection('outbound')" data-i18n="dirOutShort">去程</button>
-                <button class="filter-btn" data-filter="inbound" data-filter-type="direction" onclick="bookingSlotsFilterByDirection('inbound')" data-i18n="dirInShort">回程</button>
-              </div>
             </div>
             <div class="filter-group">
               <label class="filter-label" data-i18n="filterStationLabel">站點 / STATION</label>
