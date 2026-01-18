@@ -472,6 +472,11 @@
       min-width: 160px;
       min-height: 42px;
     }
+    #bookingSlots-stationFilter {
+      appearance: none;
+      padding-right: 36px;
+      background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="10" viewBox="0 0 24 24" fill="none" stroke="%23666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>') no-repeat right 10px center/14px;
+    }
     #bookingTimeSlots .filter-buttons {
       display: flex;
       gap: 10px;
@@ -802,12 +807,9 @@
             </div>
             <div class="filter-group">
               <label class="filter-label" data-i18n="filterStationLabel">站點 / STATION</label>
-              <div class="filter-buttons">
-                <button class="filter-btn" data-filter="all" data-filter-type="station" onclick="bookingSlotsFilterByStation('all')" data-i18n="all">全部</button>
-                <button class="filter-btn" data-filter="mrt" data-filter-type="station" onclick="bookingSlotsFilterByStation('mrt')" data-i18n="stationMrtFull">南港展覽館捷運站</button>
-                <button class="filter-btn" data-filter="train" data-filter-type="station" onclick="bookingSlotsFilterByStation('train')" data-i18n="stationTrainFull">南港火車站</button>
-                <button class="filter-btn" data-filter="lala" data-filter-type="station" onclick="bookingSlotsFilterByStation('lala')" data-i18n="stationLalaFull">LaLaport Shopping Park</button>
-              </div>
+              <select class="filter-select" id="bookingSlots-stationFilter" onchange="bookingSlotsFilterByStation()">
+                <option value="all" data-i18n="allStations">全部站點</option>
+              </select>
             </div>
           </div>
           <div class="filter-stats" style="display:none">
