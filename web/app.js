@@ -181,6 +181,12 @@ function getCurrentLang() {
   return "zh";
 }
 
+function getDirectionLabel(direction) {
+  if (direction === "去程") return t("dirOutLabel");
+  if (direction === "回程") return t("dirInLabel");
+  return direction || "";
+}
+
 /* ====== 日期時間工具函數（統一管理） ====== */
 // 這些函數被多處使用，統一放在這裡便於維護和優化
 
@@ -860,7 +866,7 @@ function toStep4() {
       btn.classList.add("disabled");
       btn.innerHTML = `
         <span style="color:#999;font-weight:700">${time}</span>
-        <span style="color:#999;font-size:13px">(已額滿)</span>
+        <span style="color:#999;font-size:13px">(${t("soldOut")})</span>
       `;
     } else {
       const texts = TEXTS[currentLang] || TEXTS.zh;
@@ -1016,7 +1022,7 @@ function toStep6() {
   if (!validateStep5()) return;
 
   const cfDirectionEl = getElement("cf_direction");
-  if (cfDirectionEl) cfDirectionEl.value = selectedDirection;
+  if (cfDirectionEl) cfDirectionEl.value = getDirectionLabel(selectedDirection);
   const cfDateEl = getElement("cf_date");
   if (cfDateEl) cfDateEl.value = selectedDateRaw;
 
@@ -1065,7 +1071,7 @@ function toStep6() {
   }
   const passengersHintEl = getElement("passengersHint");
   if (passengersHintEl) {
-    passengersHintEl.textContent = `此班次可預約：${selectedAvailableSeats} 人；單筆最多 4 人`;
+    passengersHintEl.textContent = `${t("paxHintPrefix")}${selectedAvailableSeats}${t("paxHintSuffix")}`;
   }
 
   ["step1", "step2", "step3", "step4", "step5"].forEach((id) => {
@@ -1082,6 +1088,37 @@ function toStep6() {
     sel.onchange = () => {
       if (errEl) errEl.style.display = sel.value ? "none" : "block";
     };
+  }
+}
+
+function updateStep6I18N() {
+  const step6 = getElement("step6");
+  if (step6 && step6.style.display !== "none") {
+    const cfDirectionEl = getElement("cf_direction");
+    if (cfDirectionEl) cfDirectionEl.value = getDirectionLabel(selectedDirection);
+
+    const sel = getElement("passengers");
+    if (sel) {
+      const placeholder = sel.querySelector('option[value=""]');
+      if (placeholder) placeholder.textContent = t("selectPassengers");
+    }
+
+    const passengersHintEl = getElement("passengersHint");
+    if (passengersHintEl) {
+      passengersHintEl.textContent = `${t("paxHintPrefix")}${selectedAvailableSeats}${t("paxHintSuffix")}`;
+    }
+  }
+
+  const successCard = getElement("successCard");
+  if (successCard && successCard.style.display !== "none") {
+    const directionEl = getElement("ticketDirection");
+    if (directionEl && currentBookingData && currentBookingData.direction) {
+      directionEl.textContent = getDirectionLabel(currentBookingData.direction);
+    }
+    const paxEl = getElement("ticketPassengers");
+    if (paxEl && currentBookingData && currentBookingData.passengers != null) {
+      paxEl.textContent = currentBookingData.passengers + " " + t("labelPassengersShort");
+    }
   }
 }
 
@@ -1276,7 +1313,7 @@ function mountTicketAndShow(ticket) {
   }
 
   const directionEl = getElement("ticketDirection");
-  if (directionEl) directionEl.textContent = ticket.direction || "";
+  if (directionEl) directionEl.textContent = getDirectionLabel(ticket.direction);
 
   const pickEl = getElement("ticketPick");
   if (pickEl) pickEl.textContent = ticket.pickLocation || "";
@@ -1320,7 +1357,7 @@ function closeTicketToHome() {
 async function downloadTicket() {
   const card = getElement("ticketCard");
   if (!card) {
-    showErrorCard("找不到票卡");
+    showErrorCard(t("ticketNotFound"));
     return;
   }
   try {
@@ -1328,7 +1365,7 @@ async function downloadTicket() {
     const dpr = Math.max(window.devicePixelRatio || 1, 1);
     const width = Math.round(rect.width);
     const height = Math.round(rect.height);
-    if (!window.domtoimage) throw new Error("domtoimage not found");
+    if (!window.domtoimage) throw new Error(t("domToImageNotFound"));
     const dataUrl = await domtoimage.toPng(card, {
       width,
       height,
@@ -1348,7 +1385,7 @@ async function downloadTicket() {
     a.download = `ticket_${bid}.png`;
     a.click();
   } catch (e) {
-    showErrorCard("下載失敗：" + (e?.message || e));
+    showErrorCard(t("downloadFailedPrefix") + (e?.message || e));
   }
 }
 
@@ -1514,6 +1551,7 @@ function buildTicketCard(row, { mask = false } = {}) {
     ? maskEmail(String(row["信箱"] || ""))
     : String(row["信箱"] || "");
   const rb = String(row["往返"] || row["往返方向"] || "");
+  const rbLabel = getDirectionLabel(rb);
   const pick = String(row["上車地點"] || "");
   const drop = String(row["下車地點"] || "");
   const bookingId = String(row["預約編號"] || "");
@@ -1542,7 +1580,7 @@ function buildTicketCard(row, { mask = false } = {}) {
           <div class="${statusPillClass}" style="position:relative;left:0;top:0;">${sanitize(statusPillText)}</div>
           ${rejectedTipBtn}
         </div>
-        <button class="ticket-close" aria-label="close" style="position:relative;right:0;top:0;">✕</button>
+        <button class="ticket-close" aria-label="${t("closeLabel")}" style="position:relative;right:0;top:0;">✕</button>
       </div>
       <div class="ticket-header">
         <h2>${sanitize(carDateTime)}</h2>
@@ -1551,7 +1589,7 @@ function buildTicketCard(row, { mask = false } = {}) {
         <div class="ticket-qr">${qrImage}</div>
         <div class="ticket-info">
           <div class="ticket-field"><span class="ticket-label">${t("labelBookingId")}</span><span class="ticket-value">${sanitize(bookingId)}</span></div>
-          <div class="ticket-field"><span class="ticket-label">${t("labelDirection")}</span><span class="ticket-value">${sanitize(rb)}</span></div>
+          <div class="ticket-field"><span class="ticket-label">${t("labelDirection")}</span><span class="ticket-value">${sanitize(rbLabel)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelPick")}</span><span class="ticket-value">${sanitize(pick)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelDrop")}</span><span class="ticket-value">${sanitize(drop)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelName")}</span><span class="ticket-value">${sanitize(name)}</span></div>
@@ -1653,7 +1691,7 @@ async function queryOrders() {
     try {
       data = await res.json();
     } catch (e) {
-      throw new Error("無法解析伺服器回應");
+      throw new Error(t("serverResponseParseFailed"));
     }
     const arr = Array.isArray(data) ? data : data.results || [];
     lastQueryResults = arr;
@@ -1799,7 +1837,7 @@ async function deleteOrder(bookingId) {
       try {
         j = await r.json();
       } catch (e) {
-        throw new Error("無法解析伺服器回應");
+        throw new Error(t("serverResponseParseFailed"));
       }
       if (j && j.status === "success") {
         showSuccessAnimation();
@@ -2209,10 +2247,10 @@ async function refreshData() {
     try {
       raw = await res.json();
     } catch (e) {
-      throw new Error("無法解析伺服器回應");
+      throw new Error(t("serverResponseParseFailed"));
     }
     if (!raw || !Array.isArray(raw) || raw.length === 0) {
-      throw new Error("伺服器回應格式錯誤");
+      throw new Error(t("serverResponseFormatError"));
     }
     const headers = raw[0];
     const rows = raw.slice(1);
@@ -2299,10 +2337,10 @@ async function loadScheduleData() {
     try {
       data = await res.json();
     } catch (e) {
-      throw new Error("無法解析伺服器回應");
+      throw new Error(t("serverResponseParseFailed"));
     }
     if (!data || !Array.isArray(data) || data.length === 0) {
-      throw new Error("伺服器回應格式錯誤");
+      throw new Error(t("serverResponseFormatError"));
     }
     const headers = data[0];
     const rows = data.slice(1);
@@ -2501,6 +2539,7 @@ function renderScheduleResults() {
 
   const texts = TEXTS[currentLang] || TEXTS.zh;
   const capLabel = t("scheduleCapacityLabel");        // ✅ 這裡拿多語系字
+  const noScheduleDataText = t("noScheduleData");
 
   function translateDirection(direction) {
     if (direction === '去程') return texts.dirOutLabel || direction;
@@ -2516,7 +2555,7 @@ function renderScheduleResults() {
   };
 
   // 輔助函數：處理顯示值，如果是 #N/A 則顯示友好訊息
-  const formatValue = (value, defaultValue = '目前暫無可預約班次') => {
+  const formatValue = (value, defaultValue = noScheduleDataText) => {
     return isNA(value) ? defaultValue : sanitize(value);
   };
 
@@ -2527,16 +2566,16 @@ function renderScheduleResults() {
     
     // 檢查是否為 #N/A 或類似的無效值
     const capIsNA = isNA(capNumber);
-    const displayCapacity = capIsNA ? '目前暫無可預約班次' : `${sanitize(capLabel)}：${sanitize(capNumber)}`;
+    const displayCapacity = capIsNA ? noScheduleDataText : `${sanitize(capLabel)}：${sanitize(capNumber)}`;
 
     // 處理所有欄位的 #N/A 情況
     // 方向需要先翻譯再處理 #N/A
     const displayDirection = isNA(row.direction) 
-      ? '目前暫無可預約班次' 
+      ? noScheduleDataText 
       : sanitize(translateDirection(row.direction));
-    const displayDate = formatValue(row.date, '目前暫無可預約班次');
-    const displayTime = formatValue(row.time, '目前暫無可預約班次');
-    const displayStation = formatValue(row.station, '目前暫無可預約班次');
+    const displayDate = formatValue(row.date);
+    const displayTime = formatValue(row.time);
+    const displayStation = formatValue(row.station);
 
     return `
       <div class="schedule-card">
@@ -3292,8 +3331,8 @@ function initLiveLocation(mount) {
   const loadMaps = () =>
     new Promise((resolve, reject) => {
       if (!cfg.key) { 
-        if (startBtn) startBtn.textContent = "缺少地圖 key";
-        reject(new Error("缺少地圖 key"));
+        if (startBtn) startBtn.textContent = t("missingMapKey");
+        reject(new Error(t("missingMapKey")));
         return; 
       }
       // 檢查 Google Maps API 是否已經載入
@@ -3710,7 +3749,7 @@ function initLiveLocation(mount) {
       // 直接使用傳入的資料結構（已在監聽器中構建）
       await processLocationData(firebaseData);
     } catch (e) {
-      updateStatus("#dc3545", "更新失敗");
+      updateStatus("#dc3545", t("rtStatusUpdateFailed"));
     }
   };
   
@@ -3862,19 +3901,19 @@ function initLiveLocation(mount) {
       const apiUrl = "https://booking-api-995728097341.asia-east1.run.app/api/realtime/location";
       const r = await fetch(apiUrl);
       if (!r.ok) {
-        updateStatus("#dc3545", "連線失敗");
+        updateStatus("#dc3545", t("rtStatusFailed"));
         return;
       }
       let data = null;
       try {
         data = await r.json();
       } catch (e) {
-        updateStatus("#dc3545", "資料解析錯誤");
+        updateStatus("#dc3545", t("rtStatusParseError"));
         return;
       }
       await processLocationData(data);
     } catch (e) {
-      updateStatus("#dc3545", "錯誤");
+      updateStatus("#dc3545", t("rtStatusError"));
     }
   };
 
@@ -3887,7 +3926,7 @@ function initLiveLocation(mount) {
     
     // 確保 Google Maps API 已完全載入和初始化
     if (!window.google || !window.google.maps) {
-      throw new Error("Google Maps API 載入失敗");
+      throw new Error(t("mapsLoadFailed"));
     }
     
     // 等待 Google Maps API 完全初始化（額外檢查）
@@ -3898,7 +3937,7 @@ function initLiveLocation(mount) {
     }
     
     if (!window.google.maps.LatLngBounds || !window.google.maps.Map) {
-      throw new Error("Google Maps API 初始化超時");
+      throw new Error(t("mapsInitTimeout"));
     }
     
     // 灰色地圖樣式 - 地圖灰色，隱藏地標，但保留路名
@@ -3956,7 +3995,7 @@ function initLiveLocation(mount) {
     
     // 確保 Google Maps API 已完全載入
     if (!window.google || !window.google.maps || !window.google.maps.LatLngBounds) {
-      throw new Error("Google Maps API 尚未完全載入");
+      throw new Error(t("mapsNotReady"));
     }
     
     const restrictionBounds = new google.maps.LatLngBounds(
@@ -4176,7 +4215,7 @@ function initLiveLocation(mount) {
           }
         }, (error) => {
           firebaseConnected = false;
-          updateStatus("#dc3545", "連線失敗");
+          updateStatus("#dc3545", t("rtStatusFailed"));
           updateRefreshButtonVisibility();
           startFallbackPolling();
         });
@@ -4188,7 +4227,7 @@ function initLiveLocation(mount) {
       // Firebase 連接成功時，調整輪詢間隔（使用更長間隔）
       // 保留輪詢作為備用機制，但使用更長間隔以減少資源消耗
       startFallbackPolling();
-      updateStatus("#28a745", "良好");
+      updateStatus("#28a745", t("rtStatusGood"));
       
       // 更新刷新按鈕顯示狀態
       updateRefreshButtonVisibility();
