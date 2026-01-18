@@ -888,7 +888,7 @@ function toStep4() {
           b.classList.remove("active")
         );
         btn.classList.add("active");
-        toStep5();
+        toStep6();
       };
     }
 
@@ -934,12 +934,7 @@ function onIdentityChange() {
 }
 
 function toStep5() {
-  if (!selectedScheduleTime) {
-    showErrorCard(t("labelSchedule"));
-    return;
-  }
-  onIdentityChange();
-  goStep(5);
+  toStep6();
 }
 
 function validateStep5() {
@@ -1030,7 +1025,10 @@ function validateStep5() {
 }
 
 function toStep6() {
-  if (!validateStep5()) return;
+  if (!selectedScheduleTime) {
+    showErrorCard(t("labelSchedule"));
+    return;
+  }
 
   const cfDirectionEl = getElement("cf_direction");
   if (cfDirectionEl) cfDirectionEl.value = getDirectionLabel(selectedDirection);
@@ -1100,6 +1098,27 @@ function toStep6() {
       if (errEl) errEl.style.display = sel.value ? "none" : "block";
     };
   }
+
+  onIdentityChange();
+  startSubmitCountdown();
+}
+
+function startSubmitCountdown(seconds = 3) {
+  const btn = getElement("step6")?.querySelector('button[data-i18n="submit"]');
+  if (!btn) return;
+  let remaining = seconds;
+  btn.disabled = true;
+  btn.textContent = `${t("submit")} (${remaining})`;
+  const timer = setInterval(() => {
+    remaining -= 1;
+    if (remaining <= 0) {
+      clearInterval(timer);
+      btn.disabled = false;
+      btn.textContent = t("submit");
+      return;
+    }
+    btn.textContent = `${t("submit")} (${remaining})`;
+  }, 1000);
 }
 
 function updateStep6I18N() {
@@ -1149,6 +1168,8 @@ function showSuccessAnimation() {
 let bookingSubmitting = false;
 async function submitBooking() {
   if (bookingSubmitting) return;
+
+  if (!validateStep5()) return;
 
   const pSel = getElement("passengers");
   const pValue = pSel?.value || "";
