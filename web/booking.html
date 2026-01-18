@@ -226,6 +226,11 @@
       }
     }
     .opt-btn:hover{box-shadow:var(--shadow)}
+    #directionList .opt-btn:hover{
+      background:#f7f2ee;
+      color:var(--primary);
+      border-color:var(--primary);
+    }
     .opt-btn.active{outline:3px solid rgba(169,133,112,.25)}
     .opt-btn.disabled{color:#bbb;background:#f7f7f7;border-color:#eee;cursor:not-allowed}
 
@@ -429,11 +434,12 @@
     }
     @media (max-width: 768px) {
       #bookingTimeSlots .filters { gap: 8px; }
-      #bookingTimeSlots .filter-section { gap: 12px; }
+      #bookingTimeSlots .filter-section { gap: 8px; }
+      #bookingTimeSlots .filter-group { margin-bottom: 6px; }
     }
     #bookingTimeSlots .booking-hint {
       padding: 0 20px;
-      margin: 10px 0 12px;
+      margin: 16px 0 16px;
       font-size: 15px;
       font-weight: 800;
       line-height: 1.6;
@@ -537,7 +543,7 @@
       color: #fff;
       padding: 8px 12px;
       font-weight: 800;
-      font-size: 14px;
+      font-size: 16px;
     }
     #bookingTimeSlots .date-card-content thead {
       background: #fafafa;
@@ -558,10 +564,6 @@
     #bookingTimeSlots th:last-child { border-right: none; }
     #bookingTimeSlots th.time-col {
       width: 90px;
-    }
-    #bookingTimeSlots th.direction {
-      text-align: center;
-      font-size: 14px;
       background: #f6f1eb;
     }
     #bookingTimeSlots th.station {
@@ -577,6 +579,9 @@
       vertical-align: middle;
       text-align: center;
       color: var(--text);
+    }
+    #bookingTimeSlots td.time-col .datetime-time {
+      font-weight: 800;
     }
     #bookingTimeSlots td:last-child { border-right: none; }
     #bookingTimeSlots td.station-cell {
@@ -745,10 +750,10 @@
 
     <!-- Step 2：班次/站點 -->
     <section id="step2" class="card wizard-fixed" style="display:none">
+      <h2 id="step2TitleText" data-i18n="step2TitleOutbound">去程選擇班次</h2>
       <div style="margin-bottom:12px">
         <img src="/images/各站點橫幅.png" class="station-info-img" alt="stations banner" />
       </div>
-      <h2 id="step2TitleText" data-i18n="step2TitleOutbound">去程選擇班次</h2>
       <div class="booking-hint">
         <div data-i18n="boardingStationHint">1.上車站點:福泰大飯店 Forte Hotel</div>
         <div style="color:#b00020;font-weight:800" data-i18n="selectDropoffHint">2.請選擇下車站點</div>
