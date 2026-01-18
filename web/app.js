@@ -1041,9 +1041,9 @@ function bookingSlotsRenderTable() {
                 <tr>
                   <th class="time-col">${t("labelScheduleOnly")}</th>
                   ${showOutbound || showInbound ? `
-                  ${showMrt ? `<th class="station">${t("stationMrt")}</th>` : ""}
-                  ${showTrain ? `<th class="station">${t("stationTrain")}</th>` : ""}
-                  ${showLala ? `<th class="station">${t("stationLala")}</th>` : ""}
+                  ${showMrt ? `<th class="station">${t("stationMrtFull")}</th>` : ""}
+                  ${showTrain ? `<th class="station">${t("stationTrainFull")}</th>` : ""}
+                  ${showLala ? `<th class="station">${t("stationLalaFull")}</th>` : ""}
                   ` : ""}
                 </tr>
               </thead>
@@ -1078,6 +1078,10 @@ function bookingSlotsRenderTable() {
 
   container.querySelectorAll(".station-value[data-capacity]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      container.querySelectorAll(".station-value.selected").forEach((el) => {
+        el.classList.remove("selected");
+      });
+      btn.classList.add("selected");
       selectedDateRaw = btn.getAttribute("data-date") || "";
       selectedScheduleTime = btn.getAttribute("data-time") || "";
       const stRaw = btn.getAttribute("data-station") || "";
@@ -1098,11 +1102,13 @@ function bookingSlotsRenderStationCell(slot, directionKey, stationKey) {
   if (entry === null) {
     const departed = bookingSlotsIsDeparted(slot.date, slot.time);
     const label = departed ? t("slotDeparted") : t("slotNotOpen");
-    return `<span class="station-value unavailable">${label}</span>`;
+    const tip = t("slotUnavailableTitle");
+    return `<span class="station-value unavailable" title="${tip}">${label}</span>`;
   }
   const available = entry && typeof entry.avail === "number" ? entry.avail : 0;
   if (available <= 0) {
-    return `<span class="station-value soldout">${t("soldOut")}</span>`;
+    const tip = t("slotUnavailableTitle");
+    return `<span class="station-value soldout" title="${tip}">${t("soldOut")}</span>`;
   }
 
   const stationAttr = encodeURIComponent(stationName);
