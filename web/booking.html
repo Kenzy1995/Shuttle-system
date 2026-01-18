@@ -427,9 +427,9 @@
       box-shadow: var(--shadow);
     }
     @media (max-width: 768px) {
-      #bookingTimeSlots .filters { gap: 6px; }
-      #bookingTimeSlots .filter-section { gap: 6px; }
-      #bookingTimeSlots .filter-group { margin-bottom: 2px; }
+      #bookingTimeSlots .filters { gap: 4px; padding: 8px 16px; }
+      #bookingTimeSlots .filter-section { gap: 4px; row-gap: 4px; }
+      #bookingTimeSlots .filter-group { margin-bottom: 0; gap: 4px; }
     }
     #bookingTimeSlots .booking-hint {
       padding: 0 24px 0 calc(24px + 2em);
@@ -748,7 +748,6 @@
       justify-content: center;
       box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
       transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-      position: relative;
     "
     onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 12px 35px rgba(0, 0, 0, 0.15)'; this.style.background='#d1d5db';"
     onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 8px 25px rgba(0, 0, 0, 0.1)'; this.style.background='#e5e7eb';"
