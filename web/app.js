@@ -785,6 +785,27 @@ const bookingSlotsStationNameMap = {
   lala: "LaLaport Shopping Park"
 };
 
+function bookingSlotsComputeMainDateTime(directionKey, dateStr, timeStr, stationName) {
+  if (!dateStr || !timeStr) return { date: dateStr, time: timeStr };
+  const stationText = String(stationName || "");
+  let offsetMin = 0;
+  if (directionKey === "inbound") {
+    if (/捷運|Exhibition Center/i.test(stationText)) offsetMin = 5;
+    else if (/火車|Train Station/i.test(stationText)) offsetMin = 10;
+    else if (/LaLaport/i.test(stationText)) offsetMin = 20;
+  }
+
+  const base = new Date(`${dateStr}T${timeStr}:00`);
+  if (Number.isNaN(base.getTime())) return { date: dateStr, time: timeStr };
+  base.setMinutes(base.getMinutes() - offsetMin);
+  const y = base.getFullYear();
+  const m = String(base.getMonth() + 1).padStart(2, "0");
+  const d = String(base.getDate()).padStart(2, "0");
+  const hh = String(base.getHours()).padStart(2, "0");
+  const mm = String(base.getMinutes()).padStart(2, "0");
+  return { date: `${y}-${m}-${d}`, time: `${hh}:${mm}` };
+}
+
 function bookingSlotsGetDirectionKey() {
   return selectedDirection === "回程" ? "inbound" : "outbound";
 }
@@ -838,12 +859,13 @@ function bookingSlotsLoadData() {
     const stationKey = bookingSlotsNormalizeStationKey(stationName);
     if (!date || !time || !stationKey) return;
 
-    const key = `${date}|${time}`;
+    const mainDt = bookingSlotsComputeMainDateTime(directionKey, date, time, stationName);
+    const key = `${mainDt.date}|${mainDt.time}`;
     if (!slotsMap.has(key)) {
       slotsMap.set(key, {
-        date,
-        time,
-        datetime: `${date} ${time}`,
+        date: mainDt.date,
+        time: mainDt.time,
+        datetime: `${mainDt.date} ${mainDt.time}`,
         stations: {
           outbound: { mrt: null, train: null, lala: null },
           inbound: { mrt: null, train: null, lala: null }
@@ -859,7 +881,10 @@ function bookingSlotsLoadData() {
       r["可預約人數"] || r["可約人數 / Available"] || ""
     ).trim();
     const avail = bookingSlotsParseAvailability(availText);
-    slot.stations[directionKey][stationKey] = avail;
+    slot.stations[directionKey][stationKey] = {
+      avail,
+      time
+    };
     slot.stationNames[directionKey][stationKey] = stationName;
   });
 
@@ -957,8 +982,8 @@ function bookingSlotsApplyFilters() {
 
     if (stationFilter === "all") return true;
 
-    const avail = slot.stations[directionKey][stationFilter];
-    return avail !== null;
+    const entry = slot.stations[directionKey][stationFilter];
+    return entry !== null;
   });
 
   bookingSlotsUpdateStats();
@@ -1068,24 +1093,25 @@ function bookingSlotsRenderTable() {
 }
 
 function bookingSlotsRenderStationCell(slot, directionKey, stationKey) {
-  const available = slot.stations[directionKey][stationKey];
+  const entry = slot.stations[directionKey][stationKey];
   const stationName =
     slot.stationNames[directionKey][stationKey] ||
     bookingSlotsStationNameMap[stationKey] ||
     "";
 
-  if (available === null) {
+  if (entry === null) {
     const departed = bookingSlotsIsDeparted(slot.date, slot.time);
     const label = departed ? t("slotDeparted") : t("slotNotOpen");
     return `<span class="station-value unavailable">${label}</span>`;
   }
+  const available = entry && typeof entry.avail === "number" ? entry.avail : 0;
   if (available <= 0) {
     return `<span class="station-value soldout">${t("soldOut")}</span>`;
   }
 
   const stationAttr = encodeURIComponent(stationName);
   return `
-    <button class="station-value" data-date="${slot.date}" data-time="${slot.time}" data-station="${stationAttr}" data-capacity="${available}">
+    <button class="station-value" data-date="${slot.date}" data-time="${entry.time}" data-station="${stationAttr}" data-capacity="${available}">
       ${available}
     </button>
   `;
