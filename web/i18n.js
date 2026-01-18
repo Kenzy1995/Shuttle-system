@@ -791,6 +791,9 @@ function onLanguageChange(lang) {
   }
 
   // ✅ 預約班次列表：語言切換時重新渲染表格標題/站點
+  if (typeof bookingSlotsInitDateFilter === "function") {
+    bookingSlotsInitDateFilter();
+  }
   if (typeof bookingSlotsInitStationFilter === "function") {
     bookingSlotsInitStationFilter();
   }
