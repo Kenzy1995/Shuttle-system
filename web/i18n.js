@@ -58,6 +58,10 @@ const TEXTS = {
     stationMrtFull: "南港展覽館捷運站",
     stationTrainFull: "南港火車站",
     stationLalaFull: "LaLaport Shopping Park",
+    pickupLabel: "1.上車站點:",
+    dropoffLabel: "2.下車站點:",
+    pleaseSelect: "請選擇",
+    forteHotel: "福泰大飯店 Forte Hotel",
     boardingStationHint: "1.上車站點:福泰大飯店 Forte Hotel",
     selectDropoffHint: "2.請選擇下車站點",
     slotNotOpen: "額滿",
@@ -225,6 +229,10 @@ const TEXTS = {
     stationMrtFull: "Nangang Exhibition Center - MRT Exit 3",
     stationTrainFull: "Nangang Train Station",
     stationLalaFull: "LaLaport Shopping Park",
+    pickupLabel: "1. Pickup:",
+    dropoffLabel: "2. Dropoff:",
+    pleaseSelect: "Please select",
+    forteHotel: "Forte Hotel",
     boardingStationHint: "1. Pickup: Forte Hotel",
     selectDropoffHint: "2. Please select dropoff station",
     slotNotOpen: "Sold out",
@@ -387,6 +395,10 @@ const TEXTS = {
     stationMrtFull: "南港展覧館MRT3番出口",
     stationTrainFull: "南港駅",
     stationLalaFull: "LaLaport Shopping Park",
+    pickupLabel: "1. 乗車:",
+    dropoffLabel: "2. 降車:",
+    pleaseSelect: "選択してください",
+    forteHotel: "フォルテホテル",
     boardingStationHint: "1. 乗車: フォルテホテル",
     selectDropoffHint: "2. 降車場所を選択してください",
     slotNotOpen: "満席",
@@ -549,6 +561,10 @@ const TEXTS = {
     stationMrtFull: "난강 전람관 MRT 3번 출구",
     stationTrainFull: "난강역",
     stationLalaFull: "LaLaport Shopping Park",
+    pickupLabel: "1. 승차:",
+    dropoffLabel: "2. 하차:",
+    pleaseSelect: "선택하세요",
+    forteHotel: "포르테 호텔",
     boardingStationHint: "1. 승차: 포르테 호텔",
     selectDropoffHint: "2. 하차 역을 선택하세요",
     slotNotOpen: "매진",
@@ -796,6 +812,9 @@ function onLanguageChange(lang) {
   }
   if (typeof bookingSlotsInitStationFilter === "function") {
     bookingSlotsInitStationFilter();
+  }
+  if (typeof updateStep2Hints === "function") {
+    updateStep2Hints();
   }
   if (
     typeof bookingSlotsRenderTable === "function" &&
