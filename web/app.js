@@ -99,7 +99,7 @@ const domCache = {
   // 初始化緩存（在 DOM 加載完成後調用）
   init() {
     const commonIds = [
-      "backToTop", "marqueeContainer", "marqueeContent", "dialogOverlay",
+      "scrollToTop", "marqueeContainer", "marqueeContent", "dialogOverlay",
       "dialogTitle", "dialogContent", "dialogCancelBtn", "dialogConfirmBtn",
       "loading", "loadingConfirm", "expiredOverlay", "initialLoading",
       "homeHero", "step1", "step2", "step3", "step4", "step5", "step6",
@@ -194,7 +194,7 @@ function getDirectionLabel(direction) {
 // 這些函數被多處使用，統一放在這裡便於維護和優化
 
 function handleScroll() {
-  const btn = domCache.get("backToTop");
+  const btn = domCache.get("scrollToTop");
   if (!btn) return;
   
   // 支援多種滾動位置獲取方式，確保手機版也能正常運作
