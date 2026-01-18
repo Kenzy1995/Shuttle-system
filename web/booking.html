@@ -418,7 +418,7 @@
       border-bottom: 1px solid #e7e7e7;
       display: flex;
       flex-wrap: wrap;
-      gap: 16px;
+      gap: 12px;
       align-items: center;
       justify-content: space-between;
       position: sticky;
@@ -427,8 +427,13 @@
       border-radius: 0;
       box-shadow: var(--shadow);
     }
+    @media (max-width: 768px) {
+      #bookingTimeSlots .filters { gap: 8px; }
+      #bookingTimeSlots .filter-section { gap: 12px; }
+    }
     #bookingTimeSlots .booking-hint {
-      padding: 0 20px 8px;
+      padding: 0 20px;
+      margin: 10px 0 12px;
       font-size: 15px;
       font-weight: 800;
       line-height: 1.6;
@@ -584,7 +589,7 @@
       border-radius: 10px;
       background: #10b981;
       color: #fff;
-      min-width: 56px;
+      min-width: 64px;
       font-size: 13px;
       font-weight: 800;
       text-align: center;
@@ -593,20 +598,25 @@
       transition: transform 0.06s ease, box-shadow 0.2s ease, filter 0.2s ease;
       box-shadow: 0 2px 6px rgba(0,0,0,0.12);
     }
+    #bookingTimeSlots .station-value.selected {
+      transform: scale(0.98);
+      box-shadow: 0 0 0 2px rgba(169,133,112,0.4);
+      filter: brightness(0.95);
+    }
     #bookingTimeSlots .station-value:active { transform: scale(0.96); }
     #bookingTimeSlots .station-value:focus-visible { outline: 2px solid #111; outline-offset: 2px; }
     #bookingTimeSlots .station-value.unavailable {
       background: #ef4444;
       color: #fff;
       cursor: not-allowed;
-      min-width: 56px;
+      min-width: 64px;
       font-size: 13px;
     }
     #bookingTimeSlots .station-value.soldout {
       background: #9e9e9e;
       color: #fff;
       cursor: not-allowed;
-      min-width: 56px;
+      min-width: 64px;
       font-size: 13px;
     }
     #bookingTimeSlots .direction-badge {
@@ -756,9 +766,9 @@
               <label class="filter-label" data-i18n="filterStationLabel">站點 / STATION</label>
               <div class="filter-buttons">
                 <button class="filter-btn" data-filter="all" data-filter-type="station" onclick="bookingSlotsFilterByStation('all')" data-i18n="all">全部</button>
-                <button class="filter-btn" data-filter="mrt" data-filter-type="station" onclick="bookingSlotsFilterByStation('mrt')" data-i18n="stationMrt">捷運站</button>
-                <button class="filter-btn" data-filter="train" data-filter-type="station" onclick="bookingSlotsFilterByStation('train')" data-i18n="stationTrain">火車站</button>
-                <button class="filter-btn" data-filter="lala" data-filter-type="station" onclick="bookingSlotsFilterByStation('lala')" data-i18n="stationLala">LaLaport</button>
+                <button class="filter-btn" data-filter="mrt" data-filter-type="station" onclick="bookingSlotsFilterByStation('mrt')" data-i18n="stationMrtFull">南港展覽館捷運站</button>
+                <button class="filter-btn" data-filter="train" data-filter-type="station" onclick="bookingSlotsFilterByStation('train')" data-i18n="stationTrainFull">南港火車站</button>
+                <button class="filter-btn" data-filter="lala" data-filter-type="station" onclick="bookingSlotsFilterByStation('lala')" data-i18n="stationLalaFull">LaLaport Shopping Park</button>
               </div>
             </div>
           </div>
