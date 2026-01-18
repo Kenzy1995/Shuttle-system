@@ -1035,7 +1035,10 @@ function bookingSlotsRenderTable() {
       const pickHintKey = directionKey === "inbound" ? "slotPickHintInbound" : "slotPickHintOutbound";
       html += `
         <div class="date-card">
-          <div class="date-card-header">${bookingSlotsFormatDate(date)} <span style="font-weight:700;font-size:12px;opacity:.85">(${t(pickHintKey)})</span></div>
+          <div class="date-card-header">
+            <span class="date-title">${bookingSlotsFormatDate(date)}</span>
+            <span class="date-hint">(${t(pickHintKey)})</span>
+          </div>
           <div class="date-card-content">
             <table>
               <thead>
