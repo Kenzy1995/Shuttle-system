@@ -714,10 +714,9 @@ function restart() {
     "dateList",
     "stationList",
     "scheduleList",
-    "bookingAllFilter",
-    "bookingDateFilter",
-    "bookingStationFilter",
-    "bookingSlotsResults"
+    "bookingSlots-dateFilter",
+    "bookingSlots-totalSlots",
+    "bookingSlots-tableContainer"
   ].forEach((id) => {
     const el = getElement(id);
     if (el) el.innerHTML = "";
@@ -765,148 +764,298 @@ function toStep2() {
     showErrorCard(t("labelDirection"));
     return;
   }
-  buildBookingSlotsData();
+  bookingSlotsLoadData();
   goStep(2);
 }
 
 /* ====== Step 2：班次/站點列表 ====== */
 let bookingSlotsData = {
-  rows: [],
-  dates: new Set(),
-  stations: new Set(),
-  selectedDate: null,
-  selectedStation: null
+  allTimeSlots: [],
+  filteredTimeSlots: [],
+  currentFilter: {
+    date: "all",
+    direction: "all",
+    station: "all"
+  }
 };
 
-function buildBookingSlotsData() {
-  const rawRows = allRows
-    .filter((r) => String(r["去程 / 回程"]).trim() === selectedDirection)
-    .map((r) => {
-      const date = fmtDateLabel(r["日期"]);
-      const time = fmtTimeLabel(r["班次"] || r["車次"]);
-      const station = String(r["站點"] || "").trim();
-      const capacityRaw = String(
-        r["可預約人數"] || r["可約人數 / Available"] || ""
-      ).trim();
-      const capacity = Number(onlyDigits(capacityRaw)) || 0;
-      return { date, time, station, capacity };
-    })
-    .filter((r) => r.date && r.time && r.station);
+const bookingSlotsStationNameMap = {
+  mrt: "南港展覽館捷運站 Nangang Exhibition Center - MRT Exit 3",
+  train: "南港火車站 Nangang Train Station",
+  lala: "LaLaport Shopping Park"
+};
 
-  bookingSlotsData.rows = rawRows;
-  bookingSlotsData.dates = new Set(rawRows.map((r) => r.date));
-  bookingSlotsData.stations = new Set(rawRows.map((r) => r.station));
-  bookingSlotsData.selectedDate = null;
-  bookingSlotsData.selectedStation = null;
-
-  renderBookingSlotFilters();
-  renderBookingSlotResults();
+function bookingSlotsGetDirectionKey() {
+  return selectedDirection === "回程" ? "inbound" : "outbound";
 }
 
-function renderBookingSlotFilters() {
-  const allWrap = getElement("bookingAllFilter");
-  if (!allWrap) return;
-  allWrap.innerHTML = "";
-  const allBtn = document.createElement("button");
-  allBtn.type = "button";
-  allBtn.className = "filter-pill";
-  allBtn.textContent = t("all");
-  allBtn.onclick = () => {
-    bookingSlotsData.selectedDate = null;
-    bookingSlotsData.selectedStation = null;
-    renderBookingSlotFilters();
-    renderBookingSlotResults();
-  };
-  allWrap.appendChild(allBtn);
-
-  renderFilterPills(
-    "bookingDateFilter",
-    [...bookingSlotsData.dates],
-    bookingSlotsData.selectedDate,
-    (date) => {
-      bookingSlotsData.selectedDate =
-        bookingSlotsData.selectedDate === date ? null : date;
-      renderBookingSlotFilters();
-      renderBookingSlotResults();
-    }
-  );
-  renderFilterPills(
-    "bookingStationFilter",
-    [...bookingSlotsData.stations],
-    bookingSlotsData.selectedStation,
-    (station) => {
-      bookingSlotsData.selectedStation =
-        bookingSlotsData.selectedStation === station ? null : station;
-      renderBookingSlotFilters();
-      renderBookingSlotResults();
-    }
-  );
+function bookingSlotsNormalizeStationKey(name) {
+  const s = String(name || "");
+  if (!s) return null;
+  if (/捷運|MRT/i.test(s)) return "mrt";
+  if (/火車|Train/i.test(s)) return "train";
+  if (/Lala|Laport/i.test(s)) return "lala";
+  return null;
 }
 
-function renderBookingSlotResults() {
-  const container = getElement("bookingSlotsResults");
-  if (!container) return;
+function bookingSlotsParseAvailability(text) {
+  const digits = onlyDigits(text || "");
+  if (!digits) return null;
+  return Number(digits) || 0;
+}
 
-  const filtered = bookingSlotsData.rows.filter((row) => {
-    if (bookingSlotsData.selectedDate && row.date !== bookingSlotsData.selectedDate) return false;
-    if (bookingSlotsData.selectedStation && row.station !== bookingSlotsData.selectedStation) return false;
-    return true;
+function bookingSlotsFormatDate(dateStr) {
+  if (!dateStr) return "";
+  return String(dateStr).replace(/-/g, "/");
+}
+
+function bookingSlotsIsDeparted(dateStr, timeStr) {
+  try {
+    const dateTime = new Date(`${dateStr} ${timeStr}`.replace(/-/g, "/"));
+    if (Number.isNaN(dateTime.getTime())) return false;
+    return dateTime.getTime() < Date.now();
+  } catch (e) {
+    return false;
+  }
+}
+
+function bookingSlotsLoadData() {
+  const container = getElement("bookingSlots-tableContainer");
+  if (container) {
+    container.innerHTML = `<div class="loading">${t("loading")}</div>`;
+  }
+
+  const directionKey = bookingSlotsGetDirectionKey();
+  const rows = allRows.filter(
+    (r) => String(r["去程 / 回程"]).trim() === selectedDirection
+  );
+  const slotsMap = new Map();
+
+  rows.forEach((r) => {
+    const date = fmtDateLabel(r["日期"]);
+    const time = fmtTimeLabel(r["班次"] || r["車次"]);
+    const stationName = String(r["站點"] || "").trim();
+    const stationKey = bookingSlotsNormalizeStationKey(stationName);
+    if (!date || !time || !stationKey) return;
+
+    const key = `${date}|${time}`;
+    if (!slotsMap.has(key)) {
+      slotsMap.set(key, {
+        date,
+        time,
+        datetime: `${date} ${time}`,
+        stations: {
+          outbound: { mrt: null, train: null, lala: null },
+          inbound: { mrt: null, train: null, lala: null }
+        },
+        stationNames: {
+          outbound: {},
+          inbound: {}
+        }
+      });
+    }
+    const slot = slotsMap.get(key);
+    const availText = String(
+      r["可預約人數"] || r["可約人數 / Available"] || ""
+    ).trim();
+    const avail = bookingSlotsParseAvailability(availText);
+    slot.stations[directionKey][stationKey] = avail;
+    slot.stationNames[directionKey][stationKey] = stationName;
   });
 
-  if (filtered.length === 0) {
+  bookingSlotsData.allTimeSlots = Array.from(slotsMap.values()).sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    return a.time.localeCompare(b.time);
+  });
+
+  bookingSlotsData.currentFilter.date = "all";
+  bookingSlotsData.currentFilter.station = "all";
+  bookingSlotsData.currentFilter.direction = directionKey;
+
+  bookingSlotsInitDateFilter();
+  bookingSlotsUpdateFilterButtons("direction", directionKey);
+  bookingSlotsLockDirectionButtons(directionKey);
+  bookingSlotsApplyFilters();
+}
+
+function bookingSlotsInitDateFilter() {
+  const dateFilter = getElement("bookingSlots-dateFilter");
+  if (!dateFilter) return;
+  const dates = [
+    ...new Set(bookingSlotsData.allTimeSlots.map((s) => s.date))
+  ].sort();
+  dateFilter.innerHTML = "";
+  const optAll = document.createElement("option");
+  optAll.value = "all";
+  optAll.textContent = t("allDates");
+  dateFilter.appendChild(optAll);
+  dates.forEach((date) => {
+    const option = document.createElement("option");
+    option.value = date;
+    option.textContent = bookingSlotsFormatDate(date);
+    dateFilter.appendChild(option);
+  });
+}
+
+function bookingSlotsFilterByDate() {
+  const dateFilter = getElement("bookingSlots-dateFilter");
+  bookingSlotsData.currentFilter.date = dateFilter ? dateFilter.value : "all";
+  bookingSlotsApplyFilters();
+}
+
+function bookingSlotsFilterByDirection(direction) {
+  const directionKey = bookingSlotsGetDirectionKey();
+  if (direction !== directionKey) {
+    bookingSlotsUpdateFilterButtons("direction", directionKey);
+    return;
+  }
+  bookingSlotsData.currentFilter.direction = direction;
+  bookingSlotsUpdateFilterButtons("direction", direction);
+  bookingSlotsApplyFilters();
+}
+
+function bookingSlotsFilterByStation(station) {
+  bookingSlotsData.currentFilter.station = station;
+  bookingSlotsUpdateFilterButtons("station", station);
+  bookingSlotsApplyFilters();
+}
+
+function bookingSlotsUpdateFilterButtons(type, value) {
+  const buttons = document.querySelectorAll(
+    `#bookingTimeSlots [data-filter-type="${type}"]`
+  );
+  buttons.forEach((btn) => {
+    if (btn.dataset.filter === value) btn.classList.add("active");
+    else btn.classList.remove("active");
+  });
+}
+
+function bookingSlotsLockDirectionButtons(directionKey) {
+  const buttons = document.querySelectorAll(
+    `#bookingTimeSlots [data-filter-type="direction"]`
+  );
+  buttons.forEach((btn) => {
+    const isAllowed = btn.dataset.filter === directionKey;
+    if (!isAllowed) {
+      btn.classList.add("disabled");
+      btn.disabled = true;
+    } else {
+      btn.classList.remove("disabled");
+      btn.disabled = false;
+    }
+  });
+}
+
+function bookingSlotsApplyFilters() {
+  bookingSlotsData.filteredTimeSlots = bookingSlotsData.allTimeSlots.filter((slot) => {
+    if (bookingSlotsData.currentFilter.date !== "all" && slot.date !== bookingSlotsData.currentFilter.date) {
+      return false;
+    }
+
+    const directionKey = bookingSlotsData.currentFilter.direction;
+    const stationFilter = bookingSlotsData.currentFilter.station;
+
+    if (stationFilter === "all") return true;
+
+    const avail = slot.stations[directionKey][stationFilter];
+    return avail !== null;
+  });
+
+  bookingSlotsUpdateStats();
+  bookingSlotsRenderTable();
+}
+
+function bookingSlotsUpdateStats() {
+  const totalSlotsEl = getElement("bookingSlots-totalSlots");
+  if (totalSlotsEl) {
+    totalSlotsEl.textContent = bookingSlotsData.filteredTimeSlots.length;
+  }
+}
+
+function bookingSlotsRenderTable() {
+  const container = getElement("bookingSlots-tableContainer");
+  if (!container) return;
+
+  if (bookingSlotsData.filteredTimeSlots.length === 0) {
     container.innerHTML = `<div class="empty-state">${t("noSchedules")}</div>`;
     return;
   }
 
-  const grouped = new Map();
-  filtered.forEach((row) => {
-    if (!grouped.has(row.date)) grouped.set(row.date, []);
-    grouped.get(row.date).push(row);
+  const directionKey = bookingSlotsData.currentFilter.direction;
+  const showOutbound = directionKey === "outbound";
+  const showInbound = directionKey === "inbound";
+  const showAllStations = bookingSlotsData.currentFilter.station === "all";
+  const showMrt = showAllStations || bookingSlotsData.currentFilter.station === "mrt";
+  const showTrain = showAllStations || bookingSlotsData.currentFilter.station === "train";
+  const showLala = showAllStations || bookingSlotsData.currentFilter.station === "lala";
+  const colCount =
+    (showMrt ? 1 : 0) + (showTrain ? 1 : 0) + (showLala ? 1 : 0);
+
+  let html = '<div class="time-slot-table">';
+  const groupedByDate = {};
+  bookingSlotsData.filteredTimeSlots.forEach((slot) => {
+    if (!groupedByDate[slot.date]) groupedByDate[slot.date] = [];
+    groupedByDate[slot.date].push(slot);
   });
 
-  const sortedDates = [...grouped.keys()].sort((a, b) => new Date(a) - new Date(b));
-
-  const html = sortedDates.map((date) => {
-    const rows = grouped.get(date) || [];
-    rows.sort((a, b) => a.time.localeCompare(b.time));
-    const body = rows.map((row) => {
-      const disabled = row.capacity <= 0;
-      const btnText = disabled ? t("soldOut") : String(row.capacity);
-      const btnClass = disabled ? "slot-capacity-btn disabled" : "slot-capacity-btn";
-      const stationAttr = encodeURIComponent(row.station);
-      return `
-        <tr>
-          <td class="time">${row.time}</td>
-          <td class="station">${sanitize(row.station)}</td>
-          <td class="capacity">
-            <button class="${btnClass}" ${disabled ? "disabled" : ""} data-date="${row.date}" data-time="${row.time}" data-station="${stationAttr}" data-capacity="${row.capacity}">
-              ${btnText}
-            </button>
-          </td>
-        </tr>
+  Object.keys(groupedByDate)
+    .sort()
+    .forEach((date) => {
+      const slots = groupedByDate[date];
+      html += `
+        <div class="date-card">
+          <div class="date-card-header">${bookingSlotsFormatDate(date)}</div>
+          <div class="date-card-content">
+            <table>
+              <thead>
+                <tr>
+                  <th class="time-col" rowspan="2">${t("labelScheduleOnly")}</th>
+                  ${colCount > 0 ? `
+                  <th class="direction" colspan="${colCount}">
+                    <div class="direction-header">
+                      <span class="direction-badge">${directionKey === "outbound" ? t("dirOutShort") : t("dirInShort")}</span>
+                    </div>
+                  </th>
+                  ` : ""}
+                </tr>
+                <tr>
+                  ${showOutbound || showInbound ? `
+                  ${showMrt ? `<th class="station">${t("stationMrt")}</th>` : ""}
+                  ${showTrain ? `<th class="station">${t("stationTrain")}</th>` : ""}
+                  ${showLala ? `<th class="station">${t("stationLala")}</th>` : ""}
+                  ` : ""}
+                </tr>
+              </thead>
+              <tbody>
       `;
-    }).join("");
+      slots.forEach((slot) => {
+        html += `<tr>`;
+        html += `<td class="time-col"><span class="datetime-time">${slot.time}</span></td>`;
+        if (showOutbound || showInbound) {
+          if (showMrt) {
+            html += `<td class="station-cell">${bookingSlotsRenderStationCell(slot, directionKey, "mrt")}</td>`;
+          }
+          if (showTrain) {
+            html += `<td class="station-cell">${bookingSlotsRenderStationCell(slot, directionKey, "train")}</td>`;
+          }
+          if (showLala) {
+            html += `<td class="station-cell">${bookingSlotsRenderStationCell(slot, directionKey, "lala")}</td>`;
+          }
+        }
+        html += `</tr>`;
+      });
+      html += `
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    });
 
-    return `
-      <div class="slot-date-card">
-        <div class="slot-date-header">${date}</div>
-        <table class="slot-table">
-          <thead>
-            <tr>
-              <th>${t("labelScheduleOnly")}</th>
-              <th>${t("labelStation")}</th>
-              <th style="text-align:right">${t("scheduleCapacityLabel")}</th>
-            </tr>
-          </thead>
-          <tbody>${body}</tbody>
-        </table>
-      </div>
-    `;
-  }).join("");
+  html += "</div>";
+  container.innerHTML = html;
 
-  container.innerHTML = `<div class="booking-slots">${html}</div>`;
-
-  container.querySelectorAll(".slot-capacity-btn:not(.disabled)").forEach((btn) => {
+  container.querySelectorAll(".station-value[data-capacity]").forEach((btn) => {
     btn.addEventListener("click", () => {
       selectedDateRaw = btn.getAttribute("data-date") || "";
       selectedScheduleTime = btn.getAttribute("data-time") || "";
@@ -916,6 +1065,30 @@ function renderBookingSlotResults() {
       toStep6();
     });
   });
+}
+
+function bookingSlotsRenderStationCell(slot, directionKey, stationKey) {
+  const available = slot.stations[directionKey][stationKey];
+  const stationName =
+    slot.stationNames[directionKey][stationKey] ||
+    bookingSlotsStationNameMap[stationKey] ||
+    "";
+
+  if (available === null) {
+    const departed = bookingSlotsIsDeparted(slot.date, slot.time);
+    const label = departed ? t("slotDeparted") : t("slotNotOpen");
+    return `<span class="station-value unavailable">${label}</span>`;
+  }
+  if (available <= 0) {
+    return `<span class="station-value soldout">${t("soldOut")}</span>`;
+  }
+
+  const stationAttr = encodeURIComponent(stationName);
+  return `
+    <button class="station-value" data-date="${slot.date}" data-time="${slot.time}" data-station="${stationAttr}" data-capacity="${available}">
+      ${available}
+    </button>
+  `;
 }
 
 /* ====== Step 5 ====== */
