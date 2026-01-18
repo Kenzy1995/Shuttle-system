@@ -403,6 +403,20 @@
     .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
     .loading-text { text-align: center; padding: 20px; color: var(--muted); }
 
+    /* === 預約班次列表 === */
+    .booking-slots { display: flex; flex-direction: column; gap: 12px; }
+    .slot-date-card { border: 1px solid #e7e7e7; border-radius: 12px; overflow: hidden; background: #fff; box-shadow: var(--shadow); }
+    .slot-date-header { background: #f7f2ee; padding: 10px 14px; font-weight: 800; color: var(--primary); }
+    .slot-table { width: 100%; border-collapse: collapse; }
+    .slot-table th, .slot-table td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+    .slot-table th { background: #fafafa; text-align: left; font-weight: 800; color: #333; }
+    .slot-table td.time { width: 90px; font-weight: 700; color: var(--primary); }
+    .slot-table td.station { color: var(--text); }
+    .slot-table td.capacity { text-align: right; }
+    .slot-capacity-btn { padding: 6px 10px; border-radius: 10px; border: 1px solid var(--primary); background: #fff; color: var(--primary); font-weight: 800; cursor: pointer; }
+    .slot-capacity-btn:hover { background: var(--primary); color: #fff; }
+    .slot-capacity-btn.disabled { border-color: #ddd; color: #aaa; cursor: not-allowed; background: #f7f7f7; }
+
     /* === 可收合區塊 === */
     .collapsible .collapsible-header{
       display:flex; align-items:center; justify-content:space-between; cursor:pointer;
@@ -495,47 +509,29 @@
       </div>
     </section>
 
-    <!-- Step 2：日期 -->
+    <!-- Step 2：班次/站點 -->
     <section id="step2" class="card wizard-fixed" style="display:none">
-      <h2 data-i18n="step2Title">選擇日期</h2>
-      <div class="field">
-        <label class="label" data-i18n="labelDate">請選擇日期<span style="color:#b00020">*</span></label>
-        <div id="dateList" class="options"></div>
+      <h2 data-i18n="step2Title">選擇班次</h2>
+      <div class="hint" data-i18n="slotHint">點選可預約人數以選擇班次</div>
+      <div class="filter-group" style="margin-top:10px">
+        <div id="bookingAllFilter" class="filter-pills"></div>
+      </div>
+      <div class="filter-controls">
+        <div class="filter-group">
+          <label class="label" data-i18n="labelDate">日期</label>
+          <div id="bookingDateFilter" class="filter-pills"></div>
+        </div>
+        <div class="filter-group">
+          <label class="label" data-i18n="labelStation">站點</label>
+          <div id="bookingStationFilter" class="filter-pills"></div>
+        </div>
+      </div>
+      <div id="bookingSlotsResults" class="schedule-results">
+        <div class="loading-text" data-i18n="loading">資料讀取中…</div>
       </div>
       <div class="actions">
         <button class="button btn-ghost" onclick="goStep(1)" data-i18n="back">返回</button>
         <button class="button btn-ghost" onclick="restart()" data-i18n="requery">重新查詢</button>
-      </div>
-    </section>
-
-    <!-- Step 3：站點 -->
-    <section id="step3" class="card wizard-fixed" style="display:none">
-      <h2 data-i18n="step3Title">選擇站點</h2>
-      <div class="field">
-        <label class="label" data-i18n="labelFixedStation">固定站點</label>
-        <input id="fixedStation" class="readonly" type="text" readonly value="福泰大飯店 Forte Hotel" />
-      </div>
-      <div class="field">
-        <label class="label" data-i18n="labelStation">請選擇站點<span style="color:#b00020">*</span></label>
-        <div id="stationList" class="options"></div>
-      </div>
-      <div class="actions">
-        <button class="button btn-ghost" onclick="goStep(2)" data-i18n="back">返回</button>
-        <button class="button btn-ghost" onclick="restart()" data-i18n="requery">重新查詢</button>
-      </div>
-    </section>
-
-    <!-- Step 4：班次 -->
-    <section id="step4" class="card wizard-fixed" style="display:none">
-      <h2 data-i18n="step4Title">選擇班次</h2>
-      <div class="field">
-        <label class="label" data-i18n="labelSchedule">請選擇班次<span style="color:#b00020">*</span></label>
-        <div id="scheduleList" class="options"></div>
-        <div class="hint" data-i18n="scheduleHint">點選班次以繼續</div>
-      </div>
-      <div class="actions">
-        <button class="button btn-ghost" onclick="goStep(3)" data-i18n="back">返回</button>
-        <button id="btnStep4Restart" class="button btn-ghost" onclick="restart()" data-i18n="requery">重新查詢</button>
       </div>
     </section>
 
@@ -605,7 +601,7 @@
         <div id="passengersErr" class="error" data-i18n="errPassengers">請選擇正確的人數（不可超過可預約人數或4人）</div>
       </div>
       <div class="actions row">
-        <button class="button btn-ghost" onclick="goStep(4)" data-i18n="back">返回</button>
+        <button class="button btn-ghost" onclick="goStep(2)" data-i18n="back">返回</button>
         <button class="button" onclick="submitBooking()" data-i18n="submit">提交預約</button>
       </div>
     </section>
