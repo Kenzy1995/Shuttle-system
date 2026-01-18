@@ -908,6 +908,7 @@ function bookingSlotsLoadData() {
   bookingSlotsData.currentFilter.direction = directionKey;
 
   bookingSlotsInitDateFilter();
+  bookingSlotsInitStationFilter();
   bookingSlotsUpdateFilterButtons("direction", directionKey);
   bookingSlotsLockDirectionButtons(directionKey);
   bookingSlotsApplyFilters();
@@ -945,9 +946,32 @@ function bookingSlotsFilterByDirection(direction) {
 }
 
 function bookingSlotsFilterByStation(station) {
-  bookingSlotsData.currentFilter.station = station;
-  bookingSlotsUpdateFilterButtons("station", station);
+  const stationFilter = getElement("bookingSlots-stationFilter");
+  bookingSlotsData.currentFilter.station = stationFilter ? stationFilter.value : "all";
   bookingSlotsApplyFilters();
+}
+
+function bookingSlotsInitStationFilter() {
+  const stationFilter = getElement("bookingSlots-stationFilter");
+  if (!stationFilter) return;
+  stationFilter.innerHTML = "";
+  const optAll = document.createElement("option");
+  optAll.value = "all";
+  optAll.textContent = t("allStations");
+  stationFilter.appendChild(optAll);
+
+  const stationOptions = [
+    { key: "mrt", label: t("stationMrtFull") },
+    { key: "train", label: t("stationTrainFull") },
+    { key: "lala", label: t("stationLalaFull") }
+  ];
+  stationOptions.forEach((station) => {
+    const option = document.createElement("option");
+    option.value = station.key;
+    option.textContent = station.label;
+    stationFilter.appendChild(option);
+  });
+  stationFilter.value = bookingSlotsData.currentFilter.station || "all";
 }
 
 function bookingSlotsUpdateFilterButtons(type, value) {
