@@ -791,15 +791,16 @@ function onLanguageChange(lang) {
   }
 
   // ✅ 預約班次列表：語言切換時重新渲染表格標題/站點
+  if (typeof bookingSlotsInitStationFilter === "function") {
+    bookingSlotsInitStationFilter();
+  }
   if (
     typeof bookingSlotsRenderTable === "function" &&
-    window.bookingSlotsData &&
-    bookingSlotsData.filteredTimeSlots &&
-    bookingSlotsData.filteredTimeSlots.length
+    typeof bookingSlotsData !== "undefined" &&
+    bookingSlotsData &&
+    bookingSlotsData.allTimeSlots &&
+    bookingSlotsData.allTimeSlots.length
   ) {
-    if (typeof bookingSlotsInitStationFilter === "function") {
-      bookingSlotsInitStationFilter();
-    }
     bookingSlotsRenderTable();
   }
 
