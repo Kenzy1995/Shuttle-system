@@ -769,6 +769,7 @@ function toStep2() {
     step2Title.textContent =
       selectedDirection === "回程" ? t("step2TitleInbound") : t("step2TitleOutbound");
   }
+  updateStep2Hints();
   bookingSlotsLoadData();
   goStep(2);
 }
@@ -857,6 +858,7 @@ function bookingSlotsLoadData() {
     step2Title.textContent =
       directionKey === "inbound" ? t("step2TitleInbound") : t("step2TitleOutbound");
   }
+  updateStep2Hints(directionKey);
   const rows = allRows.filter(
     (r) => String(r["去程 / 回程"]).trim() === selectedDirection
   );
@@ -972,6 +974,25 @@ function bookingSlotsInitStationFilter() {
     stationFilter.appendChild(option);
   });
   stationFilter.value = bookingSlotsData.currentFilter.station || "all";
+}
+
+function updateStep2Hints(directionKey = bookingSlotsGetDirectionKey()) {
+  const pickupValue = getElement("pickupHintValue");
+  const dropoffValue = getElement("dropoffHintValue");
+  if (!pickupValue || !dropoffValue) return;
+  const hotelText = t("forteHotel");
+  const selectText = t("pleaseSelect");
+  if (directionKey === "inbound") {
+    pickupValue.textContent = selectText;
+    pickupValue.classList.add("hint-alert");
+    dropoffValue.textContent = hotelText;
+    dropoffValue.classList.remove("hint-alert");
+  } else {
+    pickupValue.textContent = hotelText;
+    pickupValue.classList.remove("hint-alert");
+    dropoffValue.textContent = selectText;
+    dropoffValue.classList.add("hint-alert");
+  }
 }
 
 function bookingSlotsUpdateFilterButtons(type, value) {
