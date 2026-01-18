@@ -403,6 +403,211 @@
     .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
     .loading-text { text-align: center; padding: 20px; color: var(--muted); }
 
+    /* === 預約班次列表（仿後台可預約班次樣式） === */
+    #bookingTimeSlots {
+      padding: 0;
+      background: var(--bg);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    #bookingTimeSlots .filters {
+      background: var(--card);
+      padding: 7px 16px;
+      border-bottom: 1px solid #e7e7e7;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+    #bookingTimeSlots .filter-section {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      align-items: center;
+    }
+    #bookingTimeSlots .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    #bookingTimeSlots .filter-label {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    #bookingTimeSlots .filter-select {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      background: #fff;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      min-width: 160px;
+      min-height: 36px;
+    }
+    #bookingTimeSlots .filter-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    #bookingTimeSlots .filter-btn {
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      background: #fff;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.2s;
+      min-height: 36px;
+    }
+    #bookingTimeSlots .filter-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: #f7f2ee;
+    }
+    #bookingTimeSlots .filter-btn.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    #bookingTimeSlots .filter-btn.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    #bookingTimeSlots .filter-stats {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+    #bookingTimeSlots .stat-label {
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    #bookingTimeSlots .stat-value {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text);
+    }
+    #bookingTimeSlots .time-slot-table {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 4px 12px;
+    }
+    #bookingTimeSlots .date-card {
+      margin-bottom: 12px;
+      border: 1px solid #e7e7e7;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+    #bookingTimeSlots .date-card:last-child {
+      margin-bottom: 0;
+    }
+    #bookingTimeSlots .date-card-header {
+      background: var(--primary);
+      color: #fff;
+      padding: 8px 12px;
+      font-weight: 800;
+      font-size: 14px;
+    }
+    #bookingTimeSlots .date-card-content thead {
+      background: #fafafa;
+    }
+    #bookingTimeSlots table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    #bookingTimeSlots th {
+      padding: 8px 10px;
+      text-align: center;
+      font-weight: 800;
+      font-size: 13px;
+      color: var(--text);
+      border-bottom: 2px solid #e7e7e7;
+    }
+    #bookingTimeSlots th.time-col {
+      width: 90px;
+    }
+    #bookingTimeSlots th.direction {
+      text-align: center;
+      font-size: 14px;
+      background: #f6f1eb;
+    }
+    #bookingTimeSlots th.station {
+      text-align: center;
+      width: 100px;
+      background: #f6f1eb;
+    }
+    #bookingTimeSlots td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #eee;
+      font-size: 13px;
+      vertical-align: middle;
+      text-align: center;
+      color: var(--text);
+    }
+    #bookingTimeSlots td.station-cell {
+      text-align: center;
+      font-weight: 800;
+    }
+    #bookingTimeSlots .station-value {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 10px;
+      background: #10b981;
+      color: #fff;
+      min-width: 56px;
+      font-size: 13px;
+      font-weight: 800;
+      text-align: center;
+      border: none;
+      cursor: pointer;
+    }
+    #bookingTimeSlots .station-value.unavailable {
+      background: #ef4444;
+      color: #fff;
+      cursor: not-allowed;
+    }
+    #bookingTimeSlots .station-value.soldout {
+      background: #9e9e9e;
+      color: #fff;
+      cursor: not-allowed;
+    }
+    #bookingTimeSlots .direction-badge {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      background: #f0e7dd;
+      color: var(--primary);
+    }
+    #bookingTimeSlots .loading,
+    #bookingTimeSlots .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+
     /* === 預約班次列表 === */
     .booking-slots { display: flex; flex-direction: column; gap: 12px; }
     .slot-date-card { border: 1px solid #e7e7e7; border-radius: 12px; overflow: hidden; background: #fff; box-shadow: var(--shadow); }
@@ -513,21 +718,41 @@
     <section id="step2" class="card wizard-fixed" style="display:none">
       <h2 data-i18n="step2Title">選擇班次</h2>
       <div class="hint" data-i18n="slotHint">點選可預約人數以選擇班次</div>
-      <div class="filter-group" style="margin-top:10px">
-        <div id="bookingAllFilter" class="filter-pills"></div>
-      </div>
-      <div class="filter-controls">
-        <div class="filter-group">
-          <label class="label" data-i18n="labelDate">日期</label>
-          <div id="bookingDateFilter" class="filter-pills"></div>
+      <div id="bookingTimeSlots">
+        <div class="filters">
+          <div class="filter-section">
+            <div class="filter-group">
+              <label class="filter-label" data-i18n="filterDateLabel">日期 / DATE</label>
+              <select class="filter-select" id="bookingSlots-dateFilter" onchange="bookingSlotsFilterByDate()">
+                <option value="all" data-i18n="allDates">全部日期</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label class="filter-label" data-i18n="filterDirectionLabel">方向 / DIRECTION</label>
+              <div class="filter-buttons">
+                <button class="filter-btn" data-filter="all" data-filter-type="direction" onclick="bookingSlotsFilterByDirection('all')" data-i18n="all">全部</button>
+                <button class="filter-btn" data-filter="outbound" data-filter-type="direction" onclick="bookingSlotsFilterByDirection('outbound')" data-i18n="dirOutShort">去程</button>
+                <button class="filter-btn" data-filter="inbound" data-filter-type="direction" onclick="bookingSlotsFilterByDirection('inbound')" data-i18n="dirInShort">回程</button>
+              </div>
+            </div>
+            <div class="filter-group">
+              <label class="filter-label" data-i18n="filterStationLabel">站點 / STATION</label>
+              <div class="filter-buttons">
+                <button class="filter-btn" data-filter="all" data-filter-type="station" onclick="bookingSlotsFilterByStation('all')" data-i18n="all">全部</button>
+                <button class="filter-btn" data-filter="mrt" data-filter-type="station" onclick="bookingSlotsFilterByStation('mrt')" data-i18n="stationMrt">捷運站</button>
+                <button class="filter-btn" data-filter="train" data-filter-type="station" onclick="bookingSlotsFilterByStation('train')" data-i18n="stationTrain">火車站</button>
+                <button class="filter-btn" data-filter="lala" data-filter-type="station" onclick="bookingSlotsFilterByStation('lala')" data-i18n="stationLala">LaLaport</button>
+              </div>
+            </div>
+          </div>
+          <div class="filter-stats">
+            <span class="stat-label" data-i18n="totalSlotsLabel">總時段數：</span>
+            <span class="stat-value" id="bookingSlots-totalSlots">0</span>
+          </div>
         </div>
-        <div class="filter-group">
-          <label class="label" data-i18n="labelStation">站點</label>
-          <div id="bookingStationFilter" class="filter-pills"></div>
+        <div id="bookingSlots-tableContainer">
+          <div class="loading-text" data-i18n="loading">資料讀取中…</div>
         </div>
-      </div>
-      <div id="bookingSlotsResults" class="schedule-results">
-        <div class="loading-text" data-i18n="loading">資料讀取中…</div>
       </div>
       <div class="actions">
         <button class="button btn-ghost" onclick="goStep(1)" data-i18n="back">返回</button>
