@@ -1041,9 +1041,9 @@ function bookingSlotsRenderTable() {
                 <tr>
                   <th class="time-col">${t("labelScheduleOnly")}</th>
                   ${showOutbound || showInbound ? `
-                  ${showMrt ? `<th class="station">${t("stationMrtLong")}</th>` : ""}
-                  ${showTrain ? `<th class="station">${t("stationTrainLong")}</th>` : ""}
-                  ${showLala ? `<th class="station">${t("stationLalaLong")}</th>` : ""}
+                  ${showMrt ? `<th class="station">${t("stationMrt")}</th>` : ""}
+                  ${showTrain ? `<th class="station">${t("stationTrain")}</th>` : ""}
+                  ${showLala ? `<th class="station">${t("stationLala")}</th>` : ""}
                   ` : ""}
                 </tr>
               </thead>
