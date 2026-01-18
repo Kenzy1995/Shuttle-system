@@ -437,8 +437,14 @@
       #bookingTimeSlots .filters { padding: 6px 12px; gap: 6px; align-items: flex-start; }
       #bookingTimeSlots .filter-section { flex-direction: column; gap: 6px; row-gap: 6px; align-items: flex-start; width: 100%; }
       #bookingTimeSlots .filter-group { gap: 4px; margin-bottom: 0; width: 100%; }
-      #bookingTimeSlots .filter-label { font-size: 11px; line-height: 1.2; margin-bottom: 2px; }
-      #bookingTimeSlots .filter-select { min-height: 36px; padding: 6px 32px 6px 10px; font-size: 14px; }
+      #bookingTimeSlots .filter-label { font-size: 11px !important; line-height: 1.2 !important; margin-bottom: 2px !important; }
+      #bookingTimeSlots .filter-select,
+      #bookingSlots-dateFilter,
+      #bookingSlots-stationFilter {
+        min-height: 36px !important;
+        padding: 6px 32px 6px 10px !important;
+        font-size: 14px !important;
+      }
     }
     #bookingTimeSlots .booking-hint {
       padding: 0 24px 0 calc(24px + 2em);
