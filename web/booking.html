@@ -670,25 +670,27 @@
     /* 手機版欄寬與表格縮小（集中在這裡，避免多重覆蓋） */
     @media (max-width: 768px) {
       #bookingTimeSlots {
-        --time-col-width: 70px;
-        --station-col-width: 70px;
-        --btn-width: 70px;
         --time-font-size: 14px;
       }
-      #bookingTimeSlots .date-card-content { overflow-x: auto; }
+      #bookingTimeSlots .date-card-content { overflow-x: hidden; }
       #bookingTimeSlots .date-card-content table {
-        width: max-content !important;
-        min-width: 0 !important;
+        width: 100% !important;
         table-layout: fixed;
       }
       #bookingTimeSlots th,
-      #bookingTimeSlots td { padding: 5px 4px; font-size: 10px; }
+      #bookingTimeSlots td { padding: 4px 4px; font-size: 10px; }
+      #bookingTimeSlots th.time-col,
+      #bookingTimeSlots td.time-col { width: 25%; }
+      #bookingTimeSlots th.station,
+      #bookingTimeSlots td.station-cell { width: 25%; }
       #bookingTimeSlots .station-value,
       #bookingTimeSlots .station-value.unavailable,
       #bookingTimeSlots .station-value.soldout {
-        width: var(--btn-width);
-        padding: 4px 4px;
+        width: 100%;
+        min-width: 0;
+        padding: 4px 2px;
         font-size: 10px;
+        box-sizing: border-box;
       }
       #bookingTimeSlots td.time-col .datetime-time { font-size: var(--time-font-size); }
     }
