@@ -267,6 +267,10 @@
     .mobile-tabbar .bar{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
     .mobile-tabbar button{ appearance:none;border:none;background:none;padding:12px 6px;font-size:18px;color:#fff;font-weight:700;opacity:.8 }
     .mobile-tabbar button.active{opacity:1;text-decoration:underline}
+    html[lang^="en"] .mobile-tabbar button,
+    html[lang^="ja"] .mobile-tabbar button{
+      font-size:16px;
+    }
 
     /* 回到頂端按鈕 */
     #scrollToTop{
@@ -389,11 +393,12 @@
       .ticket-actions.has-three button:nth-child(3) { width: 80%; max-width: 300px; }
 
       /* 班次列表表格縮小，避免超出右邊 */
-      #bookingTimeSlots .date-card-content table { width: 98%; }
+      #bookingTimeSlots .date-card-content { overflow-x: auto; }
+      #bookingTimeSlots .date-card-content table { width: max-content; min-width: 100%; }
       #bookingTimeSlots th,
-      #bookingTimeSlots td { padding: 6px 8px; font-size: 12px; }
-      #bookingTimeSlots th.time-col { width: 76px; }
-      #bookingTimeSlots .station-value { min-width: 56px; padding: 5px 10px; font-size: 12px; }
+      #bookingTimeSlots td { padding: 5px 6px; font-size: 10px; }
+      #bookingTimeSlots th.time-col { width: 68px; font-size: 12px; }
+      #bookingTimeSlots .station-value { min-width: 48px; padding: 4px 8px; font-size: 10px; }
     }
 
     .badge-alert{
