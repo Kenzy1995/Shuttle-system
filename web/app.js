@@ -810,6 +810,7 @@ function toStep2() {
       selectedDirection === "回程" ? t("step2TitleInbound") : t("step2TitleOutbound");
   }
   updateStep2Hints();
+  updateStep2StationLabel();
   bookingSlotsLoadData();
   goStep(2);
 }
@@ -899,6 +900,7 @@ function bookingSlotsLoadData() {
       directionKey === "inbound" ? t("step2TitleInbound") : t("step2TitleOutbound");
   }
   updateStep2Hints(directionKey);
+  updateStep2StationLabel(directionKey);
   const rows = allRows.filter(
     (r) => String(r["去程 / 回程"]).trim() === selectedDirection
   );
@@ -1033,6 +1035,12 @@ function updateStep2Hints(directionKey = bookingSlotsGetDirectionKey()) {
     dropoffValue.textContent = selectText;
     dropoffValue.classList.add("hint-alert");
   }
+}
+
+function updateStep2StationLabel(directionKey = bookingSlotsGetDirectionKey()) {
+  const labelEl = getElement("bookingStationLabel");
+  if (!labelEl) return;
+  labelEl.textContent = directionKey === "inbound" ? t("labelPickupStation") : t("labelDropoffStation");
 }
 
 function bookingSlotsUpdateFilterButtons(type, value) {
