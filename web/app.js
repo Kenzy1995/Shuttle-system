@@ -199,10 +199,12 @@ function handleScroll() {
   
   // 支援多種滾動位置獲取方式，確保手機版也能正常運作
   // 優先使用 scrollingElement（手機瀏覽器更穩定）
-  const scrollEl = document.scrollingElement || document.documentElement || document.body;
-  const windowScrollY = (scrollEl && typeof scrollEl.scrollTop === "number")
-    ? scrollEl.scrollTop
-    : (window.scrollY !== undefined ? window.scrollY : window.pageYOffset || 0);
+  const windowScrollY = Math.max(
+    document.documentElement ? document.documentElement.scrollTop || 0 : 0,
+    document.body ? document.body.scrollTop || 0 : 0,
+    window.scrollY !== undefined ? window.scrollY : 0,
+    window.pageYOffset || 0
+  );
   let containerScrollY = 0;
   if (scrollContainers.length) {
     scrollContainers.forEach((el) => {
@@ -258,6 +260,8 @@ function refreshScrollContainers() {
       }
     });
   }
+  if (document.documentElement) candidates.add(document.documentElement);
+  if (document.body) candidates.add(document.body);
 
   scrollContainers = Array.from(candidates);
   scrollContainers.forEach((el) => {
@@ -288,6 +292,7 @@ function showPage(id) {
   const pageEl = getElement(id);
   if (pageEl) pageEl.classList.add("active");
   refreshScrollContainers();
+  handleScroll();
 
   // 優化：使用緩存的查詢結果
   const navButtons = document.querySelectorAll(".nav-links button");
