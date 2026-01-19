@@ -685,10 +685,17 @@
       }
       #bookingTimeSlots th,
       #bookingTimeSlots td { padding: 5px 4px; font-size: 10px; }
-      #bookingTimeSlots th.time-col { width: 34px; font-size: 14px; }
-      #bookingTimeSlots th.station { width: 34px; }
-      #bookingTimeSlots td.station-cell { width: 34px; }
-      #bookingTimeSlots .station-value { min-width: 34px; padding: 4px 4px; font-size: 10px; }
+      #bookingTimeSlots th.time-col { width: 40px; font-size: 14px; }
+      #bookingTimeSlots th.station { width: 40px; }
+      #bookingTimeSlots td.station-cell { width: 40px; }
+      #bookingTimeSlots .station-value,
+      #bookingTimeSlots .station-value.unavailable,
+      #bookingTimeSlots .station-value.soldout {
+        min-width: 40px;
+        width: 40px;
+        padding: 4px 4px;
+        font-size: 10px;
+      }
       #bookingTimeSlots td.time-col .datetime-time { font-size: 16px; }
     }
     #bookingTimeSlots .station-value.selected {
