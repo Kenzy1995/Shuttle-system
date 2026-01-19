@@ -397,10 +397,10 @@
       #bookingTimeSlots .date-card-content table { width: max-content; min-width: 100%; table-layout: fixed; }
       #bookingTimeSlots th,
       #bookingTimeSlots td { padding: 5px 6px; font-size: 10px; }
-      #bookingTimeSlots th.time-col { width: 34px; font-size: 14px; }
-      #bookingTimeSlots th.station { width: 34px; }
-      #bookingTimeSlots td.station-cell { width: 34px; }
-      #bookingTimeSlots .station-value { min-width: 34px; padding: 4px 4px; font-size: 10px; }
+      #bookingTimeSlots th.time-col { width: 44px; font-size: 14px; }
+      #bookingTimeSlots th.station { width: 44px; }
+      #bookingTimeSlots td.station-cell { width: 44px; }
+      #bookingTimeSlots .station-value { min-width: 44px; padding: 4px 4px; font-size: 10px; }
       #bookingTimeSlots td.time-col .datetime-time { font-size: 16px; }
     }
 
@@ -878,7 +878,7 @@
               </select>
             </div>
             <div class="filter-group">
-              <label class="filter-label" data-i18n="filterStationLabel">站點 / STATION</label>
+              <label class="filter-label" id="bookingStationLabel" data-i18n="filterStationLabel">站點 / STATION</label>
               <select class="filter-select" id="bookingSlots-stationFilter" onchange="bookingSlotsFilterByStation()">
                 <option value="all" data-i18n="allStations">全部站點</option>
               </select>
