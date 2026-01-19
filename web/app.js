@@ -200,9 +200,18 @@ function handleScroll() {
   // 支援多種滾動位置獲取方式，確保手機版也能正常運作
   // 優先使用 scrollingElement（手機瀏覽器更穩定）
   const scrollEl = document.scrollingElement || document.documentElement || document.body;
-  const y = (scrollEl && typeof scrollEl.scrollTop === "number")
+  const windowScrollY = (scrollEl && typeof scrollEl.scrollTop === "number")
     ? scrollEl.scrollTop
     : (window.scrollY !== undefined ? window.scrollY : window.pageYOffset || 0);
+  let containerScrollY = 0;
+  if (scrollContainers.length) {
+    scrollContainers.forEach((el) => {
+      if (el && typeof el.scrollTop === "number") {
+        containerScrollY = Math.max(containerScrollY, el.scrollTop);
+      }
+    });
+  }
+  const y = Math.max(windowScrollY, containerScrollY);
   
   // 手機版使用更小的滾動閾值（因為畫面高度較小）
   const isMobile = window.innerWidth <= 768;
@@ -233,6 +242,31 @@ function handleScroll() {
   }
 }
 
+let scrollContainers = [];
+function refreshScrollContainers() {
+  const candidates = new Set();
+  const activePage = document.querySelector(".page.active");
+  if (activePage) {
+    candidates.add(activePage);
+    activePage.querySelectorAll("*").forEach((el) => {
+      const style = window.getComputedStyle(el);
+      if (
+        (style.overflowY === "auto" || style.overflowY === "scroll") &&
+        el.scrollHeight > el.clientHeight
+      ) {
+        candidates.add(el);
+      }
+    });
+  }
+
+  scrollContainers = Array.from(candidates);
+  scrollContainers.forEach((el) => {
+    if (!el || el.dataset.scrollListenerBound) return;
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    el.dataset.scrollListenerBound = "true";
+  });
+}
+
 // 回到頂部函數（確保手機版也能正常觸發）
 function scrollToTop() {
   // 使用多種方式確保滾動到頂部
@@ -253,6 +287,7 @@ function showPage(id) {
   pages.forEach((p) => p.classList.remove("active"));
   const pageEl = getElement(id);
   if (pageEl) pageEl.classList.add("active");
+  refreshScrollContainers();
 
   // 優化：使用緩存的查詢結果
   const navButtons = document.querySelectorAll(".nav-links button");
