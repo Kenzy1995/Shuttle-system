@@ -387,6 +387,13 @@
       .ticket-actions.has-three button:nth-child(1),
       .ticket-actions.has-three button:nth-child(2) { width: 45%; max-width: 180px; }
       .ticket-actions.has-three button:nth-child(3) { width: 80%; max-width: 300px; }
+
+      /* 班次列表表格縮小，避免超出右邊 */
+      #bookingTimeSlots .date-card-content table { width: 98%; }
+      #bookingTimeSlots th,
+      #bookingTimeSlots td { padding: 6px 8px; font-size: 12px; }
+      #bookingTimeSlots th.time-col { width: 76px; }
+      #bookingTimeSlots .station-value { min-width: 56px; padding: 5px 10px; font-size: 12px; }
     }
 
     .badge-alert{
