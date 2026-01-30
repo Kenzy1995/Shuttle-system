@@ -3309,6 +3309,60 @@ function initLiveLocation(mount) {
     }
   };
   
+  // 優化：更新已走過的路線（基於路線進度索引）
+  let lastProgressIndex = -1;
+  let lastRenderedProgressIndex = -1;
+  let lastHistoryLength = 0;
+
+  function getNearestPathIndex(path, lat, lng) {
+    if (!path || !path.length || typeof lat !== "number" || typeof lng !== "number") {
+      return null;
+    }
+    let nearestIdx = 0;
+    let best = Infinity;
+    for (let i = 0; i < path.length; i++) {
+      const pt = path[i];
+      const dx = pt.lat() - lat;
+      const dy = pt.lng() - lng;
+      const dist = dx * dx + dy * dy;
+      if (dist < best) {
+        best = dist;
+        nearestIdx = i;
+      }
+    }
+    return nearestIdx;
+  }
+
+  function getProgressIndex(data, driverPos, path) {
+    let progressIdx = -1;
+    const history = data.current_trip_path_history;
+    if (history && Array.isArray(history) && history.length > 0) {
+      lastHistoryLength = history.length;
+      const step = history.length > 200 ? 5 : 1;
+      for (let i = 0; i < history.length; i += step) {
+        const p = history[i];
+        const idx = getNearestPathIndex(path, p.lat, p.lng);
+        if (idx !== null && idx > progressIdx) {
+          progressIdx = idx;
+        }
+      }
+    } else if (driverPos) {
+      const idx = getNearestPathIndex(path, driverPos.lat, driverPos.lng);
+      if (idx !== null) {
+        progressIdx = idx;
+      }
+    }
+    if (progressIdx < 0) {
+      return null;
+    }
+    if (progressIdx < lastProgressIndex) {
+      progressIdx = lastProgressIndex;
+    } else {
+      lastProgressIndex = progressIdx;
+    }
+    return progressIdx;
+  }
+
   // 更新站點列表
   const updateStationsList = (data, driverPos) => {
     if (!stationsList || !data.current_trip_route || !data.current_trip_route.stops) {
@@ -3319,6 +3373,8 @@ function initLiveLocation(mount) {
     const completedStops = data.current_trip_completed_stops || [];
     const tripDateTime = data.current_trip_datetime || "";
     const driverLocation = driverPos || (data.driver_location && typeof data.driver_location.lat === "number" ? { lat: data.driver_location.lat, lng: data.driver_location.lng } : null);
+    const routePath = mainPolyline ? mainPolyline.getPath().getArray() : [];
+    const progressIdx = routePath.length > 0 ? getProgressIndex(data, driverLocation, routePath) : null;
     
     // 解析主班次時間（第一站使用）
     let mainTripTime = null;
@@ -3341,65 +3397,12 @@ function initLiveLocation(mount) {
       const stopCoord = typeof stop === "object" && stop.lat ? { lat: stop.lat, lng: stop.lng } : stationCoords[stopName] || null;
       const isCompleted = completedStops.includes(stopName);
       
-      // 判斷站點是否已經過了（根據司機位置和路線）
+      // 判斷站點是否已經過了（使用路線進度索引，避免折返誤判）
       let isPassed = false;
-      if (driverLocation && stopCoord && data.current_trip_route && data.current_trip_route.path) {
-        // 獲取路線路徑
-        const routePath = data.current_trip_route.path || [];
-        if (routePath.length > 0) {
-          // 找到站點在路線上的最近點索引
-          let stationNearestIdx = 0;
-          let stationBestDist = Infinity;
-          for (let i = 0; i < routePath.length; i++) {
-            const point = routePath[i];
-            const dx = point.lat - stopCoord.lat;
-            const dy = point.lng - stopCoord.lng;
-            const dist = dx * dx + dy * dy;
-            if (dist < stationBestDist) {
-              stationBestDist = dist;
-              stationNearestIdx = i;
-            }
-          }
-          
-          // 找到司機當前位置在路線上的最近點索引
-          let driverNearestIdx = 0;
-          let driverBestDist = Infinity;
-          for (let i = 0; i < routePath.length; i++) {
-            const point = routePath[i];
-            const dx = point.lat - driverLocation.lat;
-            const dy = point.lng - driverLocation.lng;
-            const dist = dx * dx + dy * dy;
-            if (dist < driverBestDist) {
-              driverBestDist = dist;
-              driverNearestIdx = i;
-            }
-          }
-          
-          // 如果司機位置在路線上的索引 > 站點在路線上的索引，表示已經過了這個站點
-          // 或者如果有GPS歷史，檢查歷史中是否有點在站點之後
-          if (driverNearestIdx > stationNearestIdx) {
-            isPassed = true;
-          } else if (data.current_trip_path_history && Array.isArray(data.current_trip_path_history) && data.current_trip_path_history.length > 0) {
-            // 檢查GPS歷史中是否有點在站點之後
-            for (const historyPoint of data.current_trip_path_history) {
-              let historyNearestIdx = 0;
-              let historyBestDist = Infinity;
-              for (let i = 0; i < routePath.length; i++) {
-                const point = routePath[i];
-                const dx = point.lat - historyPoint.lat;
-                const dy = point.lng - historyPoint.lng;
-                const dist = dx * dx + dy * dy;
-                if (dist < historyBestDist) {
-                  historyBestDist = dist;
-                  historyNearestIdx = i;
-                }
-              }
-              if (historyNearestIdx > stationNearestIdx) {
-                isPassed = true;
-                break;
-              }
-            }
-          }
+      if (stopCoord && routePath.length > 0 && progressIdx !== null) {
+        const stationIdx = getNearestPathIndex(routePath, stopCoord.lat, stopCoord.lng);
+        if (stationIdx !== null && progressIdx > stationIdx) {
+          isPassed = true;
         }
       }
       
@@ -3598,8 +3601,6 @@ function initLiveLocation(mount) {
     // 不再更新任何內容
   };
   
-  // 優化：更新已走過的路線（基於GPS位置歷史，使用增量更新和快取）
-  let lastHistoryLength = 0; // 快取上次的歷史長度，用於增量更新
   const updateWalkedRoute = async (data, driverPos = null) => {
     // 檢查 Google Maps API 是否已載入
     if (!window.google || !window.google.maps || !mainPolyline || !data.current_trip_route) {
@@ -3607,60 +3608,17 @@ function initLiveLocation(mount) {
     }
     
     const path = mainPolyline.getPath().getArray();
-    
-    // 優化：使用GPS位置歷史來判斷走過的路線
-    // 這樣可以準確處理折返情況，不會誤判
-    let walkedPath = [];
-    let shouldUpdate = false;
-    
-    // 如果有GPS位置歷史，使用歷史來繪製走過的路線
-    if (data.current_trip_path_history && Array.isArray(data.current_trip_path_history) && data.current_trip_path_history.length > 0) {
-      // 優化：增量更新 - 只處理新增的點
-      const currentHistoryLength = data.current_trip_path_history.length;
-      if (currentHistoryLength !== lastHistoryLength) {
-        shouldUpdate = true;
-        lastHistoryLength = currentHistoryLength;
-        
-        // 優化：如果歷史點太多，進行抽樣（每5個點取1個）
-        const historyPoints = data.current_trip_path_history;
-        const sampledPoints = historyPoints.length > 200 
-          ? historyPoints.filter((_, idx) => idx % 5 === 0 || idx === historyPoints.length - 1)
-          : historyPoints;
-        
-        // 將GPS歷史位置轉換為Google Maps LatLng對象
-        walkedPath = sampledPoints.map(point => 
-          new google.maps.LatLng(point.lat, point.lng)
-        );
-      }
-    } else if (driverPos) {
-      // 如果沒有歷史，使用當前位置和路線的最近點來判斷
-      // 找到當前位置在路線上的最近點
-      let nearestIdx = 0, best = Infinity;
-      for (let i = 0; i < path.length; i++) {
-        const dx = path[i].lat() - driverPos.lat;
-        const dy = path[i].lng() - driverPos.lng;
-        const dist = dx * dx + dy * dy;
-        if (dist < best) {
-          best = dist;
-          nearestIdx = i;
-        }
-      }
-      // 繪製從起點到最近點的路線
-      const newPath = path.slice(0, Math.max(1, nearestIdx + 1));
-      
-      // 優化：只有當路線改變時才更新
-      if (!walkedPolyline || walkedPolyline.getPath().getLength() !== newPath.length) {
-        shouldUpdate = true;
-        walkedPath = newPath;
-      }
+    const progressIdx = getProgressIndex(data, driverPos, path);
+    if (progressIdx === null) {
+      return;
     }
+    if (progressIdx === lastRenderedProgressIndex) {
+      return;
+    }
+    lastRenderedProgressIndex = progressIdx;
     
-    // 優化：只有當需要更新時才重新繪製
-    if (shouldUpdate && walkedPath.length > 1) {
-      // 清除舊的路線
-      if (walkedPolyline) walkedPolyline.setMap(null);
-      
-      // 繪製灰色路線（走過的路線）
+    const walkedPath = path.slice(0, Math.max(1, progressIdx + 1));
+    if (!walkedPolyline) {
       walkedPolyline = new google.maps.Polyline({ 
         path: walkedPath, 
         strokeColor: "#808080", // 灰色（走過的路線）
@@ -3669,6 +3627,8 @@ function initLiveLocation(mount) {
         map,
         zIndex: 2
       });
+    } else {
+      walkedPolyline.setPath(walkedPath);
     }
   };
   const endedOverlay = mount.querySelector("#rt-ended-overlay");
@@ -3718,6 +3678,9 @@ function initLiveLocation(mount) {
   let firebaseListeners = []; // Firebase 監聽器引用，用於清理
   let firebaseConnected = false; // Firebase 連接狀態
   let fallbackTimer = null; // 備用定時輪詢計時器
+  let hasCenteredOnce = false;
+  let lastAutoPanAt = 0;
+  const AUTO_PAN_COOLDOWN_MS = 5000;
   
   // 光子動畫已移除
   const ensureFirebase = async () => {
@@ -3825,6 +3788,10 @@ function initLiveLocation(mount) {
 
   const drawRoute = async (tripData) => {
     try {
+      // 重置路線進度快取，避免跨班次或路線更新造成誤判
+      lastProgressIndex = -1;
+      lastRenderedProgressIndex = -1;
+      lastHistoryLength = 0;
       if (!tripData || !tripData.current_trip_route) {
         // 如果沒有路線數據，使用站點數據繪製基本路線
         const stations = tripData.current_trip_stations?.stops || [];
@@ -4224,7 +4191,16 @@ function initLiveLocation(mount) {
         // 只有在 Google Maps API 已載入且地圖已初始化時才更新地圖
         if (window.google && window.google.maps && map && marker) {
           marker.setPosition(driverPos);
-          map.panTo(driverPos);
+          const now = Date.now();
+          const bounds = map.getBounds && map.getBounds();
+          const shouldPan =
+            !hasCenteredOnce ||
+            (bounds && typeof bounds.contains === "function" && !bounds.contains(driverPos));
+          if (shouldPan && now - lastAutoPanAt > AUTO_PAN_COOLDOWN_MS) {
+            map.panTo(driverPos);
+            lastAutoPanAt = now;
+            hasCenteredOnce = true;
+          }
         }
         // 更新圓形外圈位置
         if (window.google && window.google.maps && markerCircle) {
