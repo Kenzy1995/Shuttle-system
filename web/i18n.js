@@ -6,7 +6,7 @@ const TEXTS = {
     languageLabel: "語言",
     backToTopTitle: "回到頂端",
     closeLabel: "關閉",
-    soldOut: "已額滿",
+    soldOut: "額滿",
     noScheduleData: "目前暫無可預約班次",
     ticketNotFound: "找不到票卡",
     downloadFailedPrefix: "下載失敗：",
