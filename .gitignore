@@ -1,9 +1,20 @@
 # Tool scripts and documentation (not needed for deployment)
-*.py
-!booking-api/server.py
-!booking-manager/server.py
-!driver-api2/server.py
+# Python tool scripts
+analyze_*.py
+auto_cleanup_*.py
+check_*.py
+cleanup_*.py
+rebuild_*.py
+safe_cleanup_*.py
+preview_*.py
+keep_*.py
+simple_*.py
+tag_*.py
+
+# Shell scripts
 *.sh
+
+# Documentation (keep only README.md and LICENSE)
 *.md
 !README.md
 !LICENSE
