@@ -865,7 +865,13 @@ function onLanguageChange(lang) {
 }
 
 // 🔹 從 URL 參數初始化語言
+let languageInitialized = false;
 function initLanguageFromURL() {
+  // 防止重複執行
+  if (languageInitialized) {
+    return;
+  }
+  
   // 檢查 URL 參數中是否有 lang 參數
   const urlParams = new URLSearchParams(window.location.search);
   const langParam = urlParams.get("lang");
@@ -877,6 +883,9 @@ function initLanguageFromURL() {
   if (langParam && supportedLangs.includes(langParam)) {
     onLanguageChange(langParam);
   }
+  
+  // 標記為已初始化
+  languageInitialized = true;
 }
 
 // 🔹 頁面載入時自動從 URL 參數初始化語言
