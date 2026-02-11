@@ -1,3 +1,4 @@
+# Rebuild trigger: 2026-02-11
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from google.auth import default
