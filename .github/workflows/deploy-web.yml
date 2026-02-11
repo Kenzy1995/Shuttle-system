@@ -50,6 +50,37 @@ jobs:
             --port=8080 \
             --project=${{ secrets.GCP_PROJECT_ID }}
 
+      - name: Cleanup old revisions (keep only latest 1)
+        run: |
+          echo "清理舊的 Cloud Run revisions..."
+          REVISIONS=$(gcloud run revisions list --service=hotel-web --region=asia-east1 --format="value(metadata.name)" --project=${{ secrets.GCP_PROJECT_ID }} --sort-by=~metadata.creationTimestamp | tail -n +2)
+          if [ -n "$REVISIONS" ]; then
+            echo "$REVISIONS" | while read revision; do
+              echo "刪除舊 revision: $revision"
+              gcloud run revisions delete "$revision" --region=asia-east1 --quiet --project=${{ secrets.GCP_PROJECT_ID }} || true
+            done
+          else
+            echo "沒有舊 revisions 需要清理"
+          fi
+
+      - name: Cleanup old images (keep only latest 1)
+        run: |
+          echo "清理舊的 Artifact Registry 映像..."
+          CURRENT_IMAGE=$(gcloud run services describe hotel-web --region=asia-east1 --format="value(spec.template.spec.containers[0].image)" --project=${{ secrets.GCP_PROJECT_ID }})
+          if [ -n "$CURRENT_IMAGE" ] && [[ "$CURRENT_IMAGE" == *"@sha256:"* ]]; then
+            CURRENT_DIGEST=$(echo "$CURRENT_IMAGE" | sed 's/.*@sha256://')
+            echo "當前使用的映像 digest: $CURRENT_DIGEST"
+            ALL_IMAGES=$(gcloud artifacts docker images list asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/hotel-web/web --format="value(version)" --project=${{ secrets.GCP_PROJECT_ID }})
+            echo "$ALL_IMAGES" | while read digest; do
+              if [ -n "$digest" ] && [ "$digest" != "sha256:$CURRENT_DIGEST" ]; then
+                echo "刪除舊映像: $digest"
+                gcloud artifacts docker images delete asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/hotel-web/web@$digest --quiet --project=${{ secrets.GCP_PROJECT_ID }} || true
+              fi
+            done
+          else
+            echo "無法確定當前映像，跳過清理"
+          fi
+
       - name: Show URL
         run: |
           echo "✅ 部署完成"
