@@ -1,0 +1,42 @@
+# Tool scripts and documentation (not needed for deployment)
+*.py
+!booking-api/server.py
+!booking-manager/server.py
+!driver-api2/server.py
+*.sh
+*.md
+!README.md
+!LICENSE
+
+# Temporary files
+*.log
+*.tmp
+*.bak
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Local configuration
+.env
+.env.local
+*.local
+
