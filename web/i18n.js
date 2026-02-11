@@ -733,8 +733,45 @@ const I18N_STATUS = {
   }
 };
 
-let currentLang = "zh";
+// 從 URL 參數讀取語言設定
+function getLangFromURL() {
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const langParam = urlParams.get("lang");
+    if (langParam && ["zh", "en", "ja", "ko"].includes(langParam.toLowerCase())) {
+      return langParam.toLowerCase();
+    }
+  } catch (e) {
+    console.warn("無法讀取 URL 參數:", e);
+  }
+  return null;
+}
+
+// 初始化語言（優先使用 URL 參數，否則使用預設值）
+function initLanguage() {
+  const urlLang = getLangFromURL();
+  if (urlLang) {
+    currentLang = urlLang;
+    window.currentLang = currentLang;
+    // 只有在 DOM 準備好時才設定 lang 屬性
+    if (document.documentElement) {
+      document.documentElement.setAttribute("lang", currentLang);
+    }
+  } else {
+    // 沒有 URL 參數時，使用預設值
+    currentLang = "zh";
+    window.currentLang = currentLang;
+  }
+}
+
+// 在頁面載入時立即初始化語言（在 DOM 準備好之前）
+// 這樣可以確保在 applyI18N() 執行時已經有正確的語言設定
+initLanguage();
+
+let currentLang = window.currentLang || "zh";
+
 window.currentLang = currentLang; 
+
 function t(key) {
   return (TEXTS[currentLang] || TEXTS.zh)[key] || key;
 }
