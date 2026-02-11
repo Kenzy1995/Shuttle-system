@@ -733,45 +733,8 @@ const I18N_STATUS = {
   }
 };
 
-// 從 URL 參數讀取語言設定
-function getLangFromURL() {
-  try {
-    const urlParams = new URLSearchParams(window.location.search);
-    const langParam = urlParams.get("lang");
-    if (langParam && ["zh", "en", "ja", "ko"].includes(langParam.toLowerCase())) {
-      return langParam.toLowerCase();
-    }
-  } catch (e) {
-    console.warn("無法讀取 URL 參數:", e);
-  }
-  return null;
-}
-
-// 初始化語言（優先使用 URL 參數，否則使用預設值）
-function initLanguage() {
-  const urlLang = getLangFromURL();
-  if (urlLang) {
-    currentLang = urlLang;
-    window.currentLang = currentLang;
-    // 只有在 DOM 準備好時才設定 lang 屬性
-    if (document.documentElement) {
-      document.documentElement.setAttribute("lang", currentLang);
-    }
-  } else {
-    // 沒有 URL 參數時，使用預設值
-    currentLang = "zh";
-    window.currentLang = currentLang;
-  }
-}
-
-// 在頁面載入時立即初始化語言（在 DOM 準備好之前）
-// 這樣可以確保在 applyI18N() 執行時已經有正確的語言設定
-initLanguage();
-
-let currentLang = window.currentLang || "zh";
-
+let currentLang = "zh";
 window.currentLang = currentLang; 
-
 function t(key) {
   return (TEXTS[currentLang] || TEXTS.zh)[key] || key;
 }
@@ -820,6 +783,22 @@ function onLanguageChange(lang) {
 
   // 🔹 順便把 <html lang> 改成當前語系（讓 getCurrentLang 第二層保險也正確）
   document.documentElement.setAttribute("lang", currentLang);
+  
+  // 🔹 更新語言選擇器的選中狀態
+  const languageSelect = document.getElementById("languageSelect");
+  if (languageSelect) {
+    languageSelect.value = currentLang;
+  }
+  
+  // 🔹 更新 URL 參數以反映當前語言
+  // 如果當前語言不是預設語言（zh），或者 URL 中已經有 lang 參數，則更新 URL
+  const url = new URL(window.location.href);
+  const existingLang = url.searchParams.get("lang");
+  if (currentLang !== "zh" || existingLang) {
+    url.searchParams.set("lang", currentLang);
+    window.history.replaceState({}, "", url);
+  }
+  
   applyI18N();
 
   // 查詢 / 票卡列表重繪（狀態文案）
@@ -883,4 +862,28 @@ function onLanguageChange(lang) {
   if (typeof updateLiveLocationI18N === "function") {
     updateLiveLocationI18N();
   }
+}
+
+// 🔹 從 URL 參數初始化語言
+function initLanguageFromURL() {
+  // 檢查 URL 參數中是否有 lang 參數
+  const urlParams = new URLSearchParams(window.location.search);
+  const langParam = urlParams.get("lang");
+  
+  // 支援的語言列表
+  const supportedLangs = ["zh", "en", "ja", "ko"];
+  
+  // 如果 URL 中有有效的語言參數，則切換到該語言
+  if (langParam && supportedLangs.includes(langParam)) {
+    onLanguageChange(langParam);
+  }
+}
+
+// 🔹 頁面載入時自動從 URL 參數初始化語言
+// 使用 DOMContentLoaded 確保 DOM 已經準備好
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initLanguageFromURL);
+} else {
+  // DOM 已經載入完成，直接執行
+  initLanguageFromURL();
 }
