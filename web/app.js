@@ -4751,6 +4751,11 @@ function initLiveLocation(mount) {
 }
 
 async function init() {
+  // 0. 先從 URL 參數初始化語言（如果有的話）
+  if (typeof initLanguageFromURL === "function") {
+    initLanguageFromURL();
+  }
+
   const tday = todayISO();
   const ci = getElement('checkInDate');
   const co = getElement('checkOutDate');
@@ -4762,14 +4767,7 @@ async function init() {
 
   hardResetOverlays();
 
-  // 1. 確保語言已從 URL 參數初始化（如果有的話）
-  // initLanguage() 已經在 i18n.js 載入時執行，這裡確保語言選擇器同步
-  const langSelect = getElement('languageSelect');
-  if (langSelect && window.currentLang) {
-    langSelect.value = window.currentLang;
-  }
-
-  // 2. 先套語系，避免一開始有文字還是舊語言
+  // 1. 先套語系，避免一開始有文字還是舊語言
   applyI18N();
 
   // 2. 立即隱藏初始載入遮罩，讓網頁先顯示出來
@@ -4886,4 +4884,3 @@ function isExpiredByCarDateTime(carDateTime) {
     return tripTime < (now - ONE_HOUR_MS);
   } catch (e) { return true; }
 }
-
