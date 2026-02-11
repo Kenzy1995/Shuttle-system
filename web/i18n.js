@@ -791,12 +791,32 @@ function onLanguageChange(lang) {
   }
   
   // 🔹 更新 URL 參數以反映當前語言
-  // 如果當前語言不是預設語言（zh），或者 URL 中已經有 lang 參數，則更新 URL
-  const url = new URL(window.location.href);
-  const existingLang = url.searchParams.get("lang");
-  if (currentLang !== "zh" || existingLang) {
-    url.searchParams.set("lang", currentLang);
-    window.history.replaceState({}, "", url);
+  // 如果正在從 URL 初始化，則不更新 URL（避免覆蓋原有的參數）
+  if (!isInitializingFromURL) {
+    const url = new URL(window.location.href);
+    const existingLang = url.searchParams.get("lang");
+    
+    // 如果當前語言不是中文，或者 URL 中已經有 lang 參數，則更新 URL
+    if (currentLang !== "zh" || existingLang) {
+      url.searchParams.set("lang", currentLang);
+      // 使用 try-catch 確保在手機瀏覽器上也能正常工作
+      try {
+        window.history.replaceState({}, "", url.toString());
+      } catch (e) {
+        // 如果 replaceState 失敗，記錄警告但不中斷執行
+        console.warn("無法更新 URL:", e);
+      }
+    } else {
+      // 如果當前是中文且 URL 中沒有 lang 參數，確保移除 lang 參數（如果有的話）
+      if (url.searchParams.has("lang")) {
+        url.searchParams.delete("lang");
+        try {
+          window.history.replaceState({}, "", url.toString());
+        } catch (e) {
+          console.warn("無法更新 URL:", e);
+        }
+      }
+    }
   }
   
   applyI18N();
@@ -866,6 +886,7 @@ function onLanguageChange(lang) {
 
 // 🔹 從 URL 參數初始化語言
 let languageInitialized = false;
+let isInitializingFromURL = false; // 標記是否正在從 URL 初始化
 function initLanguageFromURL() {
   // 防止重複執行
   if (languageInitialized) {
@@ -881,7 +902,10 @@ function initLanguageFromURL() {
   
   // 如果 URL 中有有效的語言參數，則切換到該語言
   if (langParam && supportedLangs.includes(langParam)) {
+    // 設置標記，表示正在從 URL 初始化
+    isInitializingFromURL = true;
     onLanguageChange(langParam);
+    isInitializingFromURL = false;
   }
   
   // 標記為已初始化
