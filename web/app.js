@@ -2039,23 +2039,34 @@ async function confirmSplitTicket(bookingId, ticketSplit, isReSplit = false) {
       if (queryRes.ok && queryData && queryData.length > 0) {
         const updatedTicket = queryData[0];
         
+        // 調試：打印查詢結果
+        console.log("[split_ticket] Query result:", updatedTicket);
+        console.log("[split_ticket] sub_tickets:", updatedTicket.sub_tickets);
+        console.log("[split_ticket] mother_ticket:", updatedTicket.mother_ticket);
+        
         // 構建完整的 ticket 對象（與 submitBooking 中的格式一致）
+        // 注意：查詢結果使用中文字段名（如 "日期", "班次" 等）
         const ticketData = {
-          bookingId: updatedTicket.booking_id || bookingId,
-          date: updatedTicket.date || window.currentBookingData?.date || "",
-          time: updatedTicket.time || window.currentBookingData?.time || "",
-          direction: updatedTicket.direction || window.currentBookingData?.direction || "",
-          pickLocation: updatedTicket.pick || window.currentBookingData?.pickLocation || "",
-          dropLocation: updatedTicket.drop || window.currentBookingData?.dropLocation || "",
-          name: updatedTicket.name || window.currentBookingData?.name || "",
-          phone: updatedTicket.phone || window.currentBookingData?.phone || "",
-          email: updatedTicket.email || window.currentBookingData?.email || "",
-          passengers: parseInt(updatedTicket.pax || updatedTicket.passengers || window.currentBookingData?.passengers || "1"),
-          qrUrl: updatedTicket.qr_url || window.currentBookingData?.qrUrl || "",
+          bookingId: updatedTicket["預約編號"] || updatedTicket.booking_id || bookingId,
+          date: updatedTicket["日期"] || updatedTicket.date || window.currentBookingData?.date || "",
+          time: updatedTicket["班次"] || updatedTicket.time || window.currentBookingData?.time || "",
+          direction: updatedTicket["往返"] || updatedTicket.direction || window.currentBookingData?.direction || "",
+          pickLocation: updatedTicket["上車地點"] || updatedTicket.pick || window.currentBookingData?.pickLocation || "",
+          dropLocation: updatedTicket["下車地點"] || updatedTicket.drop || window.currentBookingData?.dropLocation || "",
+          name: updatedTicket["姓名"] || updatedTicket.name || window.currentBookingData?.name || "",
+          phone: updatedTicket["手機"] || updatedTicket.phone || window.currentBookingData?.phone || "",
+          email: updatedTicket["信箱"] || updatedTicket.email || window.currentBookingData?.email || "",
+          passengers: parseInt(updatedTicket["預約人數"] || updatedTicket["確認人數"] || updatedTicket.pax || updatedTicket.passengers || window.currentBookingData?.passengers || "1"),
+          qrUrl: updatedTicket["QRCode編碼"] ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(updatedTicket["QRCode編碼"])}` : (updatedTicket.qr_url || window.currentBookingData?.qrUrl || ""),
           // ========== 母子車票信息（從查詢結果獲取） ==========
           sub_tickets: updatedTicket.sub_tickets || result.sub_tickets || [],
           mother_ticket: updatedTicket.mother_ticket || result.mother_ticket || null
         };
+        
+        // 調試：打印構建後的 ticketData
+        console.log("[split_ticket] Built ticketData:", ticketData);
+        console.log("[split_ticket] ticketData.sub_tickets:", ticketData.sub_tickets);
+        console.log("[split_ticket] ticketData.mother_ticket:", ticketData.mother_ticket);
         
         // 更新全局變量
         window.currentBookingData = ticketData;
