@@ -14,10 +14,11 @@ tag_*.py
 # Shell scripts
 *.sh
 
-# Documentation (keep only README.md and LICENSE)
+# Documentation (keep only README.md, LICENSE, and deployment checklist)
 *.md
 !README.md
 !LICENSE
+!DEPLOYMENT_CONFIG_CHECKLIST.md
 
 # Temporary files
 *.log
