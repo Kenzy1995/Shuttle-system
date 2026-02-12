@@ -1706,6 +1706,12 @@ function mountTicketAndShow(ticket) {
   // ========== 更新 QR Code 顯示區域（支持左右切換） ==========
   const qrContainer = getElement("ticketQrContainer");
   
+  // 調試：打印票卷數據
+  console.log("[mountTicketAndShow] ticket:", ticket);
+  console.log("[mountTicketAndShow] subTickets:", subTickets);
+  console.log("[mountTicketAndShow] motherTicket:", motherTicket);
+  console.log("[mountTicketAndShow] hasSubTickets:", hasSubTickets);
+  
   if (hasSubTickets) {
     // 母子車票模式：使用輪播顯示（母票 + 所有子票）
     // 計算已上車人數
