@@ -1740,8 +1740,18 @@ function mountTicketAndShow(ticket) {
         });
       }
     } else {
-      // 分票模式：只顯示子票（A, B, C, D...）
-      subTickets.forEach((t, idx) => {
+      // 分票模式：顯示子票（已核銷的在前，標記為A，未核銷的在後，標記為B、C、D...）
+      // 排序：已上車的在前，未上車的在後
+      const sortedSubTickets = [...subTickets].sort((a, b) => {
+        const aChecked = a.status === "checked_in";
+        const bChecked = b.status === "checked_in";
+        if (aChecked !== bChecked) {
+          return aChecked ? -1 : 1; // 已上車的在前
+        }
+        return (a.sub_index || 0) - (b.sub_index || 0); // 然後按索引排序
+      });
+      
+      sortedSubTickets.forEach((t, idx) => {
         const qrUrl = t.qr_url || (t.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(t.qr_content)}` : "");
         // 子票編號從 A 開始（A=65, B=66, C=67...）
         const ticketLetter = String.fromCharCode(65 + idx); // A, B, C, D, E...
@@ -1763,15 +1773,21 @@ function mountTicketAndShow(ticket) {
     // 保存所有票卷數據到全局變量，供切換時使用
     window.allTicketsData = allTickets;
     
-    // 構建輪播 HTML
+    // 構建新的顯示結構：上方狀態 + 中間標題（左右箭頭）+ 下方完整車票
     let carouselHTML = `
-      <div class="ticket-status-summary">
+      <div class="ticket-status-summary" style="text-align:center;margin-bottom:20px;padding:12px;background:#f9f9f9;border-radius:8px;">
         <strong>上車狀態：</strong>
         <span class="status-text">${checkedPax}/${totalSubPax} 人已上車</span>
       </div>
-      <div class="ticket-carousel-container">
-        <button class="carousel-btn carousel-prev" onclick="switchTicket(-1)" aria-label="上一張">‹</button>
-        <div class="ticket-carousel-track" id="ticketCarouselTrack">
+      <div class="ticket-title-carousel" style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:24px;">
+        <button class="carousel-btn carousel-prev" onclick="switchTicket(-1)" aria-label="上一張" style="width:40px;height:40px;border-radius:50%;">‹</button>
+        <div class="ticket-title-display" id="ticketTitleDisplay" style="font-size:24px;font-weight:bold;min-width:200px;text-align:center;">
+          ${allTickets.length > 0 ? allTickets[0].booking_id : ticket.bookingId}
+        </div>
+        <button class="carousel-btn carousel-next" onclick="switchTicket(1)" aria-label="下一張" style="width:40px;height:40px;border-radius:50%;">›</button>
+      </div>
+      <div class="ticket-carousel-container" style="position:relative;">
+        <div class="ticket-carousel-track" id="ticketCarouselTrack" style="display:flex;transition:transform 0.3s ease;">
     `;
     
     allTickets.forEach((tkt, idx) => {
@@ -1789,11 +1805,11 @@ function mountTicketAndShow(ticket) {
       const qrUrlToUse = tkt.qr_url || (tkt.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(tkt.qr_content)}` : "");
       
       carouselHTML += `
-        <div class="ticket-carousel-item ${isActive}" data-ticket-index="${idx}">
-          <div class="sub-ticket-qr-item ${tkt.type === 'single' ? 'mother-ticket' : ''}${checkedInClass}">
-            <div class="sub-ticket-label" style="font-size:24px;font-weight:bold;margin-bottom:8px;">${tkt.label}</div>
-            <div class="sub-ticket-pax" style="font-size:14px;color:#666;margin-bottom:12px;">${tkt.pax} 人</div>
-            <div class="sub-ticket-qr"><img src="${qrUrlToUse}" alt="票卷 ${tkt.label}" onerror="this.src='${QR_ORIGIN}/api/qr/error'; console.error('QR load failed:', '${qrUrlToUse}');" /></div>
+        <div class="ticket-carousel-item ${isActive}" data-ticket-index="${idx}" style="flex:0 0 100%;width:100%;box-sizing:border-box;padding:0 10px;">
+          <div class="sub-ticket-qr-item ${tkt.type === 'single' ? 'mother-ticket' : ''}${checkedInClass}" style="background:#fff;padding:20px;border-radius:12px;border:1px solid #e5e7eb;text-align:center;">
+            <div class="sub-ticket-qr" style="margin:16px 0;">
+              <img src="${qrUrlToUse}" alt="票卷 ${tkt.label}" style="width:200px;height:200px;border-radius:8px;border:1px solid #ddd;object-fit:contain;" onerror="this.src='${QR_ORIGIN}/api/qr/error'; console.error('QR load failed:', '${qrUrlToUse}');" />
+            </div>
             ${statusBadge}
           </div>
         </div>
@@ -1802,14 +1818,13 @@ function mountTicketAndShow(ticket) {
     
     carouselHTML += `
         </div>
-        <button class="carousel-btn carousel-next" onclick="switchTicket(1)" aria-label="下一張">›</button>
       </div>
-      <div class="ticket-carousel-indicators">
+      <div class="ticket-carousel-indicators" style="display:flex;justify-content:center;margin-top:16px;gap:8px;">
     `;
     
     allTickets.forEach((tkt, idx) => {
       const isActive = idx === 0 ? "active" : "";
-      carouselHTML += `<span class="carousel-dot ${isActive}" onclick="switchTicketTo(${idx})"></span>`;
+      carouselHTML += `<span class="carousel-dot ${isActive}" onclick="switchTicketTo(${idx})" title="${tkt.label}">${tkt.label}</span>`;
     });
     
     carouselHTML += `</div>`;
@@ -1909,7 +1924,7 @@ function showSplitTicketDialog(ticket, isReSplit = false) {
     ? `總人數：${totalPax} 人<br>已上車：${checkedInPax} 人<br><strong>剩餘可重新分票：${remainingPax} 人</strong>`
     : `總人數：${totalPax} 人`;
   
-  // 最多可以分幾張票（每張至少1人，所以最多 = 剩餘人數）
+  // 最多可以分幾張票（每張至少1人，所以最多 = 剩餘人數），包括1張選項
   const maxTickets = remainingPax;
   
   content.innerHTML = `
@@ -1918,8 +1933,8 @@ function showSplitTicketDialog(ticket, isReSplit = false) {
     <div class="field">
       <label class="label">要分成幾張票卷？</label>
       <select id="splitTicketCount" class="select" onchange="updateSplitTicketInputs(${remainingPax})">
-        ${Array.from({length: maxTickets - 1}, (_, i) => i + 2)
-          .map(n => `<option value="${n}" ${n === 2 ? 'selected' : ''}>${n} 張</option>`)
+        ${Array.from({length: maxTickets}, (_, i) => i + 1)
+          .map(n => `<option value="${n}" ${n === (isReSplit ? 1 : 2) ? 'selected' : ''}>${n} 張</option>`)
           .join('')}
       </select>
     </div>
@@ -2048,8 +2063,7 @@ async function confirmSplitTicket(bookingId, ticketSplit, isReSplit = false, mer
         action: "split_ticket", 
         data: { 
           booking_id: bookingId, 
-          ticket_split: ticketSplit,
-          merge_to_one: mergeToOne
+          ticket_split: ticketSplit
         } 
       })
     });

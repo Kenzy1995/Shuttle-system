@@ -1256,19 +1256,13 @@ class DeletePayload(BaseModel):
 
 class SplitTicketPayload(BaseModel):
     booking_id: str
-    ticket_split: Optional[List[int]] = None  # None 表示合併回一張票
-    merge_to_one: bool = False  # True 表示合併回一張票
+    ticket_split: List[int] = Field(..., min_items=1)  # 至少1張票（可以是1張，表示合併）
     lang: str = Field("zh", pattern="^(zh|en|ja|ko)$")
     
     @validator("ticket_split")
-    def _v_ticket_split(cls, v, values):
-        # 如果 merge_to_one 為 True，ticket_split 應該為 None
-        if values.get("merge_to_one", False):
-            return None
-        if v is None:
-            return None
-        if not isinstance(v, list) or len(v) < 2:
-            raise ValueError("ticket_split 必須至少包含2個元素")
+    def _v_ticket_split(cls, v):
+        if not isinstance(v, list) or len(v) < 1:
+            raise ValueError("ticket_split 必須至少包含1個元素")
         if any(not isinstance(x, int) or x < 1 for x in v):
             raise ValueError("ticket_split 每個元素必須是大於0的整數")
         return v
