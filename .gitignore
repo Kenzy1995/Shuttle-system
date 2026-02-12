@@ -38,6 +38,7 @@ tag_*.py
 !FIREBASE_PROJECT_EXPLANATION.md
 !DELETE_EXTRA_PROJECT.md
 !UPDATE_FIREBASE_URL.md
+!FIREBASE_SETUP_COMPLETE.md
 
 # Shell scripts (allow permission grant scripts)
 *.sh
