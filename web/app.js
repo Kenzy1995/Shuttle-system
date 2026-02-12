@@ -1656,6 +1656,9 @@ async function submitBooking() {
 
 
 function mountTicketAndShow(ticket) {
+  // 保存當前訂單數據，供切換票卷時使用
+  window.currentBookingData = ticket;
+  
   const bookingIdEl = getElement("ticketBookingId");
   if (bookingIdEl) bookingIdEl.textContent = ticket.bookingId || "";
 
