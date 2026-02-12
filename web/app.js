@@ -1621,7 +1621,10 @@ async function submitBooking() {
       phone: payload.phone,
       email: payload.email,
       passengers: p,
-      qrUrl: qrPath
+      qrUrl: qrPath,
+      // ========== 母子車票信息 ==========
+      sub_tickets: result.sub_tickets || [],
+      mother_ticket: result.mother_ticket || null
     };
 
     mountTicketAndShow(currentBookingData);
@@ -1650,9 +1653,6 @@ async function submitBooking() {
 
 
 function mountTicketAndShow(ticket) {
-  const qrImg = getElement("ticketQrImg");
-  if (qrImg) qrImg.src = ticket.qrUrl || "";
-
   const bookingIdEl = getElement("ticketBookingId");
   if (bookingIdEl) bookingIdEl.textContent = ticket.bookingId || "";
 
@@ -1680,8 +1680,80 @@ function mountTicketAndShow(ticket) {
   const emailEl = getElement("ticketEmail");
   if (emailEl) emailEl.textContent = ticket.email || "";
 
+  // ========== 母子車票處理 ==========
+  const subTickets = ticket.sub_tickets || [];
+  const motherTicket = ticket.mother_ticket || null;
+  const hasSubTickets = subTickets.length > 0;
+  
+  let totalSubPax = 0;
+  if (hasSubTickets) {
+    totalSubPax = subTickets.reduce((sum, t) => sum + (t.pax || 0), 0);
+  }
+
   const paxEl = getElement("ticketPassengers");
-  if (paxEl) paxEl.textContent = ticket.passengers + " " + t("labelPassengersShort");
+  if (paxEl) {
+    const paxText = ticket.passengers + " " + t("labelPassengersShort");
+    const subTicketText = hasSubTickets ? ` (${totalSubPax}人，分${subTickets.length}張子票)` : "";
+    paxEl.textContent = paxText + subTicketText;
+  }
+
+  // ========== 更新 QR Code 顯示區域 ==========
+  const qrContainer = getElement("ticketQrContainer");
+  if (qrContainer) {
+    if (hasSubTickets) {
+      // 母子車票模式：顯示所有子票和母票
+      let qrHTML = `
+        <div class="ticket-status-summary">
+          <strong>上車狀態：</strong>
+          <span class="status-text">0/${totalSubPax} 人已上車</span>
+        </div>
+        <div class="sub-tickets-grid">
+      `;
+      
+      // 添加所有子票
+      subTickets.forEach((t) => {
+        const qrUrl = t.qr_url || (t.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(t.qr_content)}` : "");
+        const qrImg = qrUrl ? `<img src="${qrUrl}" alt="Sub Ticket ${t.sub_index}" />` : `<div style="padding:20px;color:#999;">QR Code ${t.sub_index}</div>`;
+        qrHTML += `
+          <div class="sub-ticket-qr-item">
+            <div class="sub-ticket-label">子票 ${t.sub_index} (${t.pax}人)</div>
+            <div class="sub-ticket-qr">${qrImg}</div>
+            <div class="sub-ticket-status not-checked-in">未上車</div>
+          </div>
+        `;
+      });
+      
+      // 添加母票
+      if (motherTicket) {
+        const motherQrUrl = motherTicket.qr_url || (motherTicket.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(motherTicket.qr_content)}` : "");
+        if (motherQrUrl) {
+          qrHTML += `
+            <div class="sub-ticket-qr-item mother-ticket">
+              <div class="sub-ticket-label">母票（全部）</div>
+              <div class="sub-ticket-qr"><img src="${motherQrUrl}" alt="Mother Ticket" /></div>
+              <div class="sub-ticket-status info">一次性核銷所有人</div>
+            </div>
+          `;
+        }
+      }
+      
+      qrHTML += `</div>`;
+      qrContainer.innerHTML = qrHTML;
+      qrContainer.className = "ticket-qr multi-ticket";
+    } else {
+      // 單一車票模式（向後兼容）
+      const qrImg = getElement("ticketQrImg");
+      if (qrImg) qrImg.src = ticket.qrUrl || "";
+      if (qrContainer) {
+        qrContainer.innerHTML = `<img id="ticketQrImg" src="${ticket.qrUrl || ""}" alt="QR Code"/>`;
+        qrContainer.className = "ticket-qr";
+      }
+    }
+  } else {
+    // 向後兼容：如果沒有 qrContainer，使用舊的 ticketQrImg
+    const qrImg = getElement("ticketQrImg");
+    if (qrImg) qrImg.src = ticket.qrUrl || "";
+  }
 
   const card = getElement("successCard");
   if (card) card.style.display = "";
