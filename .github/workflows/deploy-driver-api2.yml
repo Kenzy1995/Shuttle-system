@@ -30,25 +30,25 @@ jobs:
 
     - name: Configure Docker auth
       run: |
-        gcloud auth configure-docker gcr.io --quiet
+        gcloud auth configure-docker asia-east1-docker.pkg.dev --quiet
 
     - name: Build Docker image
       run: |
         cd driver-api2
-        docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE }} .
+        docker build -t asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/shuttle-web/${{ env.SERVICE }} .
 
     - name: Push Docker image
       run: |
-        docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE }}
+        docker push asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/shuttle-web/${{ env.SERVICE }}
 
     - name: Deploy to Cloud Run
       run: |
         gcloud run deploy ${{ env.SERVICE }} \
-          --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE }} \
+          --image asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/shuttle-web/${{ env.SERVICE }} \
           --region ${{ env.REGION }} \
           --platform managed \
           --allow-unauthenticated \
-          --service-account=forte-booking-system@forte-booking-system.iam.gserviceaccount.com \
+          --service-account=shuttle-system@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
           --memory=1Gi \
           --cpu=1 \
           --max-instances=5 \
@@ -70,16 +70,16 @@ jobs:
 
     - name: Cleanup old images (keep only latest 1)
       run: |
-        echo "清理舊的 Container Registry 映像..."
+        echo "清理舊的 Artifact Registry 映像..."
         CURRENT_IMAGE=$(gcloud run services describe ${{ env.SERVICE }} --region=${{ env.REGION }} --format="value(spec.template.spec.containers[0].image)" --project=${{ secrets.GCP_PROJECT_ID }})
         if [ -n "$CURRENT_IMAGE" ] && [[ "$CURRENT_IMAGE" == *"@sha256:"* ]]; then
           CURRENT_DIGEST=$(echo "$CURRENT_IMAGE" | sed 's/.*@sha256://')
           echo "當前使用的映像 digest: $CURRENT_DIGEST"
-          ALL_IMAGES=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE }} --format="value(digest)" --project=${{ secrets.GCP_PROJECT_ID }})
+          ALL_IMAGES=$(gcloud artifacts docker images list asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/shuttle-web/${{ env.SERVICE }} --format="value(version)" --project=${{ secrets.GCP_PROJECT_ID }})
           echo "$ALL_IMAGES" | while read digest; do
             if [ -n "$digest" ] && [ "$digest" != "sha256:$CURRENT_DIGEST" ]; then
               echo "刪除舊映像: $digest"
-              gcloud container images delete gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE }}@$digest --quiet --project=${{ secrets.GCP_PROJECT_ID }} || true
+              gcloud artifacts docker images delete asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/shuttle-web/${{ env.SERVICE }}@$digest --quiet --project=${{ secrets.GCP_PROJECT_ID }} || true
             fi
           done
         else
