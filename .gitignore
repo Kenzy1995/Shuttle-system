@@ -39,6 +39,7 @@ tag_*.py
 !DELETE_EXTRA_PROJECT.md
 !UPDATE_FIREBASE_URL.md
 !FIREBASE_SETUP_COMPLETE.md
+!FIX_GOOGLE_SHEETS_PROTECTION.md
 
 # Shell scripts (allow permission grant scripts)
 *.sh
