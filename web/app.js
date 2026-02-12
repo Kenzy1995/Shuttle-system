@@ -1819,9 +1819,24 @@ function mountTicketAndShow(ticket) {
       qrContainer.className = "ticket-qr multi-ticket";
     }
     
-    // 保存當前票卷索引
+    // 保存當前票卷索引和所有票卷數據
     window.currentTicketIndex = 0;
     window.totalTickets = allTickets.length;
+    window.allTicketsData = allTickets;
+    
+    // 初始化顯示第一個票卷的資訊
+    if (allTickets.length > 0) {
+      const firstTicket = allTickets[0];
+      const bookingIdEl = getElement("ticketBookingId");
+      if (bookingIdEl) {
+        bookingIdEl.textContent = firstTicket.booking_id || ticket.bookingId || "";
+      }
+      const paxEl = getElement("ticketPassengers");
+      if (paxEl) {
+        const paxText = firstTicket.pax + " " + t("labelPassengersShort");
+        paxEl.textContent = paxText;
+      }
+    }
   } else {
     // 單一車票模式（向後兼容）：顯示母票 + 分票按鈕
     if (qrContainer) {
