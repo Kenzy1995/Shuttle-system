@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
 
-
 import google.auth
 import gspread
 from fastapi import FastAPI, HTTPException, Query
