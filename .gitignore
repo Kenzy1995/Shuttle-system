@@ -19,6 +19,7 @@ tag_*.py
 !README.md
 !LICENSE
 !DEPLOYMENT_CONFIG_CHECKLIST.md
+!GCP_VERIFICATION_COMMANDS.md
 
 # Temporary files
 *.log
