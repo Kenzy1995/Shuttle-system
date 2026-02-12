@@ -31,8 +31,8 @@ jobs:
           gcloud auth configure-docker asia-east1-docker.pkg.dev --quiet
 
       - name: Build Docker image
+        working-directory: ./web
         run: |
-          cd web
           docker build -t asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/shuttle-web/web .
 
       - name: Push Docker image
