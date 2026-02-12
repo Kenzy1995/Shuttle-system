@@ -19,15 +19,22 @@ tag_*.py
 !README.md
 !LICENSE
 
+# Deployment trigger files
+**/.deploy-trigger
+.deploy-trigger
+
+# Root requirements.txt (if exists, use service-specific ones)
+/requirements.txt
+
 # Old service directories (no longer needed after merge)
 booking-api/
 booking-manager/
 driver-api2/
 shuttle-api/
 
-# Shell scripts (allow permission grant scripts)
+# Shell scripts (all scripts excluded)
 *.sh
-!grant-firebase-permissions.sh
+*.ps1
 
 # Temporary files
 *.log
