@@ -2102,7 +2102,7 @@ def ops(req: OpsRequest):
                 # 返回所有子票信息（包括已上車的舊子票和新子票）
                 all_sub_tickets = _get_sub_tickets(p.booking_id)
                 
-                def get_suffix(index: int) -> str:
+                def get_suffix_for_split(index: int) -> str:
                     return chr(64 + index) if index <= 26 else f"_{index}"
                 
                 return {
@@ -2112,7 +2112,7 @@ def ops(req: OpsRequest):
                     "sub_tickets": [
                         {
                             "sub_index": t.get("sub_ticket_index"),
-                            "booking_id": f"{p.booking_id}_{get_suffix(t.get('sub_ticket_index', 1))}",
+                            "booking_id": f"{p.booking_id}_{get_suffix_for_split(t.get('sub_ticket_index', 1))}",
                             "pax": t.get("sub_ticket_pax", 0),
                             "status": t.get("status", "not_checked_in"),
                             "qr_content": t.get("qr_content", ""),
