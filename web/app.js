@@ -1898,7 +1898,7 @@ function showSplitTicketDialog(ticket, isReSplit = false) {
     </div>
     <div class="actions" style="margin-top:20px;">
       <button class="button btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>
-      <button class="button" id="confirmSplitBtn" onclick="confirmSplitTicket('${ticket.bookingId}', ${remainingPax}, ${isReSplit})" disabled>確認${isReSplit ? '重新' : ''}分票</button>
+      <button class="button" id="confirmSplitBtn" onclick="handleConfirmSplitTicket('${ticket.bookingId}', ${remainingPax}, ${isReSplit})" disabled>確認${isReSplit ? '重新' : ''}分票</button>
     </div>
   `;
   
