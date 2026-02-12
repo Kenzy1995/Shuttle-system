@@ -15,6 +15,7 @@ app = Flask(__name__)
 CORS(app, 
      origins=[
     "https://shuttle-web-509045429779.asia-east1.run.app",
+    "https://shuttle-web-ywrjpvbwya-de.a.run.app",
     "http://localhost:8080",
      ],
      supports_credentials=True,
