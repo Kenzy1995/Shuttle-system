@@ -1855,30 +1855,43 @@ function mountTicketAndShow(ticket) {
         paxEl.textContent = paxText;
       }
       
-      // 更新其他資訊（如果有的話）
-      if (ticket.direction) {
-        const directionEl = getElement("ticketDirection");
-        if (directionEl) directionEl.textContent = ticket.direction || "";
+      // 確保所有資訊欄位都正確顯示（使用 window.currentBookingData 中的數據）
+      const ticketData = window.currentBookingData || ticket;
+      
+      // 更新方向
+      const directionEl = getElement("ticketDirection");
+      if (directionEl) {
+        directionEl.textContent = getDirectionLabel(ticketData.direction) || "";
       }
-      if (ticket.pickLocation) {
-        const pickEl = getElement("ticketPick");
-        if (pickEl) pickEl.textContent = ticket.pickLocation || "";
+      
+      // 更新上車地點
+      const pickEl = getElement("ticketPick");
+      if (pickEl) {
+        pickEl.textContent = ticketData.pickLocation || "";
       }
-      if (ticket.dropLocation) {
-        const dropEl = getElement("ticketDrop");
-        if (dropEl) dropEl.textContent = ticket.dropLocation || "";
+      
+      // 更新下車地點
+      const dropEl = getElement("ticketDrop");
+      if (dropEl) {
+        dropEl.textContent = ticketData.dropLocation || "";
       }
-      if (ticket.name) {
-        const nameEl = getElement("ticketName");
-        if (nameEl) nameEl.textContent = ticket.name || "";
+      
+      // 更新姓名
+      const nameEl = getElement("ticketName");
+      if (nameEl) {
+        nameEl.textContent = ticketData.name || "";
       }
-      if (ticket.phone) {
-        const phoneEl = getElement("ticketPhone");
-        if (phoneEl) phoneEl.textContent = ticket.phone || "";
+      
+      // 更新手機
+      const phoneEl = getElement("ticketPhone");
+      if (phoneEl) {
+        phoneEl.textContent = ticketData.phone || "";
       }
-      if (ticket.email) {
-        const emailEl = getElement("ticketEmail");
-        if (emailEl) emailEl.textContent = ticket.email || "";
+      
+      // 更新信箱
+      const emailEl = getElement("ticketEmail");
+      if (emailEl) {
+        emailEl.textContent = ticketData.email || "";
       }
     }
   } else {
