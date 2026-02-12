@@ -30,6 +30,7 @@ from fastapi import FastAPI, HTTPException, Response, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
 import gspread
+import google.auth
 from google.auth import default
 from googleapiclient.discovery import build
 
