@@ -833,7 +833,7 @@ def _create_mother_ticket(booking_id: str, email: str) -> str:
     return f"FT:{booking_id}:0:{ticket_hash}"
 
 def _get_sub_tickets(booking_id: str) -> List[Dict[str, Any]]:
-    """從 Firebase 讀取所有子票"""
+    """從 Firebase 讀取所有子票（不包含母票）"""
     if not _init_firebase():
         return []
     try:
@@ -842,10 +842,21 @@ def _get_sub_tickets(booking_id: str) -> List[Dict[str, Any]]:
         if not tickets_data:
             return []
         sub_tickets = []
-        for key, ticket in tickets_data.items():
-            if isinstance(ticket, dict) and ticket.get("sub_ticket_index"):
-                sub_tickets.append(ticket)
-        return sorted(sub_tickets, key=lambda x: x.get("sub_ticket_index", 0))
+        
+        # Firebase 可能返回 dict 或 list，需要處理兩種情況
+        if isinstance(tickets_data, dict):
+            # 如果是 dict，使用 .items()
+            for key, ticket in tickets_data.items():
+                if isinstance(ticket, dict) and ticket.get("sub_ticket_index") and ticket.get("sub_ticket_index") != 0:  # 排除母票
+                    sub_tickets.append(ticket)
+        elif isinstance(tickets_data, list):
+            # 如果是 list，直接遍歷
+            for ticket in tickets_data:
+                if isinstance(ticket, dict) and ticket.get("sub_ticket_index") and ticket.get("sub_ticket_index") != 0:  # 排除母票
+                    sub_tickets.append(ticket)
+        
+        # 排序：已上車的在前，未上車的在後，然後按索引排序
+        return sorted(sub_tickets, key=lambda x: (x.get("status") != "checked_in", x.get("sub_ticket_index", 0)))
     except Exception as e:
         log.error(f"[sub_ticket] Failed to get tickets for {booking_id}: {e}")
         return []
