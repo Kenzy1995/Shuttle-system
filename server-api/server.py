@@ -2139,16 +2139,7 @@ def ops(req: OpsRequest):
                     # 子票從 A 開始（A=65, B=66, C=67...）
                     return chr(64 + index) if index <= 26 else f"_{index}"
                 
-                # 如果合併回一張票，返回空子票列表
-                if is_re_split and (p.merge_to_one or p.ticket_split is None):
-                    return {
-                        "status": "success",
-                        "booking_id": p.booking_id,
-                        "is_re_split": True,
-                        "merged_to_one": True,
-                        "sub_tickets": [],  # 合併後沒有子票
-                        "mother_ticket": None
-                    }
+                # 重新分票後，已核銷的票保持不變，新票從下一個索引開始
                 
                 # 返回所有子票信息（包括已上車的舊子票和新子票）
                 all_sub_tickets = _get_sub_tickets(p.booking_id)
