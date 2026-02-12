@@ -1776,57 +1776,78 @@ function mountTicketAndShow(ticket) {
     // 保存所有票卷數據到全局變量，供切換時使用
     window.allTicketsData = allTickets;
     
-    // 構建新的顯示結構：上方狀態 + ABC按鈕 + 下方完整車票
-    let carouselHTML = `
-      <div class="ticket-status-summary" style="text-align:center;margin-bottom:20px;padding:12px;background:#f9f9f9;border-radius:8px;">
-        <strong>上車狀態：</strong>
-        <span class="status-text">${checkedPax}/${totalSubPax} 人已上車</span>
-      </div>
-      <div class="ticket-carousel-indicators" style="display:flex;justify-content:center;margin-bottom:24px;gap:8px;">
-    `;
+    // 構建顯示結構
+    let carouselHTML = "";
     
-    // ABC按鈕在上方
-    allTickets.forEach((tkt, idx) => {
-      const isActive = idx === 0 ? "active" : "";
-      carouselHTML += `<span class="carousel-dot ${isActive}" onclick="switchTicketTo(${idx})" title="${tkt.label}">${tkt.label}</span>`;
-    });
-    
-    carouselHTML += `
-      </div>
-      <div class="ticket-carousel-container" style="position:relative;">
-        <div class="ticket-carousel-track" id="ticketCarouselTrack" style="display:flex;transition:transform 0.3s ease;">
-    `;
-    
-    allTickets.forEach((tkt, idx) => {
-      const isActive = idx === 0 ? "active" : "";
-      const statusBadge = tkt.type === "single" 
-        ? `<div class="sub-ticket-status info">單一票卷</div>`
-        : (tkt.status === "checked_in" 
-          ? `<div class="sub-ticket-status checked-in">✓ 已上車</div>`
-          : `<div class="sub-ticket-status not-checked-in">未上車</div>`);
-      
-      // 如果是已上車的子票，添加視覺標記
-      const checkedInClass = tkt.status === "checked_in" ? " checked-in-ticket" : "";
-      
-      // 確保 QR URL 正確
+    // 如果是單一票卷，不顯示狀態和ABC按鈕（就像最初預約時一樣）
+    if (allTickets.length === 1 && allTickets[0].type === "single") {
+      // 單一票卷：直接顯示QR Code，不顯示狀態和按鈕
+      const tkt = allTickets[0];
       const qrUrlToUse = tkt.qr_url || (tkt.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(tkt.qr_content)}` : "");
-      
-      carouselHTML += `
-        <div class="ticket-carousel-item ${isActive}" data-ticket-index="${idx}" style="flex:0 0 100%;width:100%;box-sizing:border-box;padding:0 10px;">
-          <div class="sub-ticket-qr-item ${tkt.type === 'single' ? 'mother-ticket' : ''}${checkedInClass}" style="background:#fff;padding:20px;border-radius:12px;border:1px solid #e5e7eb;text-align:center;">
-            ${statusBadge}
-            <div class="sub-ticket-qr" style="margin:16px 0;">
-              <img src="${qrUrlToUse}" alt="票卷 ${tkt.label}" style="width:200px;height:200px;border-radius:8px;border:1px solid #ddd;object-fit:contain;" onerror="this.src='${QR_ORIGIN}/api/qr/error'; console.error('QR load failed:', '${qrUrlToUse}');" />
+      carouselHTML = `
+        <div class="ticket-carousel-container" style="position:relative;">
+          <div class="ticket-carousel-track" id="ticketCarouselTrack" style="display:flex;transition:transform 0.3s ease;">
+            <div class="ticket-carousel-item active" data-ticket-index="0" style="flex:0 0 100%;width:100%;box-sizing:border-box;padding:0 10px;">
+              <div class="sub-ticket-qr-item" style="background:#fff;padding:20px;border-radius:12px;border:1px solid #e5e7eb;text-align:center;">
+                <div class="sub-ticket-qr" style="margin:16px 0;">
+                  <img src="${qrUrlToUse}" alt="QR Code" style="width:200px;height:200px;border-radius:8px;border:1px solid #ddd;object-fit:contain;" onerror="this.src='${QR_ORIGIN}/api/qr/error'; console.error('QR load failed:', '${qrUrlToUse}');" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
       `;
-    });
-    
-    carouselHTML += `
+    } else {
+      // 分票模式：顯示狀態和ABC按鈕
+      carouselHTML = `
+        <div class="ticket-status-summary" style="text-align:center;margin-bottom:20px;padding:12px;background:#f9f9f9;border-radius:8px;">
+          <strong>上車狀態：</strong>
+          <span class="status-text">${checkedPax}/${totalSubPax} 人已上車</span>
         </div>
-      </div>
-    `;
+        <div class="ticket-carousel-indicators" style="display:flex;justify-content:center;margin-bottom:24px;gap:8px;">
+      `;
+      
+      // ABC按鈕在上方
+      allTickets.forEach((tkt, idx) => {
+        const isActive = idx === 0 ? "active" : "";
+        carouselHTML += `<span class="carousel-dot ${isActive}" onclick="switchTicketTo(${idx})" title="${tkt.label}">${tkt.label}</span>`;
+      });
+      
+      carouselHTML += `
+        </div>
+        <div class="ticket-carousel-container" style="position:relative;">
+          <div class="ticket-carousel-track" id="ticketCarouselTrack" style="display:flex;transition:transform 0.3s ease;">
+      `;
+      
+      allTickets.forEach((tkt, idx) => {
+        const isActive = idx === 0 ? "active" : "";
+        const statusBadge = tkt.status === "checked_in" 
+          ? `<div class="sub-ticket-status checked-in">✓ 已上車</div>`
+          : `<div class="sub-ticket-status not-checked-in">未上車</div>`;
+        
+        // 如果是已上車的子票，添加視覺標記
+        const checkedInClass = tkt.status === "checked_in" ? " checked-in-ticket" : "";
+        
+        // 確保 QR URL 正確
+        const qrUrlToUse = tkt.qr_url || (tkt.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(tkt.qr_content)}` : "");
+        
+        carouselHTML += `
+          <div class="ticket-carousel-item ${isActive}" data-ticket-index="${idx}" style="flex:0 0 100%;width:100%;box-sizing:border-box;padding:0 10px;">
+            <div class="sub-ticket-qr-item${checkedInClass}" style="background:#fff;padding:20px;border-radius:12px;border:1px solid #e5e7eb;text-align:center;">
+              ${statusBadge}
+              <div class="sub-ticket-qr" style="margin:16px 0;">
+                <img src="${qrUrlToUse}" alt="票卷 ${tkt.label}" style="width:200px;height:200px;border-radius:8px;border:1px solid #ddd;object-fit:contain;" onerror="this.src='${QR_ORIGIN}/api/qr/error'; console.error('QR load failed:', '${qrUrlToUse}');" />
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      
+      carouselHTML += `
+          </div>
+        </div>
+      `;
+    }
     
     if (qrContainer) {
       qrContainer.innerHTML = carouselHTML;
