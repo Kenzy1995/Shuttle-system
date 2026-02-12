@@ -1720,45 +1720,45 @@ function mountTicketAndShow(ticket) {
       if (t.status === "checked_in") checkedPax += (t.pax || 0);
     });
     
-    // 構建所有票卷（母票A + 子票BCD...）
+    // 構建所有票卷（只顯示子票，不顯示母票）
     const allTickets = [];
     
-    // 添加母票（第一個，標記為A）
-    if (motherTicket) {
-      const motherQrUrl = motherTicket.qr_url || (motherTicket.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(motherTicket.qr_content)}` : "");
-      if (motherQrUrl) {
-        const motherBookingId = `${ticket.bookingId}_A`;
+    // 如果沒有子票，顯示原始單一票卷
+    if (!hasSubTickets) {
+      // 單一票卷模式：使用原始 QR Code
+      const singleQrUrl = ticket.qrUrl || "";
+      if (singleQrUrl) {
         allTickets.push({
-          type: "mother",
-          booking_id: motherBookingId,
+          type: "single",
+          booking_id: ticket.bookingId,
           original_booking_id: ticket.bookingId,
-          pax: totalSubPax,
-          qr_url: motherQrUrl,
-          qr_content: motherTicket.qr_content || "",
+          pax: ticket.passengers || 0,
+          qr_url: singleQrUrl,
+          qr_content: "",
           label: "A",
-          status: "mother"
+          status: "single"
         });
       }
-    }
-    
-    // 添加所有子票（B, C, D, E...）
-    subTickets.forEach((t, idx) => {
-      const qrUrl = t.qr_url || (t.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(t.qr_content)}` : "");
-      // 子票編號：B=66, C=67, D=68... (65='A'是母票)
-      const ticketLetter = String.fromCharCode(66 + idx); // B, C, D, E...
-      const subBookingId = `${ticket.bookingId}_${ticketLetter}`;
-      allTickets.push({
-        type: "sub",
-        booking_id: subBookingId,
-        original_booking_id: ticket.bookingId,
-        sub_index: t.sub_index,
-        pax: t.pax || 0,
-        qr_url: qrUrl,
-        qr_content: t.qr_content || "",
-        status: t.status || "not_checked_in",
-        label: ticketLetter
+    } else {
+      // 分票模式：只顯示子票（A, B, C, D...）
+      subTickets.forEach((t, idx) => {
+        const qrUrl = t.qr_url || (t.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(t.qr_content)}` : "");
+        // 子票編號從 A 開始（A=65, B=66, C=67...）
+        const ticketLetter = String.fromCharCode(65 + idx); // A, B, C, D, E...
+        const subBookingId = `${ticket.bookingId}_${ticketLetter}`;
+        allTickets.push({
+          type: "sub",
+          booking_id: subBookingId,
+          original_booking_id: ticket.bookingId,
+          sub_index: t.sub_index,
+          pax: t.pax || 0,
+          qr_url: qrUrl,
+          qr_content: t.qr_content || "",
+          status: t.status || "not_checked_in",
+          label: ticketLetter
+        });
       });
-    });
+    }
     
     // 保存所有票卷數據到全局變量，供切換時使用
     window.allTicketsData = allTickets;
@@ -1849,20 +1849,16 @@ function mountTicketAndShow(ticket) {
       qrContainer.className = "ticket-qr";
     }
     
-    // 添加分票按鈕（如果人數 > 1，且未分票或有未上車的子票）
+    // 添加分票按鈕
     const actionsContainer = getElement("ticketActionsContainer");
     if (actionsContainer && ticket.passengers > 1) {
-      // 檢查是否有未上車的子票（如果有未上車的，可以重新分票）
-      const hasUncheckedTickets = hasSubTickets && subTickets.some(t => t.status !== "checked_in");
-      const canReSplit = hasSubTickets && hasUncheckedTickets;
-      
       // 檢查是否已有分票按鈕
       if (!actionsContainer.querySelector(".split-ticket-btn")) {
         const splitBtn = document.createElement("button");
         splitBtn.className = "button split-ticket-btn";
-        // 如果已分票且有未上車的子票，顯示「重新分票」
-        splitBtn.textContent = canReSplit ? "重新分票" : "分票";
-        splitBtn.onclick = () => showSplitTicketDialog(ticket, canReSplit);
+        // 如果已分票，顯示「重新分票」；否則顯示「分票」
+        splitBtn.textContent = hasSubTickets ? "重新分票" : "分票";
+        splitBtn.onclick = () => showSplitTicketDialog(ticket, hasSubTickets);
         actionsContainer.insertBefore(splitBtn, actionsContainer.firstChild);
       }
     }
@@ -2040,7 +2036,7 @@ function handleConfirmSplitTicket(bookingId, totalPax, isReSplit = false) {
   confirmSplitTicket(bookingId, ticketSplit, isReSplit);
 }
 
-async function confirmSplitTicket(bookingId, ticketSplit, isReSplit = false) {
+async function confirmSplitTicket(bookingId, ticketSplit, isReSplit = false, mergeToOne = false) {
   // 顯示載入動畫
   showLoading(true);
   
@@ -2048,7 +2044,14 @@ async function confirmSplitTicket(bookingId, ticketSplit, isReSplit = false) {
     const res = await fetch(OPS_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "split_ticket", data: { booking_id: bookingId, ticket_split: ticketSplit } })
+      body: JSON.stringify({ 
+        action: "split_ticket", 
+        data: { 
+          booking_id: bookingId, 
+          ticket_split: ticketSplit,
+          merge_to_one: mergeToOne
+        } 
+      })
     });
     
     const result = await res.json();

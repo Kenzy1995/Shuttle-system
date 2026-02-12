@@ -1256,11 +1256,17 @@ class DeletePayload(BaseModel):
 
 class SplitTicketPayload(BaseModel):
     booking_id: str
-    ticket_split: List[int] = Field(..., min_items=2)  # 至少2個子票
+    ticket_split: Optional[List[int]] = None  # None 表示合併回一張票
+    merge_to_one: bool = False  # True 表示合併回一張票
     lang: str = Field("zh", pattern="^(zh|en|ja|ko)$")
     
     @validator("ticket_split")
-    def _v_ticket_split(cls, v):
+    def _v_ticket_split(cls, v, values):
+        # 如果 merge_to_one 為 True，ticket_split 應該為 None
+        if values.get("merge_to_one", False):
+            return None
+        if v is None:
+            return None
         if not isinstance(v, list) or len(v) < 2:
             raise ValueError("ticket_split 必須至少包含2個元素")
         if any(not isinstance(x, int) or x < 1 for x in v):
@@ -2094,32 +2100,47 @@ def ops(req: OpsRequest):
                     
                     log.info(f"[split_ticket] Re-split booking {p.booking_id}: {checked_in_pax} checked in, {remaining_pax} remaining")
                 else:
-                    # 首次分票
+                    # 首次分票：只創建子票，不創建母票
                     if sum(p.ticket_split) != total_pax:
                         raise HTTPException(400, f"分票總和 ({sum(p.ticket_split)}) 必須等於總人數 ({total_pax})")
                     
                     sub_tickets = _create_sub_tickets(p.booking_id, p.ticket_split, email)
-                    mother_qr_content = _create_mother_ticket(p.booking_id, email)
                     
-                    # 更新 Sheet 的 QRCode編碼 為母票
-                    if "QRCode編碼" in hmap:
-                        ws_main.update_cell(rowno, hmap["QRCode編碼"], mother_qr_content)
+                    # 更新 Sheet 的分票配置（不更新 QRCode編碼，因為沒有母票）
+                    if "分票配置" in hmap:
+                        ticket_split_str = ",".join(str(x) for x in p.ticket_split)
+                        ws_main.update_cell(rowno, hmap["分票配置"], ticket_split_str)
                     
-                    log.info(f"[split_ticket] First split booking {p.booking_id} into {len(sub_tickets)} sub-tickets")
+                    log.info(f"[split_ticket] First split booking {p.booking_id} into {len(sub_tickets)} sub-tickets (no mother ticket)")
                     new_sub_tickets = sub_tickets
                 
                 _invalidate_sheet_cache()
                 
+                # 返回結果
+                def get_suffix_for_split(index: int) -> str:
+                    # 子票從 A 開始（A=65, B=66, C=67...）
+                    return chr(64 + index) if index <= 26 else f"_{index}"
+                
+                # 如果合併回一張票，返回空子票列表
+                if is_re_split and (p.merge_to_one or p.ticket_split is None):
+                    return {
+                        "status": "success",
+                        "booking_id": p.booking_id,
+                        "is_re_split": True,
+                        "merged_to_one": True,
+                        "sub_tickets": [],  # 合併後沒有子票
+                        "mother_ticket": None
+                    }
+                
                 # 返回所有子票信息（包括已上車的舊子票和新子票）
                 all_sub_tickets = _get_sub_tickets(p.booking_id)
                 
-                def get_suffix_for_split(index: int) -> str:
-                    return chr(64 + index) if index <= 26 else f"_{index}"
-                
+                # 分票後不返回母票，只返回子票
                 return {
                     "status": "success",
                     "booking_id": p.booking_id,
                     "is_re_split": is_re_split,
+                    "merged_to_one": False,
                     "sub_tickets": [
                         {
                             "sub_index": t.get("sub_ticket_index"),
@@ -2131,10 +2152,7 @@ def ops(req: OpsRequest):
                         }
                         for t in all_sub_tickets
                     ],
-                    "mother_ticket": {
-                        "qr_content": mother_qr_content,
-                        "qr_url": f"{BASE_URL}/api/qr/{urllib.parse.quote(mother_qr_content)}"
-                    }
+                    "mother_ticket": None  # 分票後不返回母票
                 }
             except ValueError as e:
                 raise HTTPException(400, str(e))
