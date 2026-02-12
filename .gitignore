@@ -41,6 +41,7 @@ tag_*.py
 !FIREBASE_SETUP_COMPLETE.md
 !FIX_GOOGLE_SHEETS_PROTECTION.md
 !BACKEND_MERGE_PLAN.md
+!shuttle-api/
 
 # Shell scripts (allow permission grant scripts)
 *.sh
