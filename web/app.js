@@ -2051,7 +2051,7 @@ function handleConfirmSplitTicket(bookingId, totalPax, isReSplit = false) {
   confirmSplitTicket(bookingId, ticketSplit, isReSplit);
 }
 
-async function confirmSplitTicket(bookingId, ticketSplit, isReSplit = false, mergeToOne = false) {
+async function confirmSplitTicket(bookingId, ticketSplit, isReSplit = false) {
   // 顯示載入動畫
   showLoading(true);
   
