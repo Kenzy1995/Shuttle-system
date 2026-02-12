@@ -36,22 +36,17 @@ gcloud services list --enabled --project=shuttle-system-487204 | grep sheets
 gcloud services enable sheets.googleapis.com --project=shuttle-system-487204
 ```
 
-### 步驟 2: 授予服務帳號 Google Sheets 權限
+### 步驟 2: 確認 Google Sheets API 和 Drive API 已啟用
 
 ```bash
-# 授予服務帳號 Google Sheets 權限
-gcloud projects add-iam-policy-binding shuttle-system-487204 \
-  --member="serviceAccount:shuttle-system@shuttle-system-487204.iam.gserviceaccount.com" \
-  --role="roles/sheets.admin"
+# 啟用 Google Sheets API
+gcloud services enable sheets.googleapis.com --project=shuttle-system-487204
+
+# 啟用 Google Drive API（用於訪問 Google Sheets）
+gcloud services enable drive.googleapis.com --project=shuttle-system-487204
 ```
 
-或者更具體的權限：
-```bash
-# 授予 Google Drive API 權限（用於訪問 Google Sheets）
-gcloud projects add-iam-policy-binding shuttle-system-487204 \
-  --member="serviceAccount:shuttle-system@shuttle-system-487204.iam.gserviceaccount.com" \
-  --role="roles/drive.file"
-```
+**注意**：Google Sheets 的訪問權限**不是**通過 GCP IAM 角色授予的，而是通過在 Google Sheets 中直接共享給服務帳號。
 
 ### 步驟 3: 在 Google Sheets 中共享給服務帳號
 
@@ -75,21 +70,22 @@ gcloud projects add-iam-policy-binding shuttle-system-487204 \
 ## 📋 檢查清單
 
 - [ ] Google Sheets API 已啟用
-- [ ] 服務帳號有 `roles/sheets.admin` 或 `roles/drive.file` 權限
-- [ ] Google Sheets 已共享給服務帳號
+- [ ] Google Drive API 已啟用
+- [ ] **Google Sheets 已共享給服務帳號**（最重要！）
 - [ ] 服務帳號可以訪問 Google Sheets
 
 ---
 
 ## 🔍 驗證步驟
 
-### 1. 檢查服務帳號權限
+### 1. 檢查 API 是否已啟用
 
 ```bash
-gcloud projects get-iam-policy shuttle-system-487204 \
-  --flatten="bindings[].members" \
-  --filter="bindings.members:serviceAccount:shuttle-system@shuttle-system-487204.iam.gserviceaccount.com" \
-  --format="table(bindings.role)"
+# 檢查 Google Sheets API
+gcloud services list --enabled --project=shuttle-system-487204 | grep sheets
+
+# 檢查 Google Drive API
+gcloud services list --enabled --project=shuttle-system-487204 | grep drive
 ```
 
 ### 2. 檢查 Google Sheets 共享設置
@@ -128,16 +124,17 @@ gcloud config set project shuttle-system-487204
 # 啟用 Google Sheets API
 gcloud services enable sheets.googleapis.com --project=shuttle-system-487204
 
-# 授予服務帳號 Google Sheets 權限
-gcloud projects add-iam-policy-binding shuttle-system-487204 \
-  --member="serviceAccount:shuttle-system@shuttle-system-487204.iam.gserviceaccount.com" \
-  --role="roles/sheets.admin"
-
-# 授予 Google Drive API 權限
-gcloud projects add-iam-policy-binding shuttle-system-487204 \
-  --member="serviceAccount:shuttle-system@shuttle-system-487204.iam.gserviceaccount.com" \
-  --role="roles/drive.file"
+# 啟用 Google Drive API
+gcloud services enable drive.googleapis.com --project=shuttle-system-487204
 ```
 
 **然後記得在 Google Sheets 中共享給服務帳號！**
+
+### 在 Google Sheets 中共享給服務帳號
+
+1. 打開 Google Sheets：https://docs.google.com/spreadsheets/d/1o_kLeuwP5_G08YYLlZKIgcYzlU1NIZD5SQnHoO59YUw
+2. 點擊右上角的「共享」按鈕
+3. 添加服務帳號：`shuttle-system@shuttle-system-487204.iam.gserviceaccount.com`
+4. 選擇權限：**編輯者**
+5. 點擊「發送」
 
