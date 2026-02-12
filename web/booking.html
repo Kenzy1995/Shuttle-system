@@ -339,6 +339,17 @@
     .sub-ticket-status.not-checked-in { background: #fef3c7; color: #92400e; }
     .sub-ticket-status.info { background: #dbeafe; color: #1e40af; }
     
+    /* 已上車子票樣式 */
+    .sub-ticket-qr-item.checked-in-ticket {
+      opacity: 0.7;
+      background: #f0f0f0;
+      border: 1px solid #d0d0d0;
+    }
+    .sub-ticket-qr-item.checked-in-ticket .sub-ticket-label {
+      color: #666;
+      text-decoration: line-through;
+    }
+    
     .ticket-info { display: flex; flex-direction: column; gap: 12px; }
     .ticket-field { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
     .ticket-field:last-child { border-bottom: none; }

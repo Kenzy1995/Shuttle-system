@@ -2042,6 +2042,95 @@ def ops(req: OpsRequest):
             _invalidate_sheet_cache()
             return {"status": "success", "row": rowno}
 
+        elif action == "split_ticket":
+            p = SplitTicketPayload(**data)
+            rownos = _find_rows_by_pred(ws_main, headers, HEADER_ROW_MAIN, lambda r: r.get("預約編號") == p.booking_id)
+            if not rownos:
+                raise HTTPException(404, "找不到此預約編號")
+            rowno = rownos[0]
+            
+            # 獲取總人數和 email
+            total_pax = int(get_by_rowno(rowno, "預約人數") or get_by_rowno(rowno, "確認人數") or "0")
+            email = get_by_rowno(rowno, "信箱")
+            if not email:
+                raise HTTPException(400, "此訂單缺少信箱信息，無法分票")
+            
+            # 檢查是否已經分票
+            existing_sub_tickets = _get_sub_tickets(p.booking_id)
+            is_re_split = len(existing_sub_tickets) > 0
+            
+            try:
+                if is_re_split:
+                    # 重新分票：保留已上車的子票，為剩餘人數創建新子票
+                    checked_in_tickets = [t for t in existing_sub_tickets if t.get("status") == "checked_in"]
+                    checked_in_pax = sum(t.get("sub_ticket_pax", 0) for t in checked_in_tickets)
+                    remaining_pax = total_pax - checked_in_pax
+                    
+                    if remaining_pax <= 0:
+                        raise HTTPException(400, "所有人已上車，無法重新分票")
+                    
+                    if sum(p.ticket_split) != remaining_pax:
+                        raise HTTPException(400, f"新分票總和 ({sum(p.ticket_split)}) 必須等於剩餘人數 ({remaining_pax})")
+                    
+                    new_sub_tickets, checked_in_pax, remaining_pax = _re_split_tickets(
+                        p.booking_id, p.ticket_split, email
+                    )
+                    
+                    # 更新母票 QR Code
+                    mother_qr_content = _create_mother_ticket(p.booking_id, email)
+                    if "QRCode編碼" in hmap:
+                        ws_main.update_cell(rowno, hmap["QRCode編碼"], mother_qr_content)
+                    
+                    log.info(f"[split_ticket] Re-split booking {p.booking_id}: {checked_in_pax} checked in, {remaining_pax} remaining")
+                else:
+                    # 首次分票
+                    if sum(p.ticket_split) != total_pax:
+                        raise HTTPException(400, f"分票總和 ({sum(p.ticket_split)}) 必須等於總人數 ({total_pax})")
+                    
+                    sub_tickets = _create_sub_tickets(p.booking_id, p.ticket_split, email)
+                    mother_qr_content = _create_mother_ticket(p.booking_id, email)
+                    
+                    # 更新 Sheet 的 QRCode編碼 為母票
+                    if "QRCode編碼" in hmap:
+                        ws_main.update_cell(rowno, hmap["QRCode編碼"], mother_qr_content)
+                    
+                    log.info(f"[split_ticket] First split booking {p.booking_id} into {len(sub_tickets)} sub-tickets")
+                    new_sub_tickets = sub_tickets
+                
+                _invalidate_sheet_cache()
+                
+                # 返回所有子票信息（包括已上車的舊子票和新子票）
+                all_sub_tickets = _get_sub_tickets(p.booking_id)
+                
+                def get_suffix(index: int) -> str:
+                    return chr(64 + index) if index <= 26 else f"_{index}"
+                
+                return {
+                    "status": "success",
+                    "booking_id": p.booking_id,
+                    "is_re_split": is_re_split,
+                    "sub_tickets": [
+                        {
+                            "sub_index": t.get("sub_ticket_index"),
+                            "booking_id": f"{p.booking_id}_{get_suffix(t.get('sub_ticket_index', 1))}",
+                            "pax": t.get("sub_ticket_pax", 0),
+                            "status": t.get("status", "not_checked_in"),
+                            "qr_content": t.get("qr_content", ""),
+                            "qr_url": f"{BASE_URL}/api/qr/{urllib.parse.quote(t.get('qr_content', ''))}"
+                        }
+                        for t in all_sub_tickets
+                    ],
+                    "mother_ticket": {
+                        "qr_content": mother_qr_content,
+                        "qr_url": f"{BASE_URL}/api/qr/{urllib.parse.quote(mother_qr_content)}"
+                    }
+                }
+            except ValueError as e:
+                raise HTTPException(400, str(e))
+            except Exception as e:
+                log.error(f"[split_ticket] Failed to split ticket: {e}")
+                raise HTTPException(500, f"分票失敗: {str(e)}")
+
         elif action == "mail":
             p = MailPayload(**data)
             rownos = _find_rows_by_pred(ws_main, headers, HEADER_ROW_MAIN, lambda r: r.get("預約編號") == p.booking_id)

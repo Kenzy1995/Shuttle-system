@@ -1691,6 +1691,9 @@ function mountTicketAndShow(ticket) {
   let totalSubPax = 0;
   if (hasSubTickets) {
     totalSubPax = subTickets.reduce((sum, t) => sum + (t.pax || 0), 0);
+  } else {
+    // 如果沒有子票，使用總人數
+    totalSubPax = ticket.passengers || 0;
   }
 
   const paxEl = getElement("ticketPassengers");
