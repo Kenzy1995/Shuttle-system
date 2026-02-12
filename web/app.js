@@ -1776,8 +1776,8 @@ function mountTicketAndShow(ticket) {
     
     allTickets.forEach((tkt, idx) => {
       const isActive = idx === 0 ? "active" : "";
-      const statusBadge = tkt.type === "mother" 
-        ? `<div class="sub-ticket-status info">一次性核銷所有人</div>`
+      const statusBadge = tkt.type === "single" 
+        ? `<div class="sub-ticket-status info">單一票卷</div>`
         : (tkt.status === "checked_in" 
           ? `<div class="sub-ticket-status checked-in">✓ 已上車</div>`
           : `<div class="sub-ticket-status not-checked-in">未上車</div>`);
@@ -2485,8 +2485,8 @@ function buildTicketCard(row, { mask = false } = {}) {
     
     allTickets.forEach((tkt, idx) => {
       const isActive = idx === 0 ? "active" : "";
-      const statusBadge = tkt.type === "mother" 
-        ? `<div class="sub-ticket-status info">一次性核銷所有人</div>`
+      const statusBadge = tkt.type === "single" 
+        ? `<div class="sub-ticket-status info">單一票卷</div>`
         : (tkt.status === "checked_in" 
           ? `<div class="sub-ticket-status checked-in">✓ 已上車</div>`
           : `<div class="sub-ticket-status not-checked-in">未上車</div>`);
