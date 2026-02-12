@@ -33,9 +33,8 @@ jobs:
         gcloud auth configure-docker asia-east1-docker.pkg.dev --quiet
 
     - name: Build Docker image
-      working-directory: ./driver-api2
       run: |
-        docker build -t asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/shuttle-web/${{ env.SERVICE }} .
+        docker build -t asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/shuttle-web/${{ env.SERVICE }} -f driver-api2/Dockerfile driver-api2
 
     - name: Push Docker image
       run: |
