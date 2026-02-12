@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import urllib.parse
 import secrets  
 
-
 import qrcode
 import firebase_admin
 from firebase_admin import credentials, db
