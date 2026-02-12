@@ -32,9 +32,17 @@ jobs:
       run: |
         gcloud auth configure-docker asia-east1-docker.pkg.dev --quiet
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
     - name: Build Docker image
       run: |
-        docker build -t asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/shuttle-web/${{ env.SERVICE }} -f booking-manager/Dockerfile booking-manager
+        docker buildx build \
+          --platform linux/amd64 \
+          --tag asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/shuttle-web/${{ env.SERVICE }} \
+          --file booking-manager/Dockerfile \
+          --load \
+          booking-manager
 
     - name: Push Docker image
       run: |

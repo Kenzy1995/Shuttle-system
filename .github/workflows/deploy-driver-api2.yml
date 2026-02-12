@@ -32,9 +32,17 @@ jobs:
       run: |
         gcloud auth configure-docker asia-east1-docker.pkg.dev --quiet
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
     - name: Build Docker image
       run: |
-        docker build -t asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/shuttle-web/${{ env.SERVICE }} -f driver-api2/Dockerfile driver-api2
+        docker buildx build \
+          --platform linux/amd64 \
+          --tag asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/shuttle-web/${{ env.SERVICE }} \
+          --file driver-api2/Dockerfile \
+          --load \
+          driver-api2
 
     - name: Push Docker image
       run: |
