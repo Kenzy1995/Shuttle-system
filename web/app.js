@@ -1697,67 +1697,126 @@ function mountTicketAndShow(ticket) {
     paxEl.textContent = paxText + subTicketText;
   }
 
-  // ========== 更新 QR Code 顯示區域 ==========
+  // ========== 更新 QR Code 顯示區域（支持左右切換） ==========
   const qrContainer = getElement("ticketQrContainer");
-  if (qrContainer) {
-    if (hasSubTickets) {
-      // 母子車票模式：顯示所有子票和母票
-      let qrHTML = `
-        <div class="ticket-status-summary">
-          <strong>上車狀態：</strong>
-          <span class="status-text">0/${totalSubPax} 人已上車</span>
-        </div>
-        <div class="sub-tickets-grid">
-      `;
-      
-      // 添加所有子票（顯示子票編號，例如：26021205_A）
-      subTickets.forEach((t) => {
-        const qrUrl = t.qr_url || (t.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(t.qr_content)}` : "");
-        const qrImg = qrUrl ? `<img src="${qrUrl}" alt="Sub Ticket ${t.sub_index}" />` : `<div style="padding:20px;color:#999;">QR Code ${t.sub_index}</div>`;
-        const subBookingId = t.booking_id || `${ticket.bookingId}_${String.fromCharCode(64 + t.sub_index)}`;
-        const statusBadge = t.status === "checked_in" 
-          ? `<div class="sub-ticket-status checked-in">✓ 已上車</div>`
-          : `<div class="sub-ticket-status not-checked-in">未上車</div>`;
-        qrHTML += `
-          <div class="sub-ticket-qr-item" data-ticket-index="${t.sub_index}">
-            <div class="sub-ticket-label">子票 ${t.sub_index} (${t.pax}人)</div>
-            <div class="sub-ticket-booking-id" style="font-size:12px;color:#666;margin:4px 0;">${subBookingId}</div>
-            <div class="sub-ticket-qr">${qrImg}</div>
-            ${statusBadge}
-          </div>
-        `;
-      });
-      
-      // 添加母票
-      if (motherTicket) {
-        const motherQrUrl = motherTicket.qr_url || (motherTicket.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(motherTicket.qr_content)}` : "");
-        if (motherQrUrl) {
-          qrHTML += `
-            <div class="sub-ticket-qr-item mother-ticket">
-              <div class="sub-ticket-label">母票（全部）</div>
-              <div class="sub-ticket-qr"><img src="${motherQrUrl}" alt="Mother Ticket" /></div>
-              <div class="sub-ticket-status info">一次性核銷所有人</div>
-            </div>
-          `;
-        }
-      }
-      
-      qrHTML += `</div>`;
-      qrContainer.innerHTML = qrHTML;
-      qrContainer.className = "ticket-qr multi-ticket";
-    } else {
-      // 單一車票模式（向後兼容）
-      const qrImg = getElement("ticketQrImg");
-      if (qrImg) qrImg.src = ticket.qrUrl || "";
-      if (qrContainer) {
-        qrContainer.innerHTML = `<img id="ticketQrImg" src="${ticket.qrUrl || ""}" alt="QR Code"/>`;
-        qrContainer.className = "ticket-qr";
+  
+  if (hasSubTickets) {
+    // 母子車票模式：使用輪播顯示（母票 + 所有子票）
+    // 計算已上車人數
+    let checkedPax = 0;
+    subTickets.forEach(t => {
+      if (t.status === "checked_in") checkedPax += (t.pax || 0);
+    });
+    
+    // 構建所有票卷（母票 + 子票）
+    const allTickets = [];
+    
+    // 添加母票（第一個）
+    if (motherTicket) {
+      const motherQrUrl = motherTicket.qr_url || (motherTicket.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(motherTicket.qr_content)}` : "");
+      if (motherQrUrl) {
+        allTickets.push({
+          type: "mother",
+          booking_id: ticket.bookingId,
+          pax: totalSubPax,
+          qr_url: motherQrUrl,
+          label: "母票（全部）"
+        });
       }
     }
+    
+    // 添加所有子票
+    subTickets.forEach((t) => {
+      const qrUrl = t.qr_url || (t.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(t.qr_content)}` : "");
+      const subBookingId = t.booking_id || `${ticket.bookingId}_${String.fromCharCode(64 + t.sub_index)}`;
+      allTickets.push({
+        type: "sub",
+        booking_id: subBookingId,
+        sub_index: t.sub_index,
+        pax: t.pax || 0,
+        qr_url: qrUrl,
+        status: t.status || "not_checked_in",
+        label: `子票 ${t.sub_index}`
+      });
+    });
+    
+    // 構建輪播 HTML
+    let carouselHTML = `
+      <div class="ticket-status-summary">
+        <strong>上車狀態：</strong>
+        <span class="status-text">${checkedPax}/${totalSubPax} 人已上車</span>
+      </div>
+      <div class="ticket-carousel-container">
+        <button class="carousel-btn carousel-prev" onclick="switchTicket(-1)" aria-label="上一張">‹</button>
+        <div class="ticket-carousel-track" id="ticketCarouselTrack">
+    `;
+    
+    allTickets.forEach((tkt, idx) => {
+      const isActive = idx === 0 ? "active" : "";
+      const statusBadge = tkt.type === "mother" 
+        ? `<div class="sub-ticket-status info">一次性核銷所有人</div>`
+        : (tkt.status === "checked_in" 
+          ? `<div class="sub-ticket-status checked-in">✓ 已上車</div>`
+          : `<div class="sub-ticket-status not-checked-in">未上車</div>`);
+      
+      carouselHTML += `
+        <div class="ticket-carousel-item ${isActive}" data-ticket-index="${idx}">
+          <div class="sub-ticket-qr-item ${tkt.type === 'mother' ? 'mother-ticket' : ''}">
+            <div class="sub-ticket-label">${tkt.label} (${tkt.pax}人)</div>
+            <div class="sub-ticket-booking-id">${tkt.booking_id}</div>
+            <div class="sub-ticket-qr"><img src="${tkt.qr_url}" alt="${tkt.label}" /></div>
+            ${statusBadge}
+          </div>
+        </div>
+      `;
+    });
+    
+    carouselHTML += `
+        </div>
+        <button class="carousel-btn carousel-next" onclick="switchTicket(1)" aria-label="下一張">›</button>
+      </div>
+      <div class="ticket-carousel-indicators">
+    `;
+    
+    allTickets.forEach((tkt, idx) => {
+      const isActive = idx === 0 ? "active" : "";
+      carouselHTML += `<span class="carousel-dot ${isActive}" onclick="switchTicketTo(${idx})"></span>`;
+    });
+    
+    carouselHTML += `</div>`;
+    
+    if (qrContainer) {
+      qrContainer.innerHTML = carouselHTML;
+      qrContainer.className = "ticket-qr multi-ticket";
+    }
+    
+    // 保存當前票卷索引
+    window.currentTicketIndex = 0;
+    window.totalTickets = allTickets.length;
   } else {
-    // 向後兼容：如果沒有 qrContainer，使用舊的 ticketQrImg
-    const qrImg = getElement("ticketQrImg");
-    if (qrImg) qrImg.src = ticket.qrUrl || "";
+    // 單一車票模式（向後兼容）：顯示母票 + 分票按鈕
+    if (qrContainer) {
+      let singleTicketHTML = `
+        <div class="ticket-qr-single">
+          <img id="ticketQrImg" src="${ticket.qrUrl || ""}" alt="QR Code"/>
+        </div>
+      `;
+      qrContainer.innerHTML = singleTicketHTML;
+      qrContainer.className = "ticket-qr";
+    }
+    
+    // 添加分票按鈕（如果還沒有分票且人數 > 1）
+    const actionsContainer = getElement("ticketActionsContainer");
+    if (actionsContainer && ticket.passengers > 1) {
+      // 檢查是否已有分票按鈕
+      if (!actionsContainer.querySelector(".split-ticket-btn")) {
+        const splitBtn = document.createElement("button");
+        splitBtn.className = "button split-ticket-btn";
+        splitBtn.textContent = "分票";
+        splitBtn.onclick = () => showSplitTicketDialog(ticket);
+        actionsContainer.insertBefore(splitBtn, actionsContainer.firstChild);
+      }
+    }
   }
 
   const card = getElement("successCard");
