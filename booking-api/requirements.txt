@@ -1,7 +1,0 @@
-Flask
-gunicorn
-google-api-python-client
-google-auth
-google-auth-httplib2
-Flask-Cors
-firebase-admin

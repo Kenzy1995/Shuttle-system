@@ -1,0 +1,88 @@
+name: Deploy Unified Server API
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'server-api/**'
+      - '.github/workflows/deploy-server-api.yml'
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID || 'shuttle-system-487204' }}
+  SERVICE_NAME: server-api
+  REGION: asia-east1
+  ARTIFACT_REGISTRY: asia-east1-docker.pkg.dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY }} --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_TAG="${{ env.ARTIFACT_REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          IMAGE_LATEST="${{ env.ARTIFACT_REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:latest"
+          
+          cd server-api
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag $IMAGE_TAG \
+            --tag $IMAGE_LATEST \
+            --file Dockerfile \
+            --push \
+            .
+          
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          echo "IMAGE_LATEST=$IMAGE_LATEST" >> $GITHUB_ENV
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.IMAGE_TAG }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }} \
+            --allow-unauthenticated \
+            --memory 1Gi \
+            --cpu 1 \
+            --timeout 300 \
+            --max-instances 10 \
+            --min-instances 0 \
+            --service-account=shuttle-system@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+            --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }}" \
+            --set-env-vars "FIREBASE_RTDB_URL=https://${{ env.PROJECT_ID }}-default-rtdb.asia-southeast1.firebasedatabase.app/" \
+            --set-env-vars "BASE_URL=https://${{ env.SERVICE_NAME }}-${{ env.PROJECT_ID }}.${{ env.REGION }}.run.app"
+
+      - name: Output service URL
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }} \
+            --format 'value(status.url)')
+          echo "Service deployed at: $SERVICE_URL"
+          echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
+

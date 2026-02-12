@@ -1,15 +1,15 @@
 
 
 /* ====== 常數（API） ====== */
-const API_URL =
-  "https://booking-api-509045429779.asia-east1.run.app/api/sheet";
-const OPS_URL =
-  "https://booking-manager-509045429779.asia-east1.run.app/api/ops";
-const QR_ORIGIN = "https://booking-manager-509045429779.asia-east1.run.app";
+// 統一後端 API 基礎 URL
+const BASE_API_URL = "https://server-api-509045429779.asia-east1.run.app";
+const API_URL = `${BASE_API_URL}/api/sheet`;
+const OPS_URL = `${BASE_API_URL}/api/ops`;
+const QR_ORIGIN = BASE_API_URL;
 
 const LIVE_LOCATION_CONFIG = {
   key: "AIzaSyB1PtwlsIgr026u29gU2L8ZXcozbkHpHco",
-  api: "https://driver-api2-509045429779.asia-east1.run.app",
+  api: BASE_API_URL,
   trip: "",
   fbdb: "https://shuttle-system-487204-default-rtdb.asia-southeast1.firebasedatabase.app/",
   fbkey: "AIzaSyDatr-z00tNMnXD7WMoTJ0vygdVCJKNuQA"
@@ -3075,7 +3075,7 @@ async function renderLiveLocationPlaceholder() {
 
   // 檢查 GPS 系統總開關（從 booking-api 讀取，該 API 會從 Sheet 的「系統」E19 讀取）
   try {
-    const apiUrl = "https://booking-api-509045429779.asia-east1.run.app/api/realtime/location";
+    const apiUrl = `${BASE_API_URL}/api/realtime/location`;
     const r = await fetch(apiUrl);
     if (r.ok) {
       let data = null;
@@ -4224,7 +4224,7 @@ function initLiveLocation(mount) {
   const fetchLocation = async () => {
     try {
       // 從 booking-api 讀取即時位置資料（作為備用方案）
-      const apiUrl = "https://booking-api-509045429779.asia-east1.run.app/api/realtime/location";
+      const apiUrl = `${BASE_API_URL}/api/realtime/location`;
       const r = await fetch(apiUrl);
       if (!r.ok) {
         updateStatus("#dc3545", t("rtStatusFailed"));

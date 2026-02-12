@@ -1,25 +1,18 @@
-# Web Framework
 fastapi>=0.110
 uvicorn>=0.23
 gunicorn>=21.2
 
-# Google APIs
 gspread>=5.7
 google-auth>=2.23
 google-auth-httplib2>=0.2.0
 google-api-python-client>=2.124.0
-
-# Firebase
 firebase-admin>=6.4
 
-# Data Validation
 pydantic>=2.6
 pydantic-core>=2.16
 
-# QR Code
 qrcode[pil]>=7.4
 Pillow>=10.0
 
-# Utilities
 python-multipart>=0.0.9
 
