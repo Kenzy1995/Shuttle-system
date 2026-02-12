@@ -1974,22 +1974,41 @@ function updateSplitTicketSummary(totalPax) {
   }
 }
 
-async function confirmSplitTicket(bookingId, totalPax) {
+function handleConfirmSplitTicket(bookingId, totalPax, isReSplit = false) {
   const inputs = document.querySelectorAll(".split-pax-input");
-  const ticketSplit = Array.from(inputs).map(inp => parseInt(inp.value) || 1);
+  const ticketSplit = Array.from(inputs).map(inp => parseInt(inp.value) || 0);
   const sum = ticketSplit.reduce((a, b) => a + b, 0);
   
-  if (sum !== totalPax) {
-    showErrorCard(`分票總和 (${sum}) 必須等於總人數 (${totalPax})`);
+  // 驗證：每張至少1人
+  if (ticketSplit.some(pax => pax < 1)) {
+    showErrorCard("每張票卷至少需要1人");
     return;
   }
   
+  // 驗證：總和必須等於總人數
+  if (sum !== totalPax) {
+    showErrorCard(`分票總和 (${sum}) 必須等於${isReSplit ? '剩餘' : '總'}人數 (${totalPax})`);
+    return;
+  }
+  
+  // 驗證：至少2張票
   if (ticketSplit.length < 2) {
     showErrorCard("至少需要分成2張子票");
     return;
   }
   
+  // 立即關閉對話框
+  const overlay = document.querySelector(".modal-overlay");
+  if (overlay) overlay.remove();
+  
+  // 執行分票
+  confirmSplitTicket(bookingId, ticketSplit, isReSplit);
+}
+
+async function confirmSplitTicket(bookingId, ticketSplit, isReSplit = false) {
+  // 顯示載入動畫
   showLoading(true);
+  
   try {
     const res = await fetch(OPS_URL, {
       method: "POST",
@@ -2002,21 +2021,47 @@ async function confirmSplitTicket(bookingId, totalPax) {
       throw new Error(result.detail || result.message || "分票失敗");
     }
     
-    // 關閉對話框
-    document.querySelector(".modal-overlay")?.remove();
-    
-    // 更新當前票卷數據
+    // 分票成功：更新數據並重新顯示票卷
     if (window.currentBookingData) {
+      // 更新票卷數據
       window.currentBookingData.sub_tickets = result.sub_tickets || [];
       window.currentBookingData.mother_ticket = result.mother_ticket || null;
       
       // 重新渲染票卷（顯示所有子票和母票，支持切換）
       mountTicketAndShow(window.currentBookingData);
+      
+      // 顯示成功動畫
+      showSuccessAnimation();
+    } else {
+      // 如果是在查詢頁面，重新查詢訂單以更新顯示
+      showSuccessAnimation();
+      setTimeout(() => {
+        // 觸發重新查詢
+        if (typeof queryOrders === "function") {
+          const qBookIdEl = getElement("qBookId");
+          const qPhoneEl = getElement("qPhone");
+          const qEmailEl = getElement("qEmail");
+          // 保存當前查詢條件
+          const savedQuery = {
+            id: qBookIdEl ? qBookIdEl.value : "",
+            phone: qPhoneEl ? qPhoneEl.value : "",
+            email: qEmailEl ? qEmailEl.value : ""
+          };
+          
+          // 重新查詢
+          queryOrders();
+          
+          // 恢復查詢條件（如果需要）
+          setTimeout(() => {
+            if (qBookIdEl && savedQuery.id) qBookIdEl.value = savedQuery.id;
+            if (qPhoneEl && savedQuery.phone) qPhoneEl.value = savedQuery.phone;
+            if (qEmailEl && savedQuery.email) qEmailEl.value = savedQuery.email;
+          }, 500);
+        }
+      }, 1500);
     }
-    
-    showSuccessAnimation();
   } catch (e) {
-    showErrorCard("分票失敗：" + (e.message || ""));
+    showErrorCard(`${isReSplit ? '重新' : ''}分票失敗：` + (e.message || ""));
   } finally {
     showLoading(false);
   }
@@ -2482,6 +2527,36 @@ function buildTicketCard(row, { mask = false } = {}) {
           });
       };
       actions.appendChild(dlBtn);
+    }
+
+    // ========== 添加分票按鈕（查詢頁面） ==========
+    if (pax > 1 && statusCode !== "cancelled" && statusCode !== "rejected") {
+      // 檢查是否有未上車的子票（如果有未上車的，可以重新分票）
+      const hasUncheckedTickets = hasSubTickets && subTickets.some(t => t.status !== "checked_in");
+      const canReSplit = hasSubTickets && hasUncheckedTickets;
+      
+      const splitBtn = document.createElement("button");
+      splitBtn.className = "button btn-ghost split-ticket-btn";
+      splitBtn.textContent = canReSplit ? "重新分票" : "分票";
+      splitBtn.onclick = () => {
+        // 構建 ticket 對象供分票對話框使用
+        const ticketData = {
+          bookingId: bookingId,
+          passengers: pax,
+          sub_tickets: subTickets,
+          mother_ticket: motherTicket,
+          date: dateIso,
+          time: time,
+          direction: rb,
+          pickLocation: pick,
+          dropLocation: drop,
+          name: name,
+          phone: phone,
+          email: email
+        };
+        showSplitTicketDialog(ticketData, canReSplit);
+      };
+      actions.appendChild(splitBtn);
     }
 
     if (!expired && statusCode !== "cancelled" && statusCode !== "rejected" && statusCode !== "boarded") {
