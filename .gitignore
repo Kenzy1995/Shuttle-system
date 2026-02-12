@@ -24,6 +24,11 @@ tag_*.py
 !ENVIRONMENT_SEPARATION_CHECK.md
 !TROUBLESHOOTING_FAILED_FETCH.md
 !FIX_FIREBASE_AUTH_ERROR.md
+!GRANT_FIREBASE_PERMISSIONS.md
+
+# Shell scripts (allow permission grant scripts)
+*.sh
+!grant-firebase-permissions.sh
 
 # Temporary files
 *.log
