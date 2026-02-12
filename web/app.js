@@ -1773,18 +1773,22 @@ function mountTicketAndShow(ticket) {
     // 保存所有票卷數據到全局變量，供切換時使用
     window.allTicketsData = allTickets;
     
-    // 構建新的顯示結構：上方狀態 + 中間標題（左右箭頭）+ 下方完整車票
+    // 構建新的顯示結構：上方狀態 + ABC按鈕 + 下方完整車票
     let carouselHTML = `
       <div class="ticket-status-summary" style="text-align:center;margin-bottom:20px;padding:12px;background:#f9f9f9;border-radius:8px;">
         <strong>上車狀態：</strong>
         <span class="status-text">${checkedPax}/${totalSubPax} 人已上車</span>
       </div>
-      <div class="ticket-title-carousel" style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:24px;">
-        <button class="carousel-btn carousel-prev" onclick="switchTicket(-1)" aria-label="上一張" style="width:40px;height:40px;border-radius:50%;">‹</button>
-        <div class="ticket-title-display" id="ticketTitleDisplay" style="font-size:24px;font-weight:bold;min-width:200px;text-align:center;">
-          ${allTickets.length > 0 ? allTickets[0].booking_id : ticket.bookingId}
-        </div>
-        <button class="carousel-btn carousel-next" onclick="switchTicket(1)" aria-label="下一張" style="width:40px;height:40px;border-radius:50%;">›</button>
+      <div class="ticket-carousel-indicators" style="display:flex;justify-content:center;margin-bottom:24px;gap:8px;">
+    `;
+    
+    // ABC按鈕在上方
+    allTickets.forEach((tkt, idx) => {
+      const isActive = idx === 0 ? "active" : "";
+      carouselHTML += `<span class="carousel-dot ${isActive}" onclick="switchTicketTo(${idx})" title="${tkt.label}">${tkt.label}</span>`;
+    });
+    
+    carouselHTML += `
       </div>
       <div class="ticket-carousel-container" style="position:relative;">
         <div class="ticket-carousel-track" id="ticketCarouselTrack" style="display:flex;transition:transform 0.3s ease;">
@@ -1807,10 +1811,10 @@ function mountTicketAndShow(ticket) {
       carouselHTML += `
         <div class="ticket-carousel-item ${isActive}" data-ticket-index="${idx}" style="flex:0 0 100%;width:100%;box-sizing:border-box;padding:0 10px;">
           <div class="sub-ticket-qr-item ${tkt.type === 'single' ? 'mother-ticket' : ''}${checkedInClass}" style="background:#fff;padding:20px;border-radius:12px;border:1px solid #e5e7eb;text-align:center;">
+            ${statusBadge}
             <div class="sub-ticket-qr" style="margin:16px 0;">
               <img src="${qrUrlToUse}" alt="票卷 ${tkt.label}" style="width:200px;height:200px;border-radius:8px;border:1px solid #ddd;object-fit:contain;" onerror="this.src='${QR_ORIGIN}/api/qr/error'; console.error('QR load failed:', '${qrUrlToUse}');" />
             </div>
-            ${statusBadge}
           </div>
         </div>
       `;
@@ -1819,15 +1823,7 @@ function mountTicketAndShow(ticket) {
     carouselHTML += `
         </div>
       </div>
-      <div class="ticket-carousel-indicators" style="display:flex;justify-content:center;margin-top:16px;gap:8px;">
     `;
-    
-    allTickets.forEach((tkt, idx) => {
-      const isActive = idx === 0 ? "active" : "";
-      carouselHTML += `<span class="carousel-dot ${isActive}" onclick="switchTicketTo(${idx})" title="${tkt.label}">${tkt.label}</span>`;
-    });
-    
-    carouselHTML += `</div>`;
     
     if (qrContainer) {
       qrContainer.innerHTML = carouselHTML;
@@ -1839,12 +1835,47 @@ function mountTicketAndShow(ticket) {
     window.totalTickets = allTickets.length;
     window.allTicketsData = allTickets;
     
-    // 初始化顯示第一個票卷的資訊
+    // 初始化顯示第一個票卷的資訊（更新所有下方資訊欄位）
     if (allTickets.length > 0) {
       const firstTicket = allTickets[0];
+      
+      // 更新預約編號
       const bookingIdEl = getElement("ticketBookingId");
       if (bookingIdEl) {
         bookingIdEl.textContent = firstTicket.booking_id || ticket.bookingId || "";
+      }
+      
+      // 更新人數
+      const paxEl = getElement("ticketPassengers");
+      if (paxEl) {
+        const paxText = firstTicket.pax + " " + t("labelPassengersShort");
+        paxEl.textContent = paxText;
+      }
+      
+      // 更新其他資訊（如果有的話）
+      if (ticket.direction) {
+        const directionEl = getElement("ticketDirection");
+        if (directionEl) directionEl.textContent = ticket.direction || "";
+      }
+      if (ticket.pickLocation) {
+        const pickEl = getElement("ticketPick");
+        if (pickEl) pickEl.textContent = ticket.pickLocation || "";
+      }
+      if (ticket.dropLocation) {
+        const dropEl = getElement("ticketDrop");
+        if (dropEl) dropEl.textContent = ticket.dropLocation || "";
+      }
+      if (ticket.name) {
+        const nameEl = getElement("ticketName");
+        if (nameEl) nameEl.textContent = ticket.name || "";
+      }
+      if (ticket.phone) {
+        const phoneEl = getElement("ticketPhone");
+        if (phoneEl) phoneEl.textContent = ticket.phone || "";
+      }
+      if (ticket.email) {
+        const emailEl = getElement("ticketEmail");
+        if (emailEl) emailEl.textContent = ticket.email || "";
       }
       const paxEl = getElement("ticketPassengers");
       if (paxEl) {
