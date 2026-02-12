@@ -269,11 +269,11 @@
 - **資料庫**：Google Sheets + Firebase Realtime Database
 - **CDN**：Google Cloud CDN
 
-### 服務端點
-- **乘客網站**：`https://hotel-web-995728097341.asia-east1.run.app`
-- **預約管理 API**：`https://booking-manager-995728097341.asia-east1.run.app`
-- **班次資料 API**：`https://booking-api-995728097341.asia-east1.run.app`
-- **司機端 API**：`https://driver-api2-995728097341.asia-east1.run.app`
+### 服務端點（測試環境）
+- **乘客網站**：`https://shuttle-web-509045429779.asia-east1.run.app`
+- **預約管理 API**：`https://booking-manager-509045429779.asia-east1.run.app`
+- **班次資料 API**：`https://booking-api-509045429779.asia-east1.run.app`
+- **司機端 API**：`https://driver-api2-509045429779.asia-east1.run.app`
 
 ---
 

@@ -1,33 +1,39 @@
+# 注意：此檔案已棄用，現在使用 GitHub Actions 進行部署
+# 如需使用 Cloud Build，請更新為新的配置：
+# - 服務名稱: shuttle-web
+# - Artifact Registry: asia-east1-docker.pkg.dev/$PROJECT_ID/shuttle-web/web
+# - 服務帳號: shuttle-system@$PROJECT_ID.iam.gserviceaccount.com
+
 steps:
   # 1. 建立 Docker 映像
   - name: 'gcr.io/cloud-builders/docker'
     args: 
       - 'build'
       - '-t'
-      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/hotel-web/web'
+      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/shuttle-web/web'
       - '-t'
-      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/hotel-web/web:latest'
+      - 'asia-east1-docker.pkg.dev/$PROJECT_ID/shuttle-web/web:latest'
       - '.'
 
   # 2. 推送到 Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'asia-east1-docker.pkg.dev/$PROJECT_ID/hotel-web/web']
+    args: ['push', 'asia-east1-docker.pkg.dev/$PROJECT_ID/shuttle-web/web']
 
-  # 3. 部署到 Cloud Run（不改變服務名稱，所以 URL 不會變）
+  # 3. 部署到 Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       [
-        'run', 'deploy', 'hotel-web',
-        '--image', 'asia-east1-docker.pkg.dev/$PROJECT_ID/hotel-web/web',
+        'run', 'deploy', 'shuttle-web',
+        '--image', 'asia-east1-docker.pkg.dev/$PROJECT_ID/shuttle-web/web',
         '--platform', 'managed',
         '--region', 'asia-east1',
         '--allow-unauthenticated',
-        '--service-account', 'forte-booking-system@forte-booking-system.iam.gserviceaccount.com',
+        '--service-account', 'shuttle-system@$PROJECT_ID.iam.gserviceaccount.com',
         '--port', '8080',
         '--quiet'
       ]
 
 images:
-  - 'asia-east1-docker.pkg.dev/$PROJECT_ID/hotel-web/web'
+  - 'asia-east1-docker.pkg.dev/$PROJECT_ID/shuttle-web/web'
 
