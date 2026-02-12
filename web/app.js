@@ -2592,25 +2592,33 @@ function buildTicketCard(row, { mask = false } = {}) {
       });
     });
     
+    // 為每個票卡使用唯一的 ID（避免多個票卡有相同 ID）
+    const uniqueCarouselId = `ticketCarouselTrack_${bookingId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const uniqueContainerId = `ticketCarouselContainer_${bookingId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    
+    // 保存該票卡的數據到全局對象（以 bookingId 為鍵）
+    if (!window.queryTicketsData) window.queryTicketsData = {};
+    window.queryTicketsData[bookingId] = allTickets;
+    
     // 構建新的顯示結構：上方狀態 + ABC按鈕 + 下方完整車票
     let carouselHTML = `
       <div class="ticket-status-summary" style="text-align:center;margin-bottom:20px;padding:12px;background:#f9f9f9;border-radius:8px;">
         <strong>上車狀態：</strong>
         <span class="status-text">${checkedPax}/${totalSubPax} 人已上車</span>
       </div>
-      <div class="ticket-carousel-indicators" style="display:flex;justify-content:center;margin-bottom:24px;gap:8px;">
+      <div class="ticket-carousel-indicators" data-booking-id="${bookingId}" style="display:flex;justify-content:center;margin-bottom:24px;gap:8px;">
     `;
     
-    // ABC按鈕在上方
+    // ABC按鈕在上方（使用 bookingId 和 index 作為參數）
     allTickets.forEach((tkt, idx) => {
       const isActive = idx === 0 ? "active" : "";
-      carouselHTML += `<span class="carousel-dot ${isActive}" onclick="switchTicketTo(${idx})" title="${tkt.label}">${tkt.label}</span>`;
+      carouselHTML += `<span class="carousel-dot ${isActive}" onclick="switchQueryTicketTo('${bookingId}', ${idx})" title="${tkt.label}">${tkt.label}</span>`;
     });
     
     carouselHTML += `
       </div>
-      <div class="ticket-carousel-container" style="position:relative;">
-        <div class="ticket-carousel-track" id="ticketCarouselTrack" style="display:flex;transition:transform 0.3s ease;">
+      <div class="ticket-carousel-container" id="${uniqueContainerId}" style="position:relative;">
+        <div class="ticket-carousel-track" id="${uniqueCarouselId}" style="display:flex;transition:transform 0.3s ease;">
     `;
     
     allTickets.forEach((tkt, idx) => {
@@ -2643,14 +2651,10 @@ function buildTicketCard(row, { mask = false } = {}) {
     `;
     
     qrSection = `
-      <div class="ticket-qr multi-ticket">
+      <div class="ticket-qr multi-ticket" data-booking-id="${bookingId}">
         ${carouselHTML}
       </div>
     `;
-    
-    // 保存當前票卷索引（用於查詢頁面的切換）
-    window.currentTicketIndex = 0;
-    window.totalTickets = allTickets.length;
   } else {
     // 單一車票模式（向後兼容）
     qrSection = `<div class="ticket-qr"><img src="${sanitize(qrUrl)}" alt="QR" /></div>`;
