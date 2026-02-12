@@ -32,6 +32,7 @@ tag_*.py
 !FIX_GOOGLE_SHEETS_PERMISSIONS.md
 !FIX_LOCK_TIMEOUT.md
 !INITIALIZE_FIREBASE_DATABASE.md
+!AUTO_INIT_FIREBASE_PATHS.md
 
 # Shell scripts (allow permission grant scripts)
 *.sh
