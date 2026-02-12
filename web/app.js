@@ -2021,6 +2021,18 @@ function updateSplitTicketSummary(totalPax) {
 }
 
 function handleConfirmSplitTicket(bookingId, totalPax, isReSplit = false) {
+  const countSelect = document.getElementById("splitTicketCount");
+  const ticketCount = parseInt(countSelect?.value) || 1;
+  
+  // 如果選擇1張票，相當於合併為一張票
+  if (ticketCount === 1) {
+    const overlay = document.querySelector(".modal-overlay");
+    if (overlay) overlay.remove();
+    confirmSplitTicket(bookingId, [totalPax], isReSplit);
+    return;
+  }
+  
+  // 否則執行正常分票邏輯
   const inputs = document.querySelectorAll(".split-pax-input");
   const ticketSplit = Array.from(inputs).map(inp => parseInt(inp.value) || 0);
   const sum = ticketSplit.reduce((a, b) => a + b, 0);
@@ -2037,9 +2049,9 @@ function handleConfirmSplitTicket(bookingId, totalPax, isReSplit = false) {
     return;
   }
   
-  // 驗證：至少2張票
-  if (ticketSplit.length < 2) {
-    showErrorCard("至少需要分成2張子票");
+  // 驗證：至少1張票（允許1張）
+  if (ticketSplit.length < 1) {
+    showErrorCard("至少需要1張票卷");
     return;
   }
   
