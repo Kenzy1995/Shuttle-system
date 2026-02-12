@@ -2237,7 +2237,7 @@ function switchTicketTo(index) {
   if (window.allTicketsData && window.allTicketsData[index]) {
     const currentTicket = window.allTicketsData[index];
     
-    // 更新預約編號
+    // 更新預約編號（顯示完整編號，例如：26021307_A）
     const bookingIdEl = getElement("ticketBookingId");
     if (bookingIdEl) {
       bookingIdEl.textContent = currentTicket.booking_id || "";
@@ -2248,6 +2248,35 @@ function switchTicketTo(index) {
     if (paxEl) {
       const paxText = currentTicket.pax + " " + t("labelPassengersShort");
       paxEl.textContent = paxText;
+    }
+    
+    // 確保其他資訊也正確顯示（從原始ticket數據獲取）
+    if (window.currentBookingData) {
+      const ticket = window.currentBookingData;
+      if (ticket.direction) {
+        const directionEl = getElement("ticketDirection");
+        if (directionEl) directionEl.textContent = ticket.direction || "";
+      }
+      if (ticket.pickLocation) {
+        const pickEl = getElement("ticketPick");
+        if (pickEl) pickEl.textContent = ticket.pickLocation || "";
+      }
+      if (ticket.dropLocation) {
+        const dropEl = getElement("ticketDrop");
+        if (dropEl) dropEl.textContent = ticket.dropLocation || "";
+      }
+      if (ticket.name) {
+        const nameEl = getElement("ticketName");
+        if (nameEl) nameEl.textContent = ticket.name || "";
+      }
+      if (ticket.phone) {
+        const phoneEl = getElement("ticketPhone");
+        if (phoneEl) phoneEl.textContent = ticket.phone || "";
+      }
+      if (ticket.email) {
+        const emailEl = getElement("ticketEmail");
+        if (emailEl) emailEl.textContent = ticket.email || "";
+      }
     }
   }
 }
