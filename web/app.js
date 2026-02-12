@@ -1791,8 +1791,8 @@ function mountTicketAndShow(ticket) {
       carouselHTML += `
         <div class="ticket-carousel-item ${isActive}" data-ticket-index="${idx}">
           <div class="sub-ticket-qr-item ${tkt.type === 'mother' ? 'mother-ticket' : ''}${checkedInClass}">
-            <div class="sub-ticket-label">票卷 ${tkt.label} (${tkt.pax}人)</div>
-            <div class="sub-ticket-booking-id">${tkt.booking_id}</div>
+            <div class="sub-ticket-label" style="font-size:24px;font-weight:bold;margin-bottom:8px;">${tkt.label}</div>
+            <div class="sub-ticket-pax" style="font-size:14px;color:#666;margin-bottom:12px;">${tkt.pax} 人</div>
             <div class="sub-ticket-qr"><img src="${qrUrlToUse}" alt="票卷 ${tkt.label}" onerror="this.src='${QR_ORIGIN}/api/qr/error'; console.error('QR load failed:', '${qrUrlToUse}');" /></div>
             ${statusBadge}
           </div>
