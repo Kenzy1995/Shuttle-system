@@ -1710,15 +1710,20 @@ function mountTicketAndShow(ticket) {
         <div class="sub-tickets-grid">
       `;
       
-      // 添加所有子票
+      // 添加所有子票（顯示子票編號，例如：26021205_A）
       subTickets.forEach((t) => {
         const qrUrl = t.qr_url || (t.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(t.qr_content)}` : "");
         const qrImg = qrUrl ? `<img src="${qrUrl}" alt="Sub Ticket ${t.sub_index}" />` : `<div style="padding:20px;color:#999;">QR Code ${t.sub_index}</div>`;
+        const subBookingId = t.booking_id || `${ticket.bookingId}_${String.fromCharCode(64 + t.sub_index)}`;
+        const statusBadge = t.status === "checked_in" 
+          ? `<div class="sub-ticket-status checked-in">✓ 已上車</div>`
+          : `<div class="sub-ticket-status not-checked-in">未上車</div>`;
         qrHTML += `
-          <div class="sub-ticket-qr-item">
+          <div class="sub-ticket-qr-item" data-ticket-index="${t.sub_index}">
             <div class="sub-ticket-label">子票 ${t.sub_index} (${t.pax}人)</div>
+            <div class="sub-ticket-booking-id" style="font-size:12px;color:#666;margin:4px 0;">${subBookingId}</div>
             <div class="sub-ticket-qr">${qrImg}</div>
-            <div class="sub-ticket-status not-checked-in">未上車</div>
+            ${statusBadge}
           </div>
         `;
       });

@@ -1194,6 +1194,19 @@ class DeletePayload(BaseModel):
     booking_id: str
     lang: str = Field("zh", pattern="^(zh|en|ja|ko)$")
 
+class SplitTicketPayload(BaseModel):
+    booking_id: str
+    ticket_split: List[int] = Field(..., min_items=2)  # 至少2個子票
+    lang: str = Field("zh", pattern="^(zh|en|ja|ko)$")
+    
+    @validator("ticket_split")
+    def _v_ticket_split(cls, v):
+        if not isinstance(v, list) or len(v) < 2:
+            raise ValueError("ticket_split 必須至少包含2個元素")
+        if any(not isinstance(x, int) or x < 1 for x in v):
+            raise ValueError("ticket_split 每個元素必須是大於0的整數")
+        return v
+
 class CheckInPayload(BaseModel):
     code: Optional[str] = None
     booking_id: Optional[str] = None
@@ -1591,9 +1604,14 @@ def ops(req: OpsRequest):
                                 for t in sub_tickets 
                                 if t.get("status") == "checked_in"
                             )
+                            # 生成子票編號後綴（A, B, C...）
+                            def get_suffix(index: int) -> str:
+                                return chr(64 + index)  # 65='A', 66='B', etc.
+                            
                             rec["sub_tickets"] = [
                                 {
                                     "sub_index": t.get("sub_ticket_index"),
+                                    "booking_id": f"{booking_id}_{get_suffix(t.get('sub_ticket_index', 1))}",  # 例如：26021205_A
                                     "pax": t.get("sub_ticket_pax", 0),
                                     "status": t.get("status", "not_checked_in"),
                                     "qr_content": t.get("qr_content", ""),
