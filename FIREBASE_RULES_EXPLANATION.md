@@ -173,8 +173,7 @@
 根據代碼分析，系統使用以下 Firebase 路徑：
 
 - `/booking_seq/{date_key}` - 用於生成預約編號
-- `/cap_lock/{lock_id}` - 用於容量鎖定（併發控制）
-- `/sheet_locks/{lock_id}` - 用於工作表鎖定（如果使用）
+- `/sheet_locks/{lock_id}` - 用於容量鎖定（併發控制）
 
 這些路徑都應該設置為 `true`，以允許 Admin SDK 訪問。
 
