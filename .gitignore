@@ -27,6 +27,7 @@ tag_*.py
 !GRANT_FIREBASE_PERMISSIONS.md
 !FIX_FIREBASE_RULES.md
 !FIREBASE_RULES_EXPLANATION.md
+!FIREBASE_RULES_AB_TEST.md
 
 # Shell scripts (allow permission grant scripts)
 *.sh
