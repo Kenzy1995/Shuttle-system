@@ -1534,7 +1534,7 @@ def ops(req: OpsRequest):
                 return row[hmap[key] - 1] if key in hmap and len(row) >= hmap[key] else ""
             now = _tz_now()
             one_month_ago = now - timedelta(days=31)
-            results: List[Dict[str, str]] = []
+            results: List[Dict[str, Any]] = []
             for row in all_values[HEADER_ROW_MAIN:]:
                 car_dt_str = get(row, "車次-日期時間")
                 date_iso: str = ""
@@ -1577,6 +1577,45 @@ def ops(req: OpsRequest):
                     rec["車次"] = _display_trip_str(date_iso, time_hm)
                 if rec.get("櫃台審核", "").lower() == "n":
                     rec["預約狀態"] = "已拒絕"
+                
+                # ========== 添加母子車票信息 ==========
+                booking_id = rec.get("預約編號", "")
+                if booking_id:
+                    try:
+                        sub_tickets = _get_sub_tickets(booking_id)
+                        if sub_tickets:
+                            # 計算子票狀態
+                            total_pax = sum(t.get("sub_ticket_pax", 0) for t in sub_tickets)
+                            checked_pax = sum(
+                                t.get("sub_ticket_pax", 0) 
+                                for t in sub_tickets 
+                                if t.get("status") == "checked_in"
+                            )
+                            rec["sub_tickets"] = [
+                                {
+                                    "sub_index": t.get("sub_ticket_index"),
+                                    "pax": t.get("sub_ticket_pax", 0),
+                                    "status": t.get("status", "not_checked_in"),
+                                    "qr_content": t.get("qr_content", ""),
+                                    "qr_url": f"{BASE_URL}/api/qr/{urllib.parse.quote(t.get('qr_content', ''))}" if t.get("qr_content") else ""
+                                }
+                                for t in sub_tickets
+                            ]
+                            # 生成母票 QR Code
+                            email = rec.get("信箱", "")
+                            if email:
+                                mother_qr = _create_mother_ticket(booking_id, email)
+                                rec["mother_ticket"] = {
+                                    "qr_content": mother_qr,
+                                    "qr_url": f"{BASE_URL}/api/qr/{urllib.parse.quote(mother_qr)}"
+                                }
+                            # 更新乘車狀態（如果存在子票）
+                            status_text, _, _ = _calculate_mother_ticket_status(booking_id)
+                            if status_text and status_text != "未上車":
+                                rec["乘車狀態"] = status_text
+                    except Exception as e:
+                        log.warning(f"[query] Failed to get sub_tickets for {booking_id}: {e}")
+                
                 results.append(rec)
             log.info(f"query results count={len(results)}")
             return results
