@@ -2021,44 +2021,63 @@ async function confirmSplitTicket(bookingId, ticketSplit, isReSplit = false) {
       throw new Error(result.detail || result.message || "分票失敗");
     }
     
-    // 分票成功：更新數據並重新顯示票卷
-    if (window.currentBookingData) {
-      // 更新票卷數據
-      window.currentBookingData.sub_tickets = result.sub_tickets || [];
-      window.currentBookingData.mother_ticket = result.mother_ticket || null;
+    // 分票成功：重新查詢訂單以獲取完整更新數據
+    showSuccessAnimation();
+    
+    // 重新查詢訂單以獲取完整的分票數據
+    try {
+      const queryRes = await fetch(OPS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          action: "query", 
+          data: { booking_id: bookingId } 
+        })
+      });
       
-      // 重新渲染票卷（顯示所有子票和母票，支持切換）
-      mountTicketAndShow(window.currentBookingData);
-      
-      // 顯示成功動畫
-      showSuccessAnimation();
-    } else {
-      // 如果是在查詢頁面，重新查詢訂單以更新顯示
-      showSuccessAnimation();
-      setTimeout(() => {
-        // 觸發重新查詢
-        if (typeof queryOrders === "function") {
-          const qBookIdEl = getElement("qBookId");
-          const qPhoneEl = getElement("qPhone");
-          const qEmailEl = getElement("qEmail");
-          // 保存當前查詢條件
-          const savedQuery = {
-            id: qBookIdEl ? qBookIdEl.value : "",
-            phone: qPhoneEl ? qPhoneEl.value : "",
-            email: qEmailEl ? qEmailEl.value : ""
-          };
-          
-          // 重新查詢
-          queryOrders();
-          
-          // 恢復查詢條件（如果需要）
-          setTimeout(() => {
-            if (qBookIdEl && savedQuery.id) qBookIdEl.value = savedQuery.id;
-            if (qPhoneEl && savedQuery.phone) qPhoneEl.value = savedQuery.phone;
-            if (qEmailEl && savedQuery.email) qEmailEl.value = savedQuery.email;
-          }, 500);
+      const queryData = await queryRes.json();
+      if (queryRes.ok && queryData && queryData.length > 0) {
+        const updatedTicket = queryData[0];
+        
+        // 構建完整的 ticket 對象（與 submitBooking 中的格式一致）
+        const ticketData = {
+          bookingId: updatedTicket.booking_id || bookingId,
+          date: updatedTicket.date || window.currentBookingData?.date || "",
+          time: updatedTicket.time || window.currentBookingData?.time || "",
+          direction: updatedTicket.direction || window.currentBookingData?.direction || "",
+          pickLocation: updatedTicket.pick || window.currentBookingData?.pickLocation || "",
+          dropLocation: updatedTicket.drop || window.currentBookingData?.dropLocation || "",
+          name: updatedTicket.name || window.currentBookingData?.name || "",
+          phone: updatedTicket.phone || window.currentBookingData?.phone || "",
+          email: updatedTicket.email || window.currentBookingData?.email || "",
+          passengers: parseInt(updatedTicket.pax || updatedTicket.passengers || window.currentBookingData?.passengers || "1"),
+          qrUrl: updatedTicket.qr_url || window.currentBookingData?.qrUrl || "",
+          // ========== 母子車票信息（從查詢結果獲取） ==========
+          sub_tickets: updatedTicket.sub_tickets || result.sub_tickets || [],
+          mother_ticket: updatedTicket.mother_ticket || result.mother_ticket || null
+        };
+        
+        // 更新全局變量
+        window.currentBookingData = ticketData;
+        
+        // 重新渲染票卷（顯示所有子票和母票，支持切換）
+        mountTicketAndShow(ticketData);
+      } else {
+        // 如果查詢失敗，至少更新現有數據
+        if (window.currentBookingData) {
+          window.currentBookingData.sub_tickets = result.sub_tickets || [];
+          window.currentBookingData.mother_ticket = result.mother_ticket || null;
+          mountTicketAndShow(window.currentBookingData);
         }
-      }, 1500);
+      }
+    } catch (queryErr) {
+      console.error("Failed to query updated ticket:", queryErr);
+      // 如果查詢失敗，至少更新現有數據
+      if (window.currentBookingData) {
+        window.currentBookingData.sub_tickets = result.sub_tickets || [];
+        window.currentBookingData.mother_ticket = result.mother_ticket || null;
+        mountTicketAndShow(window.currentBookingData);
+      }
     }
   } catch (e) {
     showErrorCard(`${isReSplit ? '重新' : ''}分票失敗：` + (e.message || ""));
