@@ -525,15 +525,22 @@ def _init_firebase():
             service_account_path = "service_account.json"
             if os.path.exists(service_account_path):
                 cred = credentials.Certificate(service_account_path)
+                log.info("Firebase: Using service account file")
             else:
                 cred = credentials.ApplicationDefault()
+                log.info("Firebase: Using ApplicationDefault credentials")
             db_url = os.environ.get("FIREBASE_RTDB_URL")
             if not db_url:
                 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-60d6a")
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
+                log.warning(f"Firebase: FIREBASE_RTDB_URL not set, using default: {db_url}")
+            else:
+                log.info(f"Firebase: Using FIREBASE_RTDB_URL from env: {db_url}")
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+            log.info("Firebase: Initialization successful")
         return True
-    except Exception:
+    except Exception as e:
+        log.error(f"Firebase initialization failed: {type(e).__name__}: {str(e)}")
         return False
 
 
