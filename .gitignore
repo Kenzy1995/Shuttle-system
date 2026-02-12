@@ -28,6 +28,7 @@ tag_*.py
 !FIX_FIREBASE_RULES.md
 !FIREBASE_RULES_EXPLANATION.md
 !FIREBASE_RULES_AB_TEST.md
+!DIAGNOSE_LOCK_TIMEOUT.md
 
 # Shell scripts (allow permission grant scripts)
 *.sh
