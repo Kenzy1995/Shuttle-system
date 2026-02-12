@@ -1814,16 +1814,20 @@ function mountTicketAndShow(ticket) {
       qrContainer.className = "ticket-qr";
     }
     
-    // 添加分票按鈕（如果人數 > 1）
+    // 添加分票按鈕（如果人數 > 1，且未分票或有未上車的子票）
     const actionsContainer = getElement("ticketActionsContainer");
     if (actionsContainer && ticket.passengers > 1) {
+      // 檢查是否有未上車的子票（如果有未上車的，可以重新分票）
+      const hasUncheckedTickets = hasSubTickets && subTickets.some(t => t.status !== "checked_in");
+      const canReSplit = hasSubTickets && hasUncheckedTickets;
+      
       // 檢查是否已有分票按鈕
       if (!actionsContainer.querySelector(".split-ticket-btn")) {
         const splitBtn = document.createElement("button");
         splitBtn.className = "button split-ticket-btn";
-        // 如果已分票，顯示「重新分票」
-        splitBtn.textContent = hasSubTickets ? "重新分票" : "分票";
-        splitBtn.onclick = () => showSplitTicketDialog(ticket, hasSubTickets);
+        // 如果已分票且有未上車的子票，顯示「重新分票」
+        splitBtn.textContent = canReSplit ? "重新分票" : "分票";
+        splitBtn.onclick = () => showSplitTicketDialog(ticket, canReSplit);
         actionsContainer.insertBefore(splitBtn, actionsContainer.firstChild);
       }
     }
@@ -1874,57 +1878,100 @@ function showSplitTicketDialog(ticket, isReSplit = false) {
     ? `總人數：${totalPax} 人<br>已上車：${checkedInPax} 人<br><strong>剩餘可重新分票：${remainingPax} 人</strong>`
     : `總人數：${totalPax} 人`;
   
+  // 最多可以分幾張票（每張至少1人，所以最多 = 剩餘人數）
+  const maxTickets = remainingPax;
+  
   content.innerHTML = `
     <h2>${titleText}</h2>
     <p style="margin-bottom:16px;">${infoText}</p>
+    <div class="field">
+      <label class="label">要分成幾張票卷？</label>
+      <select id="splitTicketCount" class="select" onchange="updateSplitTicketInputs(${remainingPax})">
+        ${Array.from({length: maxTickets - 1}, (_, i) => i + 2)
+          .map(n => `<option value="${n}" ${n === 2 ? 'selected' : ''}>${n} 張</option>`)
+          .join('')}
+      </select>
+    </div>
     <div id="splitTicketInputs"></div>
+    <div id="splitTicketSummary" style="margin-top:12px;padding:12px;background:#f0f0f0;border-radius:8px;font-size:14px;">
+      <strong>已分配：</strong><span id="splitTotalAssigned">0</span> / ${remainingPax} 人
+    </div>
     <div class="actions" style="margin-top:20px;">
       <button class="button btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>
-      <button class="button" onclick="confirmSplitTicket('${ticket.bookingId}', ${remainingPax}, ${isReSplit})">確認${isReSplit ? '重新' : ''}分票</button>
+      <button class="button" id="confirmSplitBtn" onclick="confirmSplitTicket('${ticket.bookingId}', ${remainingPax}, ${isReSplit})" disabled>確認${isReSplit ? '重新' : ''}分票</button>
     </div>
   `;
   
   dialog.appendChild(content);
   document.body.appendChild(dialog);
   
-  // 生成分票輸入框（基於剩餘人數）
-  const inputsContainer = content.querySelector("#splitTicketInputs");
-  const defaultSplit = remainingPax === 2 ? [1, 1] 
-    : remainingPax === 3 ? [1, 1, 1] 
-    : remainingPax === 4 ? [2, 2] 
-    : [Math.ceil(remainingPax/2), Math.floor(remainingPax/2)];
-  
-  defaultSplit.forEach((val, idx) => {
-    const field = document.createElement("div");
-    field.className = "field";
-    field.innerHTML = `
-      <label class="label">子票 ${String.fromCharCode(65 + idx)} 人數</label>
-      <input type="number" class="input split-pax-input" min="1" max="${remainingPax}" value="${val}" data-index="${idx}" />
-    `;
-    inputsContainer.appendChild(field);
-  });
-  
-  // 添加「添加子票」按鈕（如果總數未達上限）
-  if (defaultSplit.length < remainingPax) {
-    const addBtn = document.createElement("button");
-    addBtn.className = "button btn-ghost";
-    addBtn.textContent = "+ 添加子票";
-    addBtn.onclick = () => {
-      const field = document.createElement("div");
-      field.className = "field";
-      const newIdx = inputsContainer.querySelectorAll(".split-pax-input").length;
-      field.innerHTML = `
-        <label class="label">子票 ${String.fromCharCode(65 + newIdx)} 人數</label>
-        <input type="number" class="input split-pax-input" min="1" max="${remainingPax}" value="1" data-index="${newIdx}" />
-      `;
-      inputsContainer.appendChild(field);
-    };
-    inputsContainer.appendChild(addBtn);
-  }
+  // 初始化：生成默認2張票的輸入框
+  updateSplitTicketInputs(remainingPax);
   
   dialog.onclick = (e) => {
     if (e.target === dialog) dialog.remove();
   };
+}
+
+function updateSplitTicketInputs(totalPax) {
+  const countSelect = document.getElementById("splitTicketCount");
+  const inputsContainer = document.getElementById("splitTicketInputs");
+  const summaryEl = document.getElementById("splitTotalAssigned");
+  const confirmBtn = document.getElementById("confirmSplitBtn");
+  
+  if (!countSelect || !inputsContainer) return;
+  
+  const ticketCount = parseInt(countSelect.value) || 2;
+  inputsContainer.innerHTML = "";
+  
+  // 計算每張票的默認人數（盡量平均分配）
+  const basePax = Math.floor(totalPax / ticketCount);
+  const remainder = totalPax % ticketCount;
+  const defaultSplit = Array(ticketCount).fill(basePax);
+  for (let i = 0; i < remainder; i++) {
+    defaultSplit[i]++;
+  }
+  
+  // 生成輸入框
+  defaultSplit.forEach((val, idx) => {
+    const field = document.createElement("div");
+    field.className = "field";
+    const ticketLabel = String.fromCharCode(65 + idx); // A, B, C, D, E...
+    field.innerHTML = `
+      <label class="label">子票 ${ticketLabel} 人數</label>
+      <input type="number" class="input split-pax-input" min="1" max="${totalPax}" value="${val}" data-index="${idx}" oninput="updateSplitTicketSummary(${totalPax})" />
+    `;
+    inputsContainer.appendChild(field);
+  });
+  
+  // 更新總和顯示
+  updateSplitTicketSummary(totalPax);
+}
+
+function updateSplitTicketSummary(totalPax) {
+  const inputs = document.querySelectorAll(".split-pax-input");
+  const summaryEl = document.getElementById("splitTotalAssigned");
+  const confirmBtn = document.getElementById("confirmSplitBtn");
+  
+  if (!summaryEl || !confirmBtn) return;
+  
+  const ticketSplit = Array.from(inputs).map(inp => parseInt(inp.value) || 0);
+  const sum = ticketSplit.reduce((a, b) => a + b, 0);
+  
+  summaryEl.textContent = sum;
+  
+  // 驗證：總和必須等於總人數，且每張至少1人
+  const isValid = sum === totalPax && ticketSplit.every(pax => pax >= 1);
+  
+  if (isValid) {
+    summaryEl.style.color = "#166534"; // 綠色
+    confirmBtn.disabled = false;
+    confirmBtn.style.opacity = "1";
+  } else {
+    summaryEl.style.color = "#dc2626"; // 紅色
+    confirmBtn.disabled = true;
+    confirmBtn.style.opacity = "0.5";
+  }
 }
 
 async function confirmSplitTicket(bookingId, totalPax) {
