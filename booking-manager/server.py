@@ -538,10 +538,27 @@ def _init_firebase():
                 log.info(f"Firebase: Using FIREBASE_RTDB_URL from env: {db_url}")
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
             log.info("Firebase: Initialization successful")
+            
+            # 自動初始化必要的路徑（如果不存在）
+            _ensure_firebase_paths()
         return True
     except Exception as e:
         log.error(f"Firebase initialization failed: {type(e).__name__}: {str(e)}")
         return False
+
+
+def _ensure_firebase_paths():
+    """確保 Firebase 必要的路徑存在（自動初始化）"""
+    try:
+        paths = ["/sheet_locks", "/booking_seq"]
+        for path in paths:
+            ref = db.reference(path)
+            snapshot = ref.get()
+            if snapshot is None:
+                ref.set({})
+                log.info(f"Firebase: Initialized path {path}")
+    except Exception as e:
+        log.warning(f"Firebase: Failed to ensure paths: {type(e).__name__}: {str(e)}")
 
 
 def _lock_id_for_capacity(date_iso: str, time_hm: str) -> str:
@@ -1076,6 +1093,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+async def startup_event():
+    """應用啟動時自動初始化 Firebase 路徑"""
+    log.info("Application startup: Ensuring Firebase paths exist")
+    _init_firebase()
 
 @app.get("/health")
 def health():
