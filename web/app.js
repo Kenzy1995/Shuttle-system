@@ -1720,37 +1720,48 @@ function mountTicketAndShow(ticket) {
       if (t.status === "checked_in") checkedPax += (t.pax || 0);
     });
     
-    // 構建所有票卷（母票 + 子票）
+    // 構建所有票卷（母票A + 子票BCD...）
     const allTickets = [];
     
-    // 添加母票（第一個）
+    // 添加母票（第一個，標記為A）
     if (motherTicket) {
       const motherQrUrl = motherTicket.qr_url || (motherTicket.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(motherTicket.qr_content)}` : "");
       if (motherQrUrl) {
+        const motherBookingId = `${ticket.bookingId}_A`;
         allTickets.push({
           type: "mother",
-          booking_id: ticket.bookingId,
+          booking_id: motherBookingId,
+          original_booking_id: ticket.bookingId,
           pax: totalSubPax,
           qr_url: motherQrUrl,
-          label: "母票（全部）"
+          qr_content: motherTicket.qr_content || "",
+          label: "A",
+          status: "mother"
         });
       }
     }
     
-    // 添加所有子票
-    subTickets.forEach((t) => {
+    // 添加所有子票（B, C, D, E...）
+    subTickets.forEach((t, idx) => {
       const qrUrl = t.qr_url || (t.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(t.qr_content)}` : "");
-      const subBookingId = t.booking_id || `${ticket.bookingId}_${String.fromCharCode(64 + t.sub_index)}`;
+      // 子票編號：B=66, C=67, D=68... (65='A'是母票)
+      const ticketLetter = String.fromCharCode(66 + idx); // B, C, D, E...
+      const subBookingId = `${ticket.bookingId}_${ticketLetter}`;
       allTickets.push({
         type: "sub",
         booking_id: subBookingId,
+        original_booking_id: ticket.bookingId,
         sub_index: t.sub_index,
         pax: t.pax || 0,
         qr_url: qrUrl,
+        qr_content: t.qr_content || "",
         status: t.status || "not_checked_in",
-        label: `子票 ${t.sub_index}`
+        label: ticketLetter
       });
     });
+    
+    // 保存所有票卷數據到全局變量，供切換時使用
+    window.allTicketsData = allTickets;
     
     // 構建輪播 HTML
     let carouselHTML = `
@@ -1774,12 +1785,15 @@ function mountTicketAndShow(ticket) {
       // 如果是已上車的子票，添加視覺標記
       const checkedInClass = tkt.status === "checked_in" ? " checked-in-ticket" : "";
       
+      // 確保 QR URL 正確
+      const qrUrlToUse = tkt.qr_url || (tkt.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(tkt.qr_content)}` : "");
+      
       carouselHTML += `
         <div class="ticket-carousel-item ${isActive}" data-ticket-index="${idx}">
           <div class="sub-ticket-qr-item ${tkt.type === 'mother' ? 'mother-ticket' : ''}${checkedInClass}">
-            <div class="sub-ticket-label">${tkt.label} (${tkt.pax}人)</div>
+            <div class="sub-ticket-label">票卷 ${tkt.label} (${tkt.pax}人)</div>
             <div class="sub-ticket-booking-id">${tkt.booking_id}</div>
-            <div class="sub-ticket-qr"><img src="${tkt.qr_url}" alt="${tkt.label}" /></div>
+            <div class="sub-ticket-qr"><img src="${qrUrlToUse}" alt="票卷 ${tkt.label}" onerror="this.src='${QR_ORIGIN}/api/qr/error'; console.error('QR load failed:', '${qrUrlToUse}');" /></div>
             ${statusBadge}
           </div>
         </div>
@@ -2116,20 +2130,7 @@ function switchTicket(direction) {
   
   if (newIdx === currentIdx) return;
   
-  // 更新活動項
-  items[currentIdx].classList.remove("active");
-  items[newIdx].classList.add("active");
-  
-  // 更新指示器
-  const dots = document.querySelectorAll(".carousel-dot");
-  if (dots[currentIdx]) dots[currentIdx].classList.remove("active");
-  if (dots[newIdx]) dots[newIdx].classList.add("active");
-  
-  // 更新索引
-  window.currentTicketIndex = newIdx;
-  
-  // 滑動動畫
-  track.style.transform = `translateX(-${newIdx * 100}%)`;
+  switchTicketTo(newIdx);
 }
 
 function switchTicketTo(index) {
@@ -2156,6 +2157,24 @@ function switchTicketTo(index) {
   
   // 滑動動畫
   track.style.transform = `translateX(-${index * 100}%)`;
+  
+  // ========== 同步更新下方資訊欄 ==========
+  if (window.allTicketsData && window.allTicketsData[index]) {
+    const currentTicket = window.allTicketsData[index];
+    
+    // 更新預約編號
+    const bookingIdEl = getElement("ticketBookingId");
+    if (bookingIdEl) {
+      bookingIdEl.textContent = currentTicket.booking_id || "";
+    }
+    
+    // 更新人數
+    const paxEl = getElement("ticketPassengers");
+    if (paxEl) {
+      const paxText = currentTicket.pax + " " + t("labelPassengersShort");
+      paxEl.textContent = paxText;
+    }
+  }
 }
 
 function closeTicketToHome() {
