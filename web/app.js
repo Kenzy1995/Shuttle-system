@@ -1626,6 +1626,9 @@ async function submitBooking() {
       sub_tickets: result.sub_tickets || [],
       mother_ticket: result.mother_ticket || null
     };
+    
+    // 保存到全局變量，供分票功能使用
+    window.currentBookingData = currentBookingData;
 
     mountTicketAndShow(currentBookingData);
   } catch (err) {
