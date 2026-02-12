@@ -2075,45 +2075,90 @@ function buildTicketCard(row, { mask = false } = {}) {
   if (statusCode === "cancelled") {
     qrSection = `<div class="ticket-qr"><img src="/images/qr-placeholder.png" alt="QR placeholder" /></div>`;
   } else if (hasSubTickets) {
-    // 母子車票模式：顯示所有子票和母票
-    const subTicketQRs = subTickets.map((t, idx) => {
-      const qrImg = t.qr_url 
-        ? `<img src="${sanitize(t.qr_url)}" alt="Sub Ticket ${t.sub_index}" />`
-        : `<div style="padding:20px;color:#999;">QR Code ${t.sub_index}</div>`;
-      const statusBadge = t.status === "checked_in" 
-        ? `<span class="sub-ticket-status checked-in">✓ 已上車</span>`
-        : `<span class="sub-ticket-status not-checked-in">未上車</span>`;
-      return `
-        <div class="sub-ticket-qr-item">
-          <div class="sub-ticket-label">子票 ${t.sub_index} (${t.pax}人)</div>
-          <div class="sub-ticket-qr">${qrImg}</div>
-          ${statusBadge}
+    // 母子車票模式：使用輪播顯示（母票 + 所有子票）
+    // 構建所有票卷（母票 + 子票）
+    const allTickets = [];
+    
+    // 添加母票（第一個）
+    if (motherTicket && motherTicket.qr_url) {
+      allTickets.push({
+        type: "mother",
+        booking_id: bookingId,
+        pax: totalSubPax,
+        qr_url: motherTicket.qr_url,
+        label: "母票（全部）"
+      });
+    }
+    
+    // 添加所有子票（顯示子票編號，例如：26021205_A）
+    subTickets.forEach((t) => {
+      const qrUrl = t.qr_url || (t.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(t.qr_content)}` : "");
+      const subBookingId = t.booking_id || `${bookingId}_${String.fromCharCode(64 + t.sub_index)}`;
+      allTickets.push({
+        type: "sub",
+        booking_id: subBookingId,
+        sub_index: t.sub_index,
+        pax: t.pax || 0,
+        qr_url: qrUrl,
+        status: t.status || "not_checked_in",
+        label: `子票 ${t.sub_index}`
+      });
+    });
+    
+    // 構建輪播 HTML
+    let carouselHTML = `
+      <div class="ticket-status-summary">
+        <strong>上車狀態：</strong>
+        <span class="status-text">${checkedPax}/${totalSubPax} 人已上車</span>
+      </div>
+      <div class="ticket-carousel-container">
+        <button class="carousel-btn carousel-prev" onclick="switchTicket(-1)" aria-label="上一張">‹</button>
+        <div class="ticket-carousel-track" id="ticketCarouselTrack">
+    `;
+    
+    allTickets.forEach((tkt, idx) => {
+      const isActive = idx === 0 ? "active" : "";
+      const statusBadge = tkt.type === "mother" 
+        ? `<div class="sub-ticket-status info">一次性核銷所有人</div>`
+        : (tkt.status === "checked_in" 
+          ? `<div class="sub-ticket-status checked-in">✓ 已上車</div>`
+          : `<div class="sub-ticket-status not-checked-in">未上車</div>`);
+      
+      carouselHTML += `
+        <div class="ticket-carousel-item ${isActive}" data-ticket-index="${idx}">
+          <div class="sub-ticket-qr-item ${tkt.type === 'mother' ? 'mother-ticket' : ''}">
+            <div class="sub-ticket-label">${tkt.label} (${tkt.pax}人)</div>
+            <div class="sub-ticket-booking-id">${tkt.booking_id}</div>
+            <div class="sub-ticket-qr"><img src="${sanitize(tkt.qr_url)}" alt="${tkt.label}" /></div>
+            ${statusBadge}
+          </div>
         </div>
       `;
-    }).join("");
+    });
     
-    const motherQR = motherTicket && motherTicket.qr_url
-      ? `
-        <div class="sub-ticket-qr-item mother-ticket">
-          <div class="sub-ticket-label">母票（全部）</div>
-          <div class="sub-ticket-qr"><img src="${sanitize(motherTicket.qr_url)}" alt="Mother Ticket" /></div>
-          <div class="sub-ticket-status info">一次性核銷所有人</div>
+    carouselHTML += `
         </div>
-      `
-      : "";
+        <button class="carousel-btn carousel-next" onclick="switchTicket(1)" aria-label="下一張">›</button>
+      </div>
+      <div class="ticket-carousel-indicators">
+    `;
+    
+    allTickets.forEach((tkt, idx) => {
+      const isActive = idx === 0 ? "active" : "";
+      carouselHTML += `<span class="carousel-dot ${isActive}" onclick="switchTicketTo(${idx})"></span>`;
+    });
+    
+    carouselHTML += `</div>`;
     
     qrSection = `
       <div class="ticket-qr multi-ticket">
-        <div class="ticket-status-summary">
-          <strong>上車狀態：</strong>
-          <span class="status-text">${checkedPax}/${totalSubPax} 人已上車</span>
-        </div>
-        <div class="sub-tickets-grid">
-          ${subTicketQRs}
-          ${motherQR}
-        </div>
+        ${carouselHTML}
       </div>
     `;
+    
+    // 保存當前票卷索引（用於查詢頁面的切換）
+    window.currentTicketIndex = 0;
+    window.totalTickets = allTickets.length;
   } else {
     // 單一車票模式（向後兼容）
     qrSection = `<div class="ticket-qr"><img src="${sanitize(qrUrl)}" alt="QR" /></div>`;
@@ -2134,14 +2179,17 @@ function buildTicketCard(row, { mask = false } = {}) {
       <div class="ticket-content">
         ${qrSection}
         <div class="ticket-info">
-          <div class="ticket-field"><span class="ticket-label">${t("labelBookingId")}</span><span class="ticket-value">${sanitize(bookingId)}</span></div>
+          <div class="ticket-field"><span class="ticket-label">${t("labelBookingId")}</span><span class="ticket-value">${sanitize(hasSubTickets ? bookingId + " (母票)" : bookingId)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelDirection")}</span><span class="ticket-value">${sanitize(rbLabel)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelPick")}</span><span class="ticket-value">${sanitize(pick)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelDrop")}</span><span class="ticket-value">${sanitize(drop)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelName")}</span><span class="ticket-value">${sanitize(name)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelPhone")}</span><span class="ticket-value">${sanitize(phone)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelEmail")}</span><span class="ticket-value">${sanitize(email)}</span></div>
-          <div class="ticket-field"><span class="ticket-label">${t("labelPassengersShort")}</span><span class="ticket-value">${sanitize(String(pax))}${hasSubTickets ? ` (${totalSubPax}人，分${subTickets.length}張子票)` : ""}</span></div>
+          ${hasSubTickets ? subTickets.map(t => {
+            const subBookingId = t.booking_id || `${bookingId}_${String.fromCharCode(64 + t.sub_index)}`;
+            return `<div class="ticket-field"><span class="ticket-label">${subBookingId}</span><span class="ticket-value">${t.pax} 人</span></div>`;
+          }).join("") : `<div class="ticket-field"><span class="ticket-label">${t("labelPassengersShort")}</span><span class="ticket-value">${sanitize(String(pax))}</span></div>`}
           ${hasSubTickets ? `<div class="ticket-field"><span class="ticket-label">上車狀態</span><span class="ticket-value">${checkedPax}/${totalSubPax} 人已上車</span></div>` : ""}
         </div>
       </div>
