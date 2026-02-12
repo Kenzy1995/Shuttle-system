@@ -322,6 +322,23 @@
     .ticket-content { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
     .ticket-qr { text-align: center; padding: 20px; background: #f9f9f9; border-radius: 12px; min-height: 200px; }
     .ticket-qr img { width: 200px; height: 200px; border-radius: 8px; border: 1px solid #eee; background: #fff; object-fit: contain; }
+    
+    /* 母子車票樣式 */
+    .ticket-qr.multi-ticket { min-height: auto; padding: 16px; }
+    .ticket-status-summary { margin-bottom: 16px; padding: 12px; background: #fff; border-radius: 8px; font-size: 16px; }
+    .ticket-status-summary strong { color: var(--text); }
+    .status-text { color: #2563eb; font-weight: 600; }
+    .sub-tickets-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+    .sub-ticket-qr-item { background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb; text-align: center; }
+    .sub-ticket-qr-item.mother-ticket { border: 2px solid #2563eb; background: #eff6ff; }
+    .sub-ticket-label { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+    .sub-ticket-qr { margin: 8px 0; }
+    .sub-ticket-qr img { width: 140px; height: 140px; border-radius: 6px; border: 1px solid #ddd; }
+    .sub-ticket-status { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-top: 8px; }
+    .sub-ticket-status.checked-in { background: #dcfce7; color: #166534; }
+    .sub-ticket-status.not-checked-in { background: #fef3c7; color: #92400e; }
+    .sub-ticket-status.info { background: #dbeafe; color: #1e40af; }
+    
     .ticket-info { display: flex; flex-direction: column; gap: 12px; }
     .ticket-field { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
     .ticket-field:last-child { border-bottom: none; }
@@ -344,6 +361,8 @@
       .ticket-content { display: flex; flex-direction: column; align-items: center; gap: 12px; }
       .ticket-info { width: 100%; word-wrap: break-word; }
       .ticket-qr img { width: 160px; height: 160px; max-width: 100%; }
+      .sub-tickets-grid { grid-template-columns: 1fr; gap: 12px; }
+      .sub-ticket-qr img { width: 120px; height: 120px; }
       .hero .actions { justify-content: center !important; }
       .footer { font-size: 70%; padding: 15px 10px; }
       .tickets-row{flex-direction:column;overflow-x:hidden}
