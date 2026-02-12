@@ -339,6 +339,79 @@
     .sub-ticket-status.not-checked-in { background: #fef3c7; color: #92400e; }
     .sub-ticket-status.info { background: #dbeafe; color: #1e40af; }
     
+    /* 輪播樣式 */
+    .ticket-carousel-container {
+      position: relative;
+      width: 100%;
+      overflow: hidden;
+      margin-top: 16px;
+    }
+    .ticket-carousel-track {
+      display: flex;
+      transition: transform 0.3s ease-in-out;
+    }
+    .ticket-carousel-item {
+      flex: 0 0 100%;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0 10px;
+    }
+    .carousel-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      cursor: pointer;
+      z-index: 10;
+      font-size: 24px;
+      line-height: 1;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .carousel-prev { left: 5px; }
+    .carousel-next { right: 5px; }
+    .carousel-btn:hover { background: rgba(0, 0, 0, 0.7); }
+    .ticket-carousel-indicators {
+      display: flex;
+      justify-content: center;
+      margin-top: 10px;
+      gap: 8px;
+    }
+    .carousel-dot {
+      width: 32px;
+      height: 32px;
+      background: #e5e7eb;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: #666;
+      border: 2px solid transparent;
+    }
+    .carousel-dot.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    .carousel-dot:hover {
+      background: #d1d5db;
+      transform: scale(1.1);
+    }
+    .carousel-dot.active:hover {
+      background: var(--secondary);
+    }
+    
     /* 已上車子票樣式 */
     .sub-ticket-qr-item.checked-in-ticket {
       opacity: 0.7;
