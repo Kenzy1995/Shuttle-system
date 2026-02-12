@@ -134,6 +134,11 @@ _ws_lock = Lock()
 def _email_hash6(email: str) -> str:
     return hashlib.sha256((email or "").encode("utf-8")).hexdigest()[:6]
 
+def _generate_ticket_hash(booking_id: str, sub_index: int, email: str) -> str:
+    """生成子票 hash（用於 QR Code 驗證）"""
+    raw = f"{booking_id}:{sub_index}:{email}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:6]
+
 def _tz_now() -> datetime:
     os.environ.setdefault("TZ", "Asia/Taipei")
     try:
@@ -581,7 +586,7 @@ def _init_firebase():
 
 def _ensure_firebase_paths():
     try:
-        paths = ["/sheet_locks", "/booking_seq"]
+        paths = ["/sheet_locks", "/booking_seq", "/tickets"]
         for path in paths:
             ref = db.reference(path)
             snapshot = ref.get()
@@ -732,6 +737,162 @@ def _generate_booking_id_rtdb(today_iso: str) -> str:
         seq_int = 0
     return f"{yymmdd}{seq_int:02d}"
 
+# ========== 母子車票管理 ==========
+def _create_sub_tickets(booking_id: str, ticket_split: List[int], email: str) -> List[Dict[str, Any]]:
+    """
+    創建子票並存儲到 Firebase
+    返回：子票列表，每個包含 qr_content, sub_index, pax
+    """
+    if not _init_firebase():
+        raise RuntimeError("firebase_init_failed")
+    
+    tickets_ref = db.reference(f"/tickets/{booking_id}")
+    sub_tickets = []
+    created_at = _tz_now_str()
+    
+    for idx, pax in enumerate(ticket_split, start=1):
+        ticket_hash = _generate_ticket_hash(booking_id, idx, email)
+        qr_content = f"FT:{booking_id}:{idx}:{ticket_hash}"
+        
+        ticket_data = {
+            "parent_booking_id": booking_id,
+            "sub_ticket_index": idx,
+            "sub_ticket_pax": pax,
+            "status": "not_checked_in",
+            "checked_in_at": None,
+            "checked_in_by": None,
+            "qr_content": qr_content,
+            "created_at": created_at
+        }
+        
+        tickets_ref.child(str(idx)).set(ticket_data)
+        sub_tickets.append({
+            "qr_content": qr_content,
+            "sub_index": idx,
+            "pax": pax
+        })
+        log.info(f"[sub_ticket] Created ticket {idx}/{len(ticket_split)} for booking {booking_id}, pax={pax}")
+    
+    return sub_tickets
+
+def _create_mother_ticket(booking_id: str, email: str) -> str:
+    """
+    創建母票 QR Code（用於一次性核銷所有人）
+    返回：母票 QR Code 內容
+    """
+    ticket_hash = _generate_ticket_hash(booking_id, 0, email)
+    return f"FT:{booking_id}:0:{ticket_hash}"
+
+def _get_sub_tickets(booking_id: str) -> List[Dict[str, Any]]:
+    """從 Firebase 讀取所有子票"""
+    if not _init_firebase():
+        return []
+    try:
+        tickets_ref = db.reference(f"/tickets/{booking_id}")
+        tickets_data = tickets_ref.get()
+        if not tickets_data:
+            return []
+        sub_tickets = []
+        for key, ticket in tickets_data.items():
+            if isinstance(ticket, dict) and ticket.get("sub_ticket_index"):
+                sub_tickets.append(ticket)
+        return sorted(sub_tickets, key=lambda x: x.get("sub_ticket_index", 0))
+    except Exception as e:
+        log.error(f"[sub_ticket] Failed to get tickets for {booking_id}: {e}")
+        return []
+
+def _update_sub_ticket_status(booking_id: str, sub_index: int, checked_in_by: str = "driver") -> bool:
+    """更新子票狀態為已上車"""
+    if not _init_firebase():
+        return False
+    try:
+        ticket_ref = db.reference(f"/tickets/{booking_id}/{sub_index}")
+        ticket = ticket_ref.get()
+        if not ticket:
+            return False
+        if ticket.get("status") == "checked_in":
+            return True  # 已經上車
+        ticket_ref.update({
+            "status": "checked_in",
+            "checked_in_at": _tz_now_str(),
+            "checked_in_by": checked_in_by
+        })
+        log.info(f"[sub_ticket] Updated ticket {booking_id}:{sub_index} to checked_in")
+        return True
+    except Exception as e:
+        log.error(f"[sub_ticket] Failed to update ticket {booking_id}:{sub_index}: {e}")
+        return False
+
+def _checkin_all_sub_tickets(booking_id: str, checked_in_by: str = "driver") -> int:
+    """一次性核銷所有未上車的子票，返回核銷的子票數量"""
+    sub_tickets = _get_sub_tickets(booking_id)
+    if not sub_tickets:
+        return 0
+    checked_count = 0
+    for ticket in sub_tickets:
+        if ticket.get("status") == "not_checked_in":
+            sub_index = ticket.get("sub_ticket_index")
+            if sub_index and _update_sub_ticket_status(booking_id, sub_index, checked_in_by):
+                checked_count += 1
+    return checked_count
+
+def _calculate_mother_ticket_status(booking_id: str) -> Tuple[str, int, int]:
+    """
+    計算母票總狀態
+    返回：(狀態文字, 已上車人數, 總人數)
+    狀態：未上車 / 部分上車(X/Y) / 完全上車(Y/Y)
+    """
+    sub_tickets = _get_sub_tickets(booking_id)
+    if not sub_tickets:
+        return "未上車", 0, 0
+    
+    total_pax = sum(t.get("sub_ticket_pax", 0) for t in sub_tickets)
+    checked_pax = sum(
+        t.get("sub_ticket_pax", 0) 
+        for t in sub_tickets 
+        if t.get("status") == "checked_in"
+    )
+    
+    if checked_pax == 0:
+        return "未上車", 0, total_pax
+    elif checked_pax < total_pax:
+        return f"部分上車({checked_pax}/{total_pax})", checked_pax, total_pax
+    else:
+        return f"完全上車({total_pax}/{total_pax})", checked_pax, total_pax
+
+def _sync_mother_ticket_status_to_sheet(booking_id: str, ws_main: gspread.Worksheet, hmap: Dict[str, int], rowno: int):
+    """同步母票狀態到 Sheet"""
+    try:
+        status_text, checked_pax, total_pax = _calculate_mother_ticket_status(booking_id)
+        if "乘車狀態" in hmap:
+            ws_main.update_cell(rowno, hmap["乘車狀態"], status_text)
+        log.info(f"[sub_ticket] Synced status for {booking_id}: {status_text}")
+    except Exception as e:
+        log.error(f"[sub_ticket] Failed to sync status for {booking_id}: {e}")
+
+def _parse_qr_code(qr_content: str) -> Optional[Dict[str, Any]]:
+    """
+    解析 QR Code 內容
+    返回：{"type": "mother"|"sub", "booking_id": str, "sub_index": int, "hash": str} 或 None
+    """
+    parts = qr_content.split(":")
+    if len(parts) < 3 or parts[0] != "FT":
+        return None
+    booking_id = parts[1].strip()
+    sub_index_str = parts[2].strip()
+    hash_str = parts[3].strip() if len(parts) > 3 else ""
+    
+    try:
+        sub_index = int(sub_index_str)
+        return {
+            "type": "mother" if sub_index == 0 else "sub",
+            "booking_id": booking_id,
+            "sub_index": sub_index,
+            "hash": hash_str
+        }
+    except ValueError:
+        return None
+
 # ========== 郵件發送 ==========
 def _send_email_gmail(to_email: str, subject: str, text_body: str, attachment: Optional[bytes] = None, attachment_filename: str = "ticket.png"):
     host = os.getenv("SMTP_HOST", "smtp.gmail.com")
@@ -873,17 +1034,83 @@ def _async_process_mail(kind: str, booking_id: str, booking_data: Dict[str, Any]
                 return
             rowno = rownos[0]
             qr_attachment: Optional[bytes] = None
-            if kind in ("book", "modify") and qr_content:
-                try:
-                    qr_img = qrcode.make(qr_content)
-                    buffer = io.BytesIO()
-                    qr_img.save(buffer, format="PNG")
-                    qr_attachment = buffer.getvalue()
-                    log.info(f"[mail:{kind}] 生成 QR Code 附件成功")
-                except Exception as e:
-                    log.error(f"[mail:{kind}] 生成 QR Code 附件失敗: {e}")
+            # ========== 母子車票：生成所有子票 QR Code ==========
+            sub_tickets = booking_data.get("sub_tickets", [])
+            mother_ticket = booking_data.get("mother_ticket")
+            
+            if kind in ("book", "modify"):
+                if sub_tickets:
+                    # 多子票模式：生成所有子票 QR Code（包含母票）
+                    try:
+                        from PIL import Image, ImageDraw, ImageFont
+                        qr_images = []
+                        for sub_ticket in sub_tickets:
+                            qr_img = qrcode.make(sub_ticket["qr_content"])
+                            qr_images.append((qr_img, f"子票{sub_ticket['sub_index']}({sub_ticket['pax']}人)"))
+                        
+                        # 添加母票 QR Code
+                        if mother_ticket and mother_ticket.get("qr_content"):
+                            qr_img = qrcode.make(mother_ticket["qr_content"])
+                            qr_images.append((qr_img, "母票(全部)"))
+                        
+                        # 合併所有 QR Code 為一張圖片
+                        if qr_images:
+                            img_width = max(img.size[0] for img, _ in qr_images)
+                            img_height = max(img.size[1] for img, _ in qr_images)
+                            spacing = 20
+                            total_height = len(qr_images) * (img_height + spacing) + spacing
+                            combined_img = Image.new("RGB", (img_width + 200, total_height), "white")
+                            draw = ImageDraw.Draw(combined_img)
+                            
+                            y_offset = spacing
+                            for qr_img, label in qr_images:
+                                combined_img.paste(qr_img, (spacing, y_offset))
+                                # 添加標籤
+                                try:
+                                    font = ImageFont.truetype("arial.ttf", 16)
+                                except:
+                                    font = ImageFont.load_default()
+                                draw.text((spacing + img_width + 10, y_offset + img_height // 2), label, fill="black", font=font)
+                                y_offset += img_height + spacing
+                            
+                            buffer = io.BytesIO()
+                            combined_img.save(buffer, format="PNG")
+                            qr_attachment = buffer.getvalue()
+                            log.info(f"[mail:{kind}] 生成 {len(qr_images)} 個 QR Code 附件成功（母子車票）")
+                    except Exception as e:
+                        log.error(f"[mail:{kind}] 生成子票 QR Code 附件失敗: {e}")
+                        # 回退到單一 QR Code
+                        if qr_content:
+                            try:
+                                qr_img = qrcode.make(qr_content)
+                                buffer = io.BytesIO()
+                                qr_img.save(buffer, format="PNG")
+                                qr_attachment = buffer.getvalue()
+                            except Exception as e2:
+                                log.error(f"[mail:{kind}] 生成單一 QR Code 附件失敗: {e2}")
+                elif qr_content:
+                    # 單一子票模式（向後兼容）
+                    try:
+                        qr_img = qrcode.make(qr_content)
+                        buffer = io.BytesIO()
+                        qr_img.save(buffer, format="PNG")
+                        qr_attachment = buffer.getvalue()
+                        log.info(f"[mail:{kind}] 生成 QR Code 附件成功")
+                    except Exception as e:
+                        log.error(f"[mail:{kind}] 生成 QR Code 附件失敗: {e}")
+            
             try:
-                subject, text_body = _compose_mail_text(booking_data, lang, kind)
+                # 更新 Email 內容以包含子票信息
+                email_text = booking_data.copy()
+                if sub_tickets:
+                    email_text["sub_tickets_info"] = "\n".join([
+                        f"子票 {t['sub_index']}: {t['pax']}人 (QR Code: {t['qr_content']})"
+                        for t in sub_tickets
+                    ])
+                    if mother_ticket and mother_ticket.get("qr_content"):
+                        email_text["mother_ticket_info"] = f"母票（全部）: {mother_ticket['qr_content']}"
+                
+                subject, text_body = _compose_mail_text(email_text, lang, kind)
                 _send_email_gmail(booking_data["email"], subject, text_body, attachment=qr_attachment, attachment_filename=f"shuttle_ticket_{booking_id}.png" if qr_attachment else None)
                 mail_status = f"{_tz_now_str()} 寄信成功({kind})"
                 log.info(f"[mail:{kind}] 預約 {booking_id} 寄信成功")
@@ -924,10 +1151,25 @@ class BookPayload(BaseModel):
     pickLocation: str
     dropLocation: str
     lang: str = Field("zh", pattern="^(zh|en|ja|ko)$")
+    ticket_split: Optional[List[int]] = None  # 子票分配，例如 [2, 2, 2] 表示三個子票，每個2人
+    
     @validator("direction")
     def _v_dir(cls, v):
         if v not in {"去程", "回程"}:
             raise ValueError("方向僅允許 去程 / 回程")
+        return v
+    
+    @validator("ticket_split")
+    def _v_ticket_split(cls, v, values):
+        if v is None:
+            return None
+        if not isinstance(v, list) or len(v) == 0:
+            raise ValueError("ticket_split 必須是非空列表")
+        if any(not isinstance(x, int) or x < 1 for x in v):
+            raise ValueError("ticket_split 每個元素必須是大於0的整數")
+        total_passengers = values.get("passengers", 0)
+        if sum(v) != total_passengers:
+            raise ValueError(f"ticket_split 總和 ({sum(v)}) 必須等於 passengers ({total_passengers})")
         return v
 
 class QueryPayload(BaseModel):
@@ -1226,7 +1468,7 @@ class BookingProcessor:
     def __init__(self):
         self.processing_lock = threading.Lock()
     
-    def prepare_booking_row(self, p: BookPayload, booking_id: str, qr_content: str, headers: List[str], hmap: Dict[str, int]) -> List[str]:
+    def prepare_booking_row(self, p: BookPayload, booking_id: str, qr_content: str, headers: List[str], hmap: Dict[str, int], ticket_split_str: str = "") -> List[str]:
         time_hm = _time_hm_from_any(p.time)
         car_display = _display_trip_str(p.date, time_hm)
         pk_idx, dp_idx, seg_str = _compute_indices_and_segments(p.pickLocation, p.dropLocation)
@@ -1392,13 +1634,36 @@ def ops(req: OpsRequest):
                 except Exception as e:
                     log.warning(f"[booking_id] rtdb_failed type={type(e).__name__} msg={e}")
                     raise HTTPException(503, "暫時無法產生預約編號，請稍後再試")
-                em6 = _email_hash6(p.email)
-                qr_content = f"FT:{booking_id}:{em6}"
+                
+                # ========== 母子車票邏輯 ==========
+                ticket_split = p.ticket_split if p.ticket_split else [p.passengers]  # 如果未提供，默認單一子票
+                sub_tickets = []
+                mother_qr_content = None
+                
+                if len(ticket_split) > 1:
+                    # 多子票模式：創建子票並生成母票
+                    try:
+                        sub_tickets = _create_sub_tickets(booking_id, ticket_split, p.email)
+                        mother_qr_content = _create_mother_ticket(booking_id, p.email)
+                        log.info(f"[sub_ticket] Created {len(sub_tickets)} sub-tickets for booking {booking_id}")
+                    except Exception as e:
+                        log.error(f"[sub_ticket] Failed to create sub-tickets: {e}")
+                        raise HTTPException(500, f"創建子票失敗: {str(e)}")
+                    # 使用母票 QR Code 作為主 QR Code
+                    qr_content = mother_qr_content
+                else:
+                    # 單一子票模式（向後兼容）：使用舊格式
+                    em6 = _email_hash6(p.email)
+                    qr_content = f"FT:{booking_id}:{em6}"
+                
                 qr_url = f"{BASE_URL}/api/qr/{urllib.parse.quote(qr_content)}"
-                newrow = booking_processor.prepare_booking_row(p, booking_id, qr_content, headers, hmap)
+                
+                # 準備 Sheet 行（包含子票配置信息）
+                ticket_split_str = ",".join(str(x) for x in ticket_split) if len(ticket_split) > 1 else ""
+                newrow = booking_processor.prepare_booking_row(p, booking_id, qr_content, headers, hmap, ticket_split_str)
                 ws_main.append_row(newrow, value_input_option="USER_ENTERED")
                 wrote = True
-                log.info(f"book appended booking_id={booking_id}")
+                log.info(f"book appended booking_id={booking_id}, ticket_split={ticket_split}")
                 _invalidate_sheet_cache()
                 expected_max = max(0, int(rem) - int(p.passengers))
                 defer_release = True
@@ -1406,8 +1671,51 @@ def ops(req: OpsRequest):
             finally:
                 if not defer_release:
                     _release_capacity_lock(lock_id, lock_holder)
-            response_data = {"status": "success", "bookingId": booking_id, "qrUrl": qr_url, "qrContent": qr_content, "booking_id": booking_id, "qr_url": qr_url, "qr_content": qr_content}
-            booking_info = {"booking_id": booking_id, "date": p.date, "time": time_hm, "direction": p.direction, "pick": p.pickLocation, "drop": p.dropLocation, "name": p.name, "phone": p.phone, "email": p.email, "pax": str(p.passengers), "qr_content": qr_content, "qr_url": qr_url}
+            
+            # 準備回應數據
+            response_data = {
+                "status": "success",
+                "bookingId": booking_id,
+                "booking_id": booking_id,
+                "qrUrl": qr_url,
+                "qr_url": qr_url,
+                "qrContent": qr_content,
+                "qr_content": qr_content,
+            }
+            
+            # 如果有多個子票，返回所有子票信息
+            if sub_tickets:
+                response_data["sub_tickets"] = [
+                    {
+                        "sub_index": t["sub_index"],
+                        "pax": t["pax"],
+                        "qr_content": t["qr_content"],
+                        "qr_url": f"{BASE_URL}/api/qr/{urllib.parse.quote(t['qr_content'])}"
+                    }
+                    for t in sub_tickets
+                ]
+                response_data["mother_ticket"] = {
+                    "qr_content": mother_qr_content,
+                    "qr_url": f"{BASE_URL}/api/qr/{urllib.parse.quote(mother_qr_content)}"
+                }
+            
+            # 準備 Email 數據（包含所有子票 QR Code）
+            booking_info = {
+                "booking_id": booking_id,
+                "date": p.date,
+                "time": time_hm,
+                "direction": p.direction,
+                "pick": p.pickLocation,
+                "drop": p.dropLocation,
+                "name": p.name,
+                "phone": p.phone,
+                "email": p.email,
+                "pax": str(p.passengers),
+                "qr_content": qr_content,
+                "qr_url": qr_url,
+                "sub_tickets": sub_tickets,
+                "mother_ticket": {"qr_content": mother_qr_content} if mother_qr_content else None
+            }
             async_process_after_booking(booking_id, booking_info, qr_content, p.lang)
             return response_data
 
@@ -1567,6 +1875,48 @@ def ops(req: OpsRequest):
             p = CheckInPayload(**data)
             if not (p.code or p.booking_id):
                 raise HTTPException(400, "需提供 code 或 booking_id")
+            
+            # ========== 母子車票上車邏輯 ==========
+            qr_code = p.code or ""
+            booking_id_from_qr = None
+            
+            # 解析 QR Code（支持新格式）
+            if qr_code:
+                parsed = _parse_qr_code(qr_code)
+                if parsed:
+                    booking_id_from_qr = parsed["booking_id"]
+                    ticket_type = parsed["type"]
+                    sub_index = parsed["sub_index"]
+                    
+                    # 查找母票記錄
+                    rownos = _find_rows_by_pred(ws_main, headers, HEADER_ROW_MAIN, lambda r: r.get("預約編號") == booking_id_from_qr)
+                    if not rownos:
+                        raise HTTPException(404, "找不到對應的預約編號")
+                    rowno = rownos[0]
+                    
+                    # 子票上車
+                    if ticket_type == "sub":
+                        if _update_sub_ticket_status(booking_id_from_qr, sub_index, "check_in_api"):
+                            log.info(f"[sub_ticket] Checked in sub-ticket {booking_id_from_qr}:{sub_index}")
+                        else:
+                            raise HTTPException(500, f"無法更新子票狀態: {booking_id_from_qr}:{sub_index}")
+                    
+                    # 母票上車（一次性核銷所有人）
+                    elif ticket_type == "mother":
+                        checked_count = _checkin_all_sub_tickets(booking_id_from_qr, "check_in_api")
+                        log.info(f"[sub_ticket] Checked in all sub-tickets for {booking_id_from_qr}, count={checked_count}")
+                    
+                    # 同步狀態到 Sheet
+                    _sync_mother_ticket_status_to_sheet(booking_id_from_qr, ws_main, hmap, rowno)
+                    
+                    # 更新最後操作時間
+                    if "最後操作時間" in hmap:
+                        ws_main.update_cell(rowno, hmap["最後操作時間"], _tz_now_str() + " 已上車")
+                    
+                    _invalidate_sheet_cache()
+                    return {"status": "success", "row": rowno, "booking_id": booking_id_from_qr}
+            
+            # ========== 向後兼容：舊格式 QR Code ==========
             rownos = _find_rows_by_pred(ws_main, headers, HEADER_ROW_MAIN, lambda r: r.get("QRCode編碼") == p.code or r.get("預約編號") == p.booking_id)
             if not rownos:
                 raise HTTPException(404, "找不到符合條件之訂單")
