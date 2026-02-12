@@ -112,6 +112,27 @@ def get_sheet_data_via_api(
         raise
 
 
+def get_sheet_data_api(
+    sheet_name: str, range_name: Optional[str] = None
+) -> Tuple[List[List[str]], int]:
+    """
+    通過 Google Sheets API 讀取資料（返回狀態碼）
+    
+    Args:
+        sheet_name: 工作表名稱
+        range_name: 範圍（A1 表示法），如果為 None 則使用默認範圍
+        
+    Returns:
+        (資料列表, 狀態碼)
+    """
+    try:
+        values = get_sheet_data_via_api(sheet_name, range_name)
+        return values, 200
+    except Exception as e:
+        logger.error(f"Error reading sheet {sheet_name}: {e}")
+        return [], 500
+
+
 def get_header_map(worksheet: gspread.Worksheet, header_row: int) -> Dict[str, int]:
     """
     獲取表頭映射（欄位名稱 -> 列索引，1-based）

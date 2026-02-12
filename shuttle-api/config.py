@@ -80,7 +80,7 @@ STATION_COORDS = {
 }
 
 # ========== 主表允許欄位 ==========
-HEADER_KEYS = {
+MAIN_SHEET_HEADER_KEYS = {
     "申請日期",
     "最後操作時間",
     "預約編號",

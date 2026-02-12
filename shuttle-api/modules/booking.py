@@ -16,6 +16,12 @@ import qrcode
 import io
 from fastapi import HTTPException
 
+import sys
+import os
+
+# 添加父目錄到路徑
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import config
 from modules import firebase, sheets, cache, utils
 import gspread
@@ -566,4 +572,86 @@ def prepare_booking_row(
 def email_hash6(email: str) -> str:
     """生成 Email 的 6 位雜湊值"""
     return hashlib.sha256((email or "").encode("utf-8")).hexdigest()[:6]
+
+
+# ========== 輔助函數 ==========
+def find_rows_by_predicate(
+    values: List[List[str]], headers: List[str], start_row: int, predicate
+) -> List[int]:
+    """根據條件查找行號"""
+    if not values:
+        return []
+    hdrs = values[start_row - 1] if len(values) >= start_row else []
+    result: List[int] = []
+    for i, row in enumerate(values[start_row:], start=start_row + 1):
+        if not any(row):
+            continue
+        d = {hdrs[j]: row[j] if j < len(row) else "" for j in range(len(hdrs))}
+        if predicate(d):
+            result.append(i)
+    return result
+
+
+def async_process_mail(
+    kind: str,  # "book" / "modify" / "cancel"
+    booking_id: str,
+    booking_data: Dict[str, Any],
+    qr_content: Optional[str],
+    lang: str = "zh",
+):
+    """統一的背景寄信流程"""
+    def _process():
+        try:
+            ws = sheets.open_worksheet(config.SHEET_NAME_MAIN)
+            all_values, hmap = sheets.get_main_sheet_data()
+            headers = sheets.get_sheet_headers(ws, config.HEADER_ROW_MAIN)
+            
+            # 找到對應的行
+            rownos = find_rows_by_predicate(
+                all_values,
+                headers,
+                config.HEADER_ROW_MAIN - 1,
+                lambda r: r.get("預約編號") == booking_id,
+            )
+            if not rownos:
+                logger.error(f"[mail:{kind}] 找不到預約編號 {booking_id} 對應的行")
+                return
+            
+            rowno = rownos[0]
+            
+            # 只在 book / modify 生成 QR Code 附件
+            qr_attachment: Optional[bytes] = None
+            if kind in ("book", "modify") and qr_content:
+                try:
+                    qr_attachment = generate_qr_code_image(qr_content)
+                    logger.info(f"[mail:{kind}] 生成 QR Code 附件成功")
+                except Exception as e:
+                    logger.error(f"[mail:{kind}] 生成 QR Code 附件失敗: {e}")
+            
+            try:
+                subject, text_body = compose_mail_text(booking_data, lang, kind)
+                send_email(
+                    booking_data["email"],
+                    subject,
+                    text_body,
+                    attachment=qr_attachment,
+                    attachment_filename=f"shuttle_ticket_{booking_id}.png" if qr_attachment else None,
+                )
+                mail_status = f"{utils.tz_now_str()} 寄信成功({kind})"
+                logger.info(f"[mail:{kind}] 預約 {booking_id} 寄信成功")
+            except Exception as e:
+                mail_status = f"{utils.tz_now_str()} 寄信失敗({kind}): {str(e)}"
+                logger.error(f"[mail:{kind}] 預約 {booking_id} 寄信失敗: {str(e)}")
+            
+            # 更新寄信狀態
+            if "寄信狀態" in hmap:
+                ws.update_acell(
+                    gspread.utils.rowcol_to_a1(rowno, hmap["寄信狀態"]),
+                    mail_status,
+                )
+        except Exception as e:
+            logger.error(f"[mail:{kind}] 非同步處理預約 {booking_id} 時發生錯誤: {str(e)}")
+    
+    thread = threading.Thread(target=_process, daemon=True)
+    thread.start()
 
