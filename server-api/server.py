@@ -738,9 +738,14 @@ def _generate_booking_id_rtdb(today_iso: str) -> str:
     return f"{yymmdd}{seq_int:02d}"
 
 # ========== 母子車票管理 ==========
-def _create_sub_tickets(booking_id: str, ticket_split: List[int], email: str) -> List[Dict[str, Any]]:
+def _create_sub_tickets(booking_id: str, ticket_split: List[int], email: str, start_index: int = 1) -> List[Dict[str, Any]]:
     """
     創建子票並存儲到 Firebase
+    參數：
+        booking_id: 預約編號
+        ticket_split: 子票人數列表，例如 [2, 2, 2]
+        email: 信箱（用於生成 QR Code）
+        start_index: 起始索引（用於重新分票時避免索引衝突）
     返回：子票列表，每個包含 qr_content, sub_index, pax
     """
     if not _init_firebase():
@@ -750,13 +755,14 @@ def _create_sub_tickets(booking_id: str, ticket_split: List[int], email: str) ->
     sub_tickets = []
     created_at = _tz_now_str()
     
-    for idx, pax in enumerate(ticket_split, start=1):
-        ticket_hash = _generate_ticket_hash(booking_id, idx, email)
-        qr_content = f"FT:{booking_id}:{idx}:{ticket_hash}"
+    for idx, pax in enumerate(ticket_split, start=0):
+        sub_index = start_index + idx
+        ticket_hash = _generate_ticket_hash(booking_id, sub_index, email)
+        qr_content = f"FT:{booking_id}:{sub_index}:{ticket_hash}"
         
         ticket_data = {
             "parent_booking_id": booking_id,
-            "sub_ticket_index": idx,
+            "sub_ticket_index": sub_index,
             "sub_ticket_pax": pax,
             "status": "not_checked_in",
             "checked_in_at": None,
@@ -765,15 +771,58 @@ def _create_sub_tickets(booking_id: str, ticket_split: List[int], email: str) ->
             "created_at": created_at
         }
         
-        tickets_ref.child(str(idx)).set(ticket_data)
+        tickets_ref.child(str(sub_index)).set(ticket_data)
         sub_tickets.append({
             "qr_content": qr_content,
-            "sub_index": idx,
+            "sub_index": sub_index,
             "pax": pax
         })
-        log.info(f"[sub_ticket] Created ticket {idx}/{len(ticket_split)} for booking {booking_id}, pax={pax}")
+        log.info(f"[sub_ticket] Created ticket {sub_index} for booking {booking_id}, pax={pax}")
     
     return sub_tickets
+
+def _re_split_tickets(booking_id: str, ticket_split: List[int], email: str) -> Tuple[List[Dict[str, Any]], int, int]:
+    """
+    重新分票：保留已上車的子票，為剩餘人數創建新子票
+    返回：(新子票列表, 已上車人數, 剩餘人數)
+    """
+    if not _init_firebase():
+        raise RuntimeError("firebase_init_failed")
+    
+    existing_tickets = _get_sub_tickets(booking_id)
+    if not existing_tickets:
+        raise ValueError("找不到現有子票，請使用首次分票功能")
+    
+    # 1. 分離已上車和未上車的子票
+    checked_in_tickets = [t for t in existing_tickets if t.get("status") == "checked_in"]
+    not_checked_in_tickets = [t for t in existing_tickets if t.get("status") == "not_checked_in"]
+    
+    # 2. 計算已上車人數和剩餘人數
+    checked_in_pax = sum(t.get("sub_ticket_pax", 0) for t in checked_in_tickets)
+    total_pax = sum(t.get("sub_ticket_pax", 0) for t in existing_tickets)
+    remaining_pax = total_pax - checked_in_pax
+    
+    # 3. 驗證新分票總和 = 剩餘人數
+    if sum(ticket_split) != remaining_pax:
+        raise ValueError(f"新分票總和 ({sum(ticket_split)}) 必須等於剩餘人數 ({remaining_pax})")
+    
+    # 4. 刪除未上車的子票（保留已上車的）
+    tickets_ref = db.reference(f"/tickets/{booking_id}")
+    for ticket in not_checked_in_tickets:
+        sub_index = ticket.get("sub_ticket_index")
+        if sub_index:
+            tickets_ref.child(str(sub_index)).delete()
+            log.info(f"[re_split] Deleted unchecked ticket {booking_id}:{sub_index}")
+    
+    # 5. 為剩餘人數創建新子票（使用新的索引，從最大索引+1開始）
+    max_existing_index = max([t.get("sub_ticket_index", 0) for t in checked_in_tickets], default=0)
+    new_start_index = max_existing_index + 1
+    
+    new_sub_tickets = _create_sub_tickets(booking_id, ticket_split, email, start_index=new_start_index)
+    
+    log.info(f"[re_split] Re-split tickets for {booking_id}: checked_in={checked_in_pax}, remaining={remaining_pax}, new_tickets={len(new_sub_tickets)}")
+    
+    return new_sub_tickets, checked_in_pax, remaining_pax
 
 def _create_mother_ticket(booking_id: str, email: str) -> str:
     """
