@@ -2149,7 +2149,6 @@ def ops(req: OpsRequest):
                     "status": "success",
                     "booking_id": p.booking_id,
                     "is_re_split": is_re_split,
-                    "merged_to_one": False,
                     "sub_tickets": [
                         {
                             "sub_index": t.get("sub_ticket_index"),
