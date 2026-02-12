@@ -1827,6 +1827,175 @@ function mountTicketAndShow(ticket) {
   showSuccessAnimation();
 }
 
+// ========== 分票功能 ==========
+function showSplitTicketDialog(ticket) {
+  const totalPax = ticket.passengers || 1;
+  if (totalPax < 2) {
+    showErrorCard("至少需要2人才能分票");
+    return;
+  }
+  
+  // 創建分票對話框
+  const dialog = document.createElement("div");
+  dialog.className = "modal-overlay";
+  dialog.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;";
+  
+  const content = document.createElement("div");
+  content.className = "card";
+  content.style.cssText = "max-width:500px;width:90%;max-height:90vh;overflow-y:auto;";
+  
+  content.innerHTML = `
+    <h2>分票設定</h2>
+    <p style="margin-bottom:16px;">總人數：${totalPax} 人</p>
+    <div id="splitTicketInputs"></div>
+    <div class="actions" style="margin-top:20px;">
+      <button class="button btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>
+      <button class="button" onclick="confirmSplitTicket('${ticket.bookingId}', ${totalPax})">確認分票</button>
+    </div>
+  `;
+  
+  dialog.appendChild(content);
+  document.body.appendChild(dialog);
+  
+  // 生成分票輸入框
+  const inputsContainer = content.querySelector("#splitTicketInputs");
+  const defaultSplit = totalPax === 2 ? [1, 1] : totalPax === 3 ? [1, 1, 1] : totalPax === 4 ? [2, 2] : [Math.ceil(totalPax/2), Math.floor(totalPax/2)];
+  
+  defaultSplit.forEach((val, idx) => {
+    const field = document.createElement("div");
+    field.className = "field";
+    field.innerHTML = `
+      <label class="label">子票 ${String.fromCharCode(65 + idx)} 人數</label>
+      <input type="number" class="input split-pax-input" min="1" max="${totalPax}" value="${val}" data-index="${idx}" />
+    `;
+    inputsContainer.appendChild(field);
+  });
+  
+  // 添加「添加子票」按鈕（如果總數未達上限）
+  if (defaultSplit.length < totalPax) {
+    const addBtn = document.createElement("button");
+    addBtn.className = "button btn-ghost";
+    addBtn.textContent = "+ 添加子票";
+    addBtn.onclick = () => {
+      const field = document.createElement("div");
+      field.className = "field";
+      const newIdx = inputsContainer.querySelectorAll(".split-pax-input").length;
+      field.innerHTML = `
+        <label class="label">子票 ${String.fromCharCode(65 + newIdx)} 人數</label>
+        <input type="number" class="input split-pax-input" min="1" max="${totalPax}" value="1" data-index="${newIdx}" />
+      `;
+      inputsContainer.appendChild(field);
+    };
+    inputsContainer.appendChild(addBtn);
+  }
+  
+  dialog.onclick = (e) => {
+    if (e.target === dialog) dialog.remove();
+  };
+}
+
+async function confirmSplitTicket(bookingId, totalPax) {
+  const inputs = document.querySelectorAll(".split-pax-input");
+  const ticketSplit = Array.from(inputs).map(inp => parseInt(inp.value) || 1);
+  const sum = ticketSplit.reduce((a, b) => a + b, 0);
+  
+  if (sum !== totalPax) {
+    showErrorCard(`分票總和 (${sum}) 必須等於總人數 (${totalPax})`);
+    return;
+  }
+  
+  if (ticketSplit.length < 2) {
+    showErrorCard("至少需要分成2張子票");
+    return;
+  }
+  
+  showLoading(true);
+  try {
+    const res = await fetch(OPS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "split_ticket", data: { booking_id: bookingId, ticket_split: ticketSplit } })
+    });
+    
+    const result = await res.json();
+    if (!res.ok || result.status !== "success") {
+      throw new Error(result.detail || result.message || "分票失敗");
+    }
+    
+    // 關閉對話框
+    document.querySelector(".modal-overlay")?.remove();
+    
+    // 更新當前票卷數據
+    if (window.currentBookingData) {
+      window.currentBookingData.sub_tickets = result.sub_tickets || [];
+      window.currentBookingData.mother_ticket = result.mother_ticket || null;
+      
+      // 重新渲染票卷（顯示所有子票和母票，支持切換）
+      mountTicketAndShow(window.currentBookingData);
+    }
+    
+    showSuccessAnimation();
+  } catch (e) {
+    showErrorCard("分票失敗：" + (e.message || ""));
+  } finally {
+    showLoading(false);
+  }
+}
+
+// ========== 票卷切換功能 ==========
+function switchTicket(direction) {
+  const track = getElement("ticketCarouselTrack");
+  if (!track) return;
+  
+  const items = track.querySelectorAll(".ticket-carousel-item");
+  if (items.length === 0) return;
+  
+  const currentIdx = window.currentTicketIndex || 0;
+  const newIdx = Math.max(0, Math.min(items.length - 1, currentIdx + direction));
+  
+  if (newIdx === currentIdx) return;
+  
+  // 更新活動項
+  items[currentIdx].classList.remove("active");
+  items[newIdx].classList.add("active");
+  
+  // 更新指示器
+  const dots = document.querySelectorAll(".carousel-dot");
+  if (dots[currentIdx]) dots[currentIdx].classList.remove("active");
+  if (dots[newIdx]) dots[newIdx].classList.add("active");
+  
+  // 更新索引
+  window.currentTicketIndex = newIdx;
+  
+  // 滑動動畫
+  track.style.transform = `translateX(-${newIdx * 100}%)`;
+}
+
+function switchTicketTo(index) {
+  const track = getElement("ticketCarouselTrack");
+  if (!track) return;
+  
+  const items = track.querySelectorAll(".ticket-carousel-item");
+  if (index < 0 || index >= items.length) return;
+  
+  const currentIdx = window.currentTicketIndex || 0;
+  if (index === currentIdx) return;
+  
+  // 更新活動項
+  items[currentIdx].classList.remove("active");
+  items[index].classList.add("active");
+  
+  // 更新指示器
+  const dots = document.querySelectorAll(".carousel-dot");
+  if (dots[currentIdx]) dots[currentIdx].classList.remove("active");
+  if (dots[index]) dots[index].classList.add("active");
+  
+  // 更新索引
+  window.currentTicketIndex = index;
+  
+  // 滑動動畫
+  track.style.transform = `translateX(-${index * 100}%)`;
+}
 
 function closeTicketToHome() {
   const card = getElement("successCard");
