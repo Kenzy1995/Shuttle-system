@@ -32,6 +32,11 @@ booking-manager/
 driver-api2/
 shuttle-api/
 
+# Old deployment workflows (replaced by unified server-api)
+.github/workflows/deploy-booking-api.yml
+.github/workflows/deploy-booking-manager.yml
+.github/workflows/deploy-driver-api2.yml
+
 # Shell scripts (all scripts excluded)
 *.sh
 *.ps1
