@@ -530,7 +530,7 @@ def _init_firebase():
                 log.info("Firebase: Using ApplicationDefault credentials")
             db_url = os.environ.get("FIREBASE_RTDB_URL")
             if not db_url:
-                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-60d6a")
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-487204")
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
                 log.warning(f"Firebase: FIREBASE_RTDB_URL not set, using default: {db_url}")
             else:

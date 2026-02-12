@@ -1126,7 +1126,7 @@ def update_driver_location(loc: DriverLocation):
 
             db_url = os.environ.get("FIREBASE_RTDB_URL")
             if not db_url:
-                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-60d6a")
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-487204")
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
@@ -1375,7 +1375,7 @@ def get_driver_location():
             # 優先使用環境變數，若無則嘗試預設 URL
             db_url = os.environ.get("FIREBASE_RTDB_URL")
             if not db_url:
-                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-60d6a")
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-487204")
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
@@ -2059,7 +2059,7 @@ def api_driver_google_trip_start(req: GoogleTripStartRequest):
                     cred = credentials.ApplicationDefault()
                 db_url = os.environ.get("FIREBASE_RTDB_URL")
                 if not db_url:
-                    project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-60d6a")
+                    project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-487204")
                     db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
                 firebase_admin.initialize_app(cred, {"databaseURL": db_url})
             payload = {"stops": stops}
@@ -2167,7 +2167,7 @@ def auto_complete_trip(trip_id: str = None, main_datetime: str = None):
                 cred = credentials.ApplicationDefault()
             db_url = os.environ.get("FIREBASE_RTDB_URL")
             if not db_url:
-                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-60d6a")
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-487204")
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         
@@ -2226,7 +2226,7 @@ def api_driver_route(trip_id: str = Query(..., description="主班次時間，�
                 cred = credentials.ApplicationDefault()
             db_url = os.environ.get("FIREBASE_RTDB_URL")
             if not db_url:
-                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-60d6a")
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-487204")
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         ref = db.reference(f"/trip/{trip_id}/route")
@@ -2249,7 +2249,7 @@ def api_driver_system_status():
                 cred = credentials.ApplicationDefault()
             db_url = os.environ.get("FIREBASE_RTDB_URL")
             if not db_url:
-                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-60d6a")
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-487204")
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         ref = db.reference("/gps_system_enabled")
@@ -2277,7 +2277,7 @@ def api_driver_set_system_status(req: SystemStatusRequest):
                 cred = credentials.ApplicationDefault()
             db_url = os.environ.get("FIREBASE_RTDB_URL")
             if not db_url:
-                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-60d6a")
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-487204")
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         ref = db.reference("/gps_system_enabled")
@@ -2304,7 +2304,7 @@ def api_driver_update_station(req: UpdateStationRequest):
                 cred = credentials.ApplicationDefault()
             db_url = os.environ.get("FIREBASE_RTDB_URL")
             if not db_url:
-                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-60d6a")
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-487204")
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         db.reference("/current_trip_station").set(req.current_station)

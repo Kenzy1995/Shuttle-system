@@ -11,7 +11,7 @@ const LIVE_LOCATION_CONFIG = {
   key: "AIzaSyB1PtwlsIgr026u29gU2L8ZXcozbkHpHco",
   api: "https://driver-api2-509045429779.asia-east1.run.app",
   trip: "",
-  fbdb: "https://shuttle-system-60d6a-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  fbdb: "https://shuttle-system-487204-default-rtdb.asia-southeast1.firebasedatabase.app/",
   fbkey: "AIzaSyDatr-z00tNMnXD7WMoTJ0vygdVCJKNuQA"
 };
 

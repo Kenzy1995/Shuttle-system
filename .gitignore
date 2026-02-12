@@ -37,6 +37,7 @@ tag_*.py
 !VERIFY_TEST_ENVIRONMENT.md
 !FIREBASE_PROJECT_EXPLANATION.md
 !DELETE_EXTRA_PROJECT.md
+!UPDATE_FIREBASE_URL.md
 
 # Shell scripts (allow permission grant scripts)
 *.sh
