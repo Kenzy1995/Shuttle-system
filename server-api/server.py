@@ -2078,7 +2078,7 @@ def ops(req: OpsRequest):
             
             try:
                 if is_re_split:
-                    # 重新分票：保留已上車的子票，為剩餘人數創建新子票
+                    # 重新分票邏輯
                     checked_in_tickets = [t for t in existing_sub_tickets if t.get("status") == "checked_in"]
                     checked_in_pax = sum(t.get("sub_ticket_pax", 0) for t in checked_in_tickets)
                     remaining_pax = total_pax - checked_in_pax
@@ -2086,19 +2086,47 @@ def ops(req: OpsRequest):
                     if remaining_pax <= 0:
                         raise HTTPException(400, "所有人已上車，無法重新分票")
                     
-                    if sum(p.ticket_split) != remaining_pax:
-                        raise HTTPException(400, f"新分票總和 ({sum(p.ticket_split)}) 必須等於剩餘人數 ({remaining_pax})")
-                    
-                    new_sub_tickets, checked_in_pax, remaining_pax = _re_split_tickets(
-                        p.booking_id, p.ticket_split, email
-                    )
-                    
-                    # 更新母票 QR Code
-                    mother_qr_content = _create_mother_ticket(p.booking_id, email)
-                    if "QRCode編碼" in hmap:
-                        ws_main.update_cell(rowno, hmap["QRCode編碼"], mother_qr_content)
-                    
-                    log.info(f"[split_ticket] Re-split booking {p.booking_id}: {checked_in_pax} checked in, {remaining_pax} remaining")
+                    # 檢查是否要合併回一張票
+                    if p.merge_to_one or (p.ticket_split is None):
+                        # 合併回一張票：刪除所有未上車的子票
+                        if not _init_firebase():
+                            raise RuntimeError("firebase_init_failed")
+                        
+                        tickets_ref = db.reference(f"/tickets/{p.booking_id}")
+                        for ticket in existing_sub_tickets:
+                            if ticket.get("status") != "checked_in":
+                                sub_index = ticket.get("sub_ticket_index")
+                                if sub_index:
+                                    tickets_ref.child(str(sub_index)).delete()
+                                    log.info(f"[split_ticket] Deleted sub-ticket {p.booking_id}:{sub_index} (merge to one)")
+                        
+                        # 清除分票配置
+                        if "分票配置" in hmap:
+                            ws_main.update_cell(rowno, hmap["分票配置"], "")
+                        
+                        # 恢復原始 QR Code
+                        em6 = _email_hash6(email)
+                        original_qr = f"FT:{p.booking_id}:{em6}"
+                        if "QRCode編碼" in hmap:
+                            ws_main.update_cell(rowno, hmap["QRCode編碼"], original_qr)
+                        
+                        log.info(f"[split_ticket] Merged booking {p.booking_id} back to one ticket")
+                    else:
+                        # 重新分票：保留已上車的子票，為剩餘人數創建新子票
+                        if sum(p.ticket_split) != remaining_pax:
+                            raise HTTPException(400, f"新分票總和 ({sum(p.ticket_split)}) 必須等於剩餘人數 ({remaining_pax})")
+                        
+                        _re_split_tickets(
+                            p.booking_id, p.ticket_split, email
+                        )
+                        
+                        # 更新分票配置
+                        all_sub_tickets_after = _get_sub_tickets(p.booking_id)
+                        if "分票配置" in hmap:
+                            ticket_split_str = ",".join(str(t.get("sub_ticket_pax", 0)) for t in all_sub_tickets_after)
+                            ws_main.update_cell(rowno, hmap["分票配置"], ticket_split_str)
+                        
+                        log.info(f"[split_ticket] Re-split booking {p.booking_id}: {checked_in_pax} checked in, {remaining_pax} remaining")
                 else:
                     # 首次分票：只創建子票，不創建母票
                     if sum(p.ticket_split) != total_pax:
