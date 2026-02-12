@@ -43,12 +43,12 @@ SCOPES = [
 ]
 
 # Spreadsheet identifiers
-SPREADSHEET_ID = "1xp54tKOczklmT8uacW-HMxwV8r0VOR2ui33jYcE2pUQ"
+SPREADSHEET_ID = "1o_kLeuwP5_G08YYLlZKIgcYzlU1NIZD5SQnHoO59YUw"
 SHEET_NAME_MAIN = "預約審核(櫃台)"      # 主資料表
 SHEET_NAME_CAP  = "可預約班次(web)"     # 剩餘可預約名額（權威來源）
 
 # Base URL for generating QR code images
-BASE_URL = "https://booking-manager-995728097341.asia-east1.run.app"
+BASE_URL = "https://booking-manager-509045429779.asia-east1.run.app"
 
 # 表頭列開始索引（1-based indexing）
 HEADER_ROW_MAIN = 2
@@ -528,7 +528,7 @@ def _init_firebase():
                 cred = credentials.ApplicationDefault()
             db_url = os.environ.get("FIREBASE_RTDB_URL")
             if not db_url:
-                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-60d6a")
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         return True
@@ -1060,8 +1060,7 @@ app = FastAPI(title="Shuttle Ops API", version="1.6.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://hotel-web-995728097341.asia-east1.run.app",
-        "https://hotel-web-3addcbkbgq-de.a.run.app",
+        "https://shuttle-web-509045429779.asia-east1.run.app",
         "http://localhost:8080",
     ],
     allow_credentials=True,

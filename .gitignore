@@ -51,3 +51,7 @@ ENV/
 .env.local
 *.local
 
+# Service account keys (sensitive)
+service-account.json
+**/service-account.json
+

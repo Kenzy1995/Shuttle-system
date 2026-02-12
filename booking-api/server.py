@@ -13,8 +13,8 @@ from threading import Lock
 app = Flask(__name__)
 CORS(app, 
      origins=[
-    "https://hotel-web-3addcbkbgq-de.a.run.app",
-    "https://hotel-web-995728097341.asia-east1.run.app",
+    "https://shuttle-web-509045429779.asia-east1.run.app",
+    "http://localhost:8080",
      ],
      supports_credentials=True,
      allow_headers=["Content-Type", "Authorization"],
@@ -22,7 +22,7 @@ CORS(app,
 
 # Scopes and spreadsheet ID for Google Sheets
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-SPREADSHEET_ID = "1xp54tKOczklmT8uacW-HMxwV8r0VOR2ui33jYcE2pUQ"
+SPREADSHEET_ID = "1o_kLeuwP5_G08YYLlZKIgcYzlU1NIZD5SQnHoO59YUw"
 
 # Default sheet and range values.  The default sheet corresponds to the
 # available shuttle schedules as used by the front‑end.  When a client
@@ -169,7 +169,7 @@ def _init_firebase():
                 cred = credentials.ApplicationDefault()
             db_url = os.environ.get("FIREBASE_RTDB_URL")
             if not db_url:
-                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "forte-booking-system")
+                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "shuttle-system-60d6a")
                 db_url = f"https://{project_id}-default-rtdb.asia-southeast1.firebasedatabase.app/"
             firebase_admin.initialize_app(cred, {"databaseURL": db_url})
         return True
