@@ -35,6 +35,7 @@ tag_*.py
 !AUTO_INIT_FIREBASE_PATHS.md
 !FIX_FIREBASE_CROSS_PROJECT_ACCESS.md
 !VERIFY_TEST_ENVIRONMENT.md
+!FIREBASE_PROJECT_EXPLANATION.md
 
 # Shell scripts (allow permission grant scripts)
 *.sh
