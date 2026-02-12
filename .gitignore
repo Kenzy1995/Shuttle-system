@@ -25,6 +25,7 @@ tag_*.py
 !TROUBLESHOOTING_FAILED_FETCH.md
 !FIX_FIREBASE_AUTH_ERROR.md
 !GRANT_FIREBASE_PERMISSIONS.md
+!FIX_FIREBASE_RULES.md
 
 # Shell scripts (allow permission grant scripts)
 *.sh
