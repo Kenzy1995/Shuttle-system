@@ -325,6 +325,8 @@
     
     /* 母子車票樣式 */
     .ticket-qr.multi-ticket { min-height: auto; padding: 16px; }
+    /* 確保 ticket-info 在電腦版正確顯示 */
+    .ticket-content .ticket-info { display: flex !important; flex-direction: column; gap: 12px; }
     .ticket-status-summary { margin-bottom: 16px; padding: 12px; background: #fff; border-radius: 8px; font-size: 16px; }
     .ticket-status-summary strong { color: var(--text); }
     .status-text { color: #2563eb; font-weight: 600; }
