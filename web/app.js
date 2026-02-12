@@ -1877,11 +1877,6 @@ function mountTicketAndShow(ticket) {
         const emailEl = getElement("ticketEmail");
         if (emailEl) emailEl.textContent = ticket.email || "";
       }
-      const paxEl = getElement("ticketPassengers");
-      if (paxEl) {
-        const paxText = firstTicket.pax + " " + t("labelPassengersShort");
-        paxEl.textContent = paxText;
-      }
     }
   } else {
     // 單一車票模式（向後兼容）：顯示母票 + 分票按鈕
