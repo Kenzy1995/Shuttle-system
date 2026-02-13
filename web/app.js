@@ -2043,8 +2043,9 @@ function updateSplitTicketInputs(totalPax) {
     field.className = "field";
     const ticketLabel = String.fromCharCode(65 + idx); // A, B, C, D, E...
     field.innerHTML = `
-      <label class="label">子票 ${ticketLabel} <span style="color:#666;font-size:0.9em;">(人數)</span></label>
+      <label class="label">子票 ${ticketLabel}</label>
       <input type="number" class="input split-pax-input" min="1" max="${totalPax}" value="${val}" data-index="${idx}" oninput="updateSplitTicketSummary(${totalPax})" />
+      <span style="color:#666;font-size:0.9em;display:block;margin-top:4px;">(人數)</span>
     `;
     inputsContainer.appendChild(field);
   });
@@ -2609,12 +2610,12 @@ function buildTicketCard(row, { mask = false } = {}) {
   
   // 構建 QR Code 顯示區域
   let qrSection = "";
+  let allTickets = []; // 定義在外部，確保在整個函數中可用
   if (statusCode === "cancelled") {
     qrSection = `<div class="ticket-qr"><img src="/images/qr-placeholder.png" alt="QR placeholder" /></div>`;
   } else if (hasSubTickets) {
     // 分票模式：只顯示子票（不顯示母票）
     // 構建所有票卷（只顯示子票）
-    const allTickets = [];
     
     // 排序：已上車的在前，未上車的在後
     const sortedSubTickets = [...subTickets].sort((a, b) => {

@@ -110,6 +110,13 @@ SHEET_CACHE: Dict[str, Any] = {
 }
 CACHE_LOCK = threading.Lock()
 
+# ========== 核銷快取隊列（用於批量寫回 Sheet）==========
+# 結構：{booking_id: {sub_index: {"status": "checked_in", "checked_at": str, "checked_by": str}}}
+CHECKIN_CACHE: Dict[str, Dict[int, Dict[str, Any]]] = {}
+CHECKIN_CACHE_LOCK = threading.Lock()
+CHECKIN_FLUSH_INTERVAL = 3.0  # 3 秒後批量寫回
+_last_flush_time = 0.0
+
 CAP_SHEET_CACHE: Dict[str, Any] = {
     "values": None,
     "header_map": None,
@@ -780,10 +787,62 @@ def _generate_booking_id_rtdb(today_iso: str) -> str:
         seq_int = 0
     return f"{yymmdd}{seq_int:02d}"
 
-# ========== 母子車票管理 ==========
+# ========== 母子車票管理（僅使用 Google Sheets）==========
+def _get_sub_tickets_from_sheet(booking_id: str, values: List[List[str]], hmap: Dict[str, int]) -> List[Dict[str, Any]]:
+    """
+    從 Sheet 的 QRCode編碼（JSON）中讀取所有子票
+    返回：子票列表，每個包含 sub_ticket_index, sub_ticket_pax, qr_content, status, checked_at
+    """
+    import json
+    col = hmap.get("QRCode編碼")
+    if not col:
+        return []
+    
+    ci = col - 1
+    sub_tickets = []
+    
+    # 查找對應的預約行
+    for i, row in enumerate(values[HEADER_ROW_MAIN:], start=HEADER_ROW_MAIN + 1):
+        if ci < len(row):
+            booking_id_col = hmap.get("預約編號", 0) - 1
+            if booking_id_col >= 0 and booking_id_col < len(row):
+                if row[booking_id_col].strip() == booking_id:
+                    qr_cell = (row[ci] or "").strip()
+                    if qr_cell:
+                        try:
+                            qr_dict = json.loads(qr_cell)
+                            if isinstance(qr_dict, dict):
+                                for sub_key, sub_data in qr_dict.items():
+                                    if sub_key.isdigit():
+                                        sub_index = int(sub_key)
+                                        if sub_index > 0:  # 排除母票（索引0）
+                                            if isinstance(sub_data, dict):
+                                                sub_tickets.append({
+                                                    "sub_ticket_index": sub_index,
+                                                    "sub_ticket_pax": sub_data.get("pax", 0),
+                                                    "qr_content": sub_data.get("qr", ""),
+                                                    "status": sub_data.get("status", "not_checked_in"),
+                                                    "checked_at": sub_data.get("checked_at")
+                                                })
+                                            else:
+                                                # 舊格式：直接是 QR Code 字符串
+                                                sub_tickets.append({
+                                                    "sub_ticket_index": sub_index,
+                                                    "sub_ticket_pax": 0,  # 舊格式沒有 pax 信息
+                                                    "qr_content": str(sub_data),
+                                                    "status": "not_checked_in",
+                                                    "checked_at": None
+                                                })
+                        except (json.JSONDecodeError, ValueError) as e:
+                            log.warning(f"[sub_ticket] Failed to parse QRCode JSON for {booking_id}: {e}")
+                    break
+    
+    # 排序：已上車的在前，未上車的在後，然後按索引排序
+    return sorted(sub_tickets, key=lambda x: (x.get("status") != "checked_in", x.get("sub_ticket_index", 0)))
+
 def _create_sub_tickets(booking_id: str, ticket_split: List[int], email: str, start_index: int = 1) -> List[Dict[str, Any]]:
     """
-    創建子票並存儲到 Firebase
+    創建子票（僅存儲到 Sheet，不寫入 Firebase）
     參數：
         booking_id: 預約編號
         ticket_split: 子票人數列表，例如 [2, 2, 2]
@@ -791,10 +850,6 @@ def _create_sub_tickets(booking_id: str, ticket_split: List[int], email: str, st
         start_index: 起始索引（用於重新分票時避免索引衝突）
     返回：子票列表，每個包含 qr_content, sub_index, pax
     """
-    if not _init_firebase():
-        raise RuntimeError("firebase_init_failed")
-    
-    tickets_ref = db.reference(f"/tickets/{booking_id}")
     sub_tickets = []
     created_at = _tz_now_str()
     
@@ -803,18 +858,6 @@ def _create_sub_tickets(booking_id: str, ticket_split: List[int], email: str, st
         ticket_hash = _generate_ticket_hash(booking_id, sub_index, email)
         qr_content = f"FT:{booking_id}:{sub_index}:{ticket_hash}"
         
-        ticket_data = {
-            "parent_booking_id": booking_id,
-            "sub_ticket_index": sub_index,
-            "sub_ticket_pax": pax,
-            "status": "not_checked_in",
-            "checked_in_at": None,
-            "checked_in_by": None,
-            "qr_content": qr_content,
-            "created_at": created_at
-        }
-        
-        tickets_ref.child(str(sub_index)).set(ticket_data)
         sub_tickets.append({
             "qr_content": qr_content,
             "sub_index": sub_index,
@@ -824,21 +867,18 @@ def _create_sub_tickets(booking_id: str, ticket_split: List[int], email: str, st
     
     return sub_tickets
 
-def _re_split_tickets(booking_id: str, ticket_split: List[int], email: str) -> Tuple[List[Dict[str, Any]], int, int]:
+def _re_split_tickets(booking_id: str, ticket_split: List[int], email: str, values: List[List[str]], hmap: Dict[str, int]) -> Tuple[List[Dict[str, Any]], int, int]:
     """
-    重新分票：保留已上車的子票，為剩餘人數創建新子票
+    重新分票：保留已上車的子票，為剩餘人數創建新子票（僅使用 Sheet）
     返回：(新子票列表, 已上車人數, 剩餘人數)
     """
-    if not _init_firebase():
-        raise RuntimeError("firebase_init_failed")
-    
-    existing_tickets = _get_sub_tickets(booking_id)
+    existing_tickets = _get_sub_tickets_from_sheet(booking_id, values, hmap)
     if not existing_tickets:
         raise ValueError("找不到現有子票，請使用首次分票功能")
     
     # 1. 分離已上車和未上車的子票
     checked_in_tickets = [t for t in existing_tickets if t.get("status") == "checked_in"]
-    not_checked_in_tickets = [t for t in existing_tickets if t.get("status") == "not_checked_in"]
+    not_checked_in_tickets = [t for t in existing_tickets if t.get("status") != "checked_in"]
     
     # 2. 計算已上車人數和剩餘人數
     checked_in_pax = sum(t.get("sub_ticket_pax", 0) for t in checked_in_tickets)
@@ -849,15 +889,7 @@ def _re_split_tickets(booking_id: str, ticket_split: List[int], email: str) -> T
     if sum(ticket_split) != remaining_pax:
         raise ValueError(f"新分票總和 ({sum(ticket_split)}) 必須等於剩餘人數 ({remaining_pax})")
     
-    # 4. 刪除未上車的子票（保留已上車的）
-    tickets_ref = db.reference(f"/tickets/{booking_id}")
-    for ticket in not_checked_in_tickets:
-        sub_index = ticket.get("sub_ticket_index")
-        if sub_index:
-            tickets_ref.child(str(sub_index)).delete()
-            log.info(f"[re_split] Deleted unchecked ticket {booking_id}:{sub_index}")
-    
-    # 5. 為剩餘人數創建新子票（使用新的索引，從最大索引+1開始）
+    # 4. 為剩餘人數創建新子票（使用新的索引，從最大索引+1開始）
     max_existing_index = max([t.get("sub_ticket_index", 0) for t in checked_in_tickets], default=0)
     new_start_index = max_existing_index + 1
     
@@ -875,86 +907,172 @@ def _create_mother_ticket(booking_id: str, email: str) -> str:
     ticket_hash = _generate_ticket_hash(booking_id, 0, email)
     return f"FT:{booking_id}:0:{ticket_hash}"
 
-def _get_sub_tickets(booking_id: str) -> List[Dict[str, Any]]:
-    """從 Firebase 讀取所有子票（不包含母票）"""
-    if not _init_firebase():
-        return []
-    try:
-        tickets_ref = db.reference(f"/tickets/{booking_id}")
-        tickets_data = tickets_ref.get()
-        if not tickets_data:
-            return []
-        sub_tickets = []
+def _update_sub_ticket_status_in_cache(booking_id: str, sub_index: int, checked_in_by: str = "driver") -> bool:
+    """
+    更新子票狀態到內存快取（用於批量寫回 Sheet）
+    返回：True 如果成功加入快取，False 如果已存在
+    """
+    global CHECKIN_CACHE, CHECKIN_CACHE_LOCK
+    with CHECKIN_CACHE_LOCK:
+        if booking_id not in CHECKIN_CACHE:
+            CHECKIN_CACHE[booking_id] = {}
         
-        # Firebase 可能返回 dict 或 list，需要處理兩種情況
-        if isinstance(tickets_data, dict):
-            # 如果是 dict，使用 .items()
-            for key, ticket in tickets_data.items():
-                if isinstance(ticket, dict) and ticket.get("sub_ticket_index") and ticket.get("sub_ticket_index") != 0:  # 排除母票
-                    sub_tickets.append(ticket)
-        elif isinstance(tickets_data, list):
-            # 如果是 list，直接遍歷
-            for ticket in tickets_data:
-                if isinstance(ticket, dict) and ticket.get("sub_ticket_index") and ticket.get("sub_ticket_index") != 0:  # 排除母票
-                    sub_tickets.append(ticket)
+        # 檢查是否已核銷
+        if sub_index in CHECKIN_CACHE[booking_id]:
+            return False  # 已經在快取中（已核銷）
         
-        # 排序：已上車的在前，未上車的在後，然後按索引排序
-        return sorted(sub_tickets, key=lambda x: (x.get("status") != "checked_in", x.get("sub_ticket_index", 0)))
-    except Exception as e:
-        log.error(f"[sub_ticket] Failed to get tickets for {booking_id}: {e}")
-        return []
-
-def _update_sub_ticket_status(booking_id: str, sub_index: int, checked_in_by: str = "driver") -> bool:
-    """更新子票狀態為已上車"""
-    if not _init_firebase():
-        return False
-    try:
-        ticket_ref = db.reference(f"/tickets/{booking_id}/{sub_index}")
-        ticket = ticket_ref.get()
-        if not ticket:
-            return False
-        if ticket.get("status") == "checked_in":
-            return True  # 已經上車
-        ticket_ref.update({
+        # 加入快取
+        CHECKIN_CACHE[booking_id][sub_index] = {
             "status": "checked_in",
-            "checked_in_at": _tz_now_str(),
-            "checked_in_by": checked_in_by
-        })
-        log.info(f"[sub_ticket] Updated ticket {booking_id}:{sub_index} to checked_in")
+            "checked_at": _tz_now_str(),
+            "checked_by": checked_in_by
+        }
+        log.info(f"[sub_ticket] Added to cache: {booking_id}:{sub_index}")
         return True
-    except Exception as e:
-        log.error(f"[sub_ticket] Failed to update ticket {booking_id}:{sub_index}: {e}")
-        return False
 
-def _checkin_all_sub_tickets(booking_id: str, checked_in_by: str = "driver") -> int:
+def _flush_checkin_cache() -> None:
+    """批量寫回核銷快取到 Sheet"""
+    global CHECKIN_CACHE, CHECKIN_CACHE_LOCK, _last_flush_time
+    import json
+    
+    now = time.time()
+    if now - _last_flush_time < CHECKIN_FLUSH_INTERVAL:
+        return
+    
+    with CHECKIN_CACHE_LOCK:
+        if not CHECKIN_CACHE:
+            _last_flush_time = now
+            return
+        
+        try:
+            values, hmap = _get_sheet_data_main()
+            ws = open_ws(SHEET_NAME_MAIN)
+            
+            # 按 booking_id 分組處理
+            for booking_id, sub_tickets in CHECKIN_CACHE.items():
+                # 查找對應的行
+                rowno = None
+                for i, row in enumerate(values[HEADER_ROW_MAIN:], start=HEADER_ROW_MAIN + 1):
+                    booking_id_col = hmap.get("預約編號", 0) - 1
+                    if booking_id_col >= 0 and booking_id_col < len(row):
+                        if row[booking_id_col].strip() == booking_id:
+                            rowno = i
+                            break
+                
+                if not rowno:
+                    log.warning(f"[flush_checkin] Booking {booking_id} not found in sheet")
+                    continue
+                
+                # 讀取當前的 QRCode編碼 JSON
+                qr_col = hmap.get("QRCode編碼", 0) - 1
+                if qr_col < 0:
+                    continue
+                
+                row_idx = rowno - 1
+                row = values[row_idx] if 0 <= row_idx < len(values) else []
+                qr_cell = (row[qr_col] or "").strip() if qr_col < len(row) else ""
+                
+                qr_dict = {}
+                if qr_cell:
+                    try:
+                        qr_dict = json.loads(qr_cell)
+                    except (json.JSONDecodeError, ValueError):
+                        qr_dict = {}
+                
+                # 更新子票狀態
+                updated = False
+                for sub_index, checkin_data in sub_tickets.items():
+                    sub_key = str(sub_index)
+                    if sub_key in qr_dict:
+                        if isinstance(qr_dict[sub_key], dict):
+                            qr_dict[sub_key]["status"] = "checked_in"
+                            qr_dict[sub_key]["checked_at"] = checkin_data["checked_at"]
+                            updated = True
+                
+                # 計算總狀態
+                if updated:
+                    total_pax = 0
+                    checked_pax = 0
+                    for sub_key, sub_data in qr_dict.items():
+                        if sub_key.isdigit() and isinstance(sub_data, dict):
+                            pax = sub_data.get("pax", 0)
+                            total_pax += pax
+                            if sub_data.get("status") == "checked_in":
+                                checked_pax += pax
+                    
+                    # 更新 Sheet
+                    updates = {}
+                    if total_pax > 0:
+                        if checked_pax == 0:
+                            ride_status = "未上車"
+                        else:
+                            ride_status = f"上車 ({checked_pax}/{total_pax})"
+                        updates["乘車狀態"] = ride_status
+                    
+                    qr_json_str = json.dumps(qr_dict, ensure_ascii=False)
+                    updates["QRCode編碼"] = qr_json_str
+                    
+                    if "最後操作時間" in hmap:
+                        updates["最後操作時間"] = _tz_now_str() + " 已上車(司機)"
+                    
+                    # 批量更新
+                    if updates:
+                        data = []
+                        for col_name, val in updates.items():
+                            if col_name in hmap:
+                                ci = hmap[col_name]
+                                data.append({"range": gspread.utils.rowcol_to_a1(rowno, ci), "values": [[val]]})
+                        if data:
+                            ws.batch_update(data, value_input_option="USER_ENTERED")
+                            log.info(f"[flush_checkin] Updated {booking_id} with {len(sub_tickets)} checkins")
+            
+            # 清空快取
+            CHECKIN_CACHE = {}
+            _last_flush_time = now
+            _invalidate_sheet_cache()
+            
+        except Exception as e:
+            log.error(f"[flush_checkin] Failed to flush cache: {e}")
+
+def _checkin_all_sub_tickets(booking_id: str, values: List[List[str]], hmap: Dict[str, int], checked_in_by: str = "driver") -> int:
     """一次性核銷所有未上車的子票，返回核銷的子票數量"""
-    sub_tickets = _get_sub_tickets(booking_id)
+    sub_tickets = _get_sub_tickets_from_sheet(booking_id, values, hmap)
     if not sub_tickets:
         return 0
     checked_count = 0
     for ticket in sub_tickets:
-        if ticket.get("status") == "not_checked_in":
+        if ticket.get("status") != "checked_in":
             sub_index = ticket.get("sub_ticket_index")
-            if sub_index and _update_sub_ticket_status(booking_id, sub_index, checked_in_by):
+            if sub_index and _update_sub_ticket_status_in_cache(booking_id, sub_index, checked_in_by):
                 checked_count += 1
     return checked_count
 
-def _calculate_mother_ticket_status(booking_id: str) -> Tuple[str, int, int]:
+def _calculate_mother_ticket_status(booking_id: str, values: List[List[str]], hmap: Dict[str, int]) -> Tuple[str, int, int]:
     """
-    計算母票總狀態
+    計算母票總狀態（從 Sheet JSON 讀取）
     返回：(狀態文字, 已上車人數, 總人數)
     狀態：未上車 / 上車 (X/Y)
     """
-    sub_tickets = _get_sub_tickets(booking_id)
+    sub_tickets = _get_sub_tickets_from_sheet(booking_id, values, hmap)
     if not sub_tickets:
         return "未上車", 0, 0
     
-    total_pax = sum(t.get("sub_ticket_pax", 0) for t in sub_tickets)
-    checked_pax = sum(
-        t.get("sub_ticket_pax", 0) 
-        for t in sub_tickets 
-        if t.get("status") == "checked_in"
-    )
+    # 檢查快取中的核銷狀態
+    global CHECKIN_CACHE, CHECKIN_CACHE_LOCK
+    with CHECKIN_CACHE_LOCK:
+        cache_data = CHECKIN_CACHE.get(booking_id, {})
+    
+    total_pax = 0
+    checked_pax = 0
+    
+    for t in sub_tickets:
+        pax = t.get("sub_ticket_pax", 0)
+        total_pax += pax
+        
+        sub_index = t.get("sub_ticket_index")
+        # 檢查快取或 Sheet 中的狀態
+        if sub_index in cache_data or t.get("status") == "checked_in":
+            checked_pax += pax
     
     if checked_pax == 0:
         return "未上車", 0, total_pax
@@ -962,10 +1080,10 @@ def _calculate_mother_ticket_status(booking_id: str) -> Tuple[str, int, int]:
         # 統一格式：上車 (已上車人數/總人數)
         return f"上車 ({checked_pax}/{total_pax})", checked_pax, total_pax
 
-def _sync_mother_ticket_status_to_sheet(booking_id: str, ws_main: gspread.Worksheet, hmap: Dict[str, int], rowno: int):
+def _sync_mother_ticket_status_to_sheet(booking_id: str, ws_main: gspread.Worksheet, hmap: Dict[str, int], rowno: int, values: List[List[str]]):
     """同步母票狀態到 Sheet"""
     try:
-        status_text, checked_pax, total_pax = _calculate_mother_ticket_status(booking_id)
+        status_text, checked_pax, total_pax = _calculate_mother_ticket_status(booking_id, values, hmap)
         if "乘車狀態" in hmap:
             ws_main.update_cell(rowno, hmap["乘車狀態"], status_text)
         log.info(f"[sub_ticket] Synced status for {booking_id}: {status_text}")
@@ -1446,6 +1564,23 @@ async def startup_event():
     log.info("Application startup: Ensuring Firebase paths exist")
     _init_firebase()
 
+# 啟動定時刷新核銷快取的後台線程
+def _start_checkin_cache_flusher():
+    """啟動定時刷新核銷快取的後台線程"""
+    def flush_loop():
+        while True:
+            try:
+                time.sleep(CHECKIN_FLUSH_INTERVAL)
+                _flush_checkin_cache()
+            except Exception as e:
+                log.error(f"[flush_loop] Error: {e}")
+    
+    threading.Thread(target=flush_loop, daemon=True).start()
+    log.info("[checkin_cache] Started background flusher thread")
+
+# 啟動後台線程
+_start_checkin_cache_flusher()
+
 @app.get("/health")
 @app.get("/api/health")
 def health():
@@ -1701,15 +1836,8 @@ def ops(req: OpsRequest):
                 booking_id = rec.get("預約編號", "")
                 if booking_id:
                     try:
-                        sub_tickets = _get_sub_tickets(booking_id)
+                        sub_tickets = _get_sub_tickets_from_sheet(booking_id, values, hmap)
                         if sub_tickets:
-                            # 計算子票狀態
-                            total_pax = sum(t.get("sub_ticket_pax", 0) for t in sub_tickets)
-                            checked_pax = sum(
-                                t.get("sub_ticket_pax", 0) 
-                                for t in sub_tickets 
-                                if t.get("status") == "checked_in"
-                            )
                             # 生成子票編號後綴（A, B, C...）
                             def get_suffix(index: int) -> str:
                                 return chr(64 + index)  # 65='A', 66='B', etc.
@@ -1725,16 +1853,8 @@ def ops(req: OpsRequest):
                                 }
                                 for t in sub_tickets
                             ]
-                            # 生成母票 QR Code
-                            email = rec.get("信箱", "")
-                            if email:
-                                mother_qr = _create_mother_ticket(booking_id, email)
-                                rec["mother_ticket"] = {
-                                    "qr_content": mother_qr,
-                                    "qr_url": f"{BASE_URL}/api/qr/{urllib.parse.quote(mother_qr)}"
-                                }
                             # 更新乘車狀態（如果存在子票）
-                            status_text, _, _ = _calculate_mother_ticket_status(booking_id)
+                            status_text, _, _ = _calculate_mother_ticket_status(booking_id, values, hmap)
                             if status_text and status_text != "未上車":
                                 rec["乘車狀態"] = status_text
                     except Exception as e:
@@ -2059,18 +2179,23 @@ def ops(req: OpsRequest):
                     
                     # 子票上車
                     if ticket_type == "sub":
-                        if _update_sub_ticket_status(booking_id_from_qr, sub_index, "check_in_api"):
+                        if _update_sub_ticket_status_in_cache(booking_id_from_qr, sub_index, "check_in_api"):
                             log.info(f"[sub_ticket] Checked in sub-ticket {booking_id_from_qr}:{sub_index}")
+                            # 觸發異步刷新快取
+                            threading.Thread(target=_flush_checkin_cache, daemon=True).start()
                         else:
                             raise HTTPException(500, f"無法更新子票狀態: {booking_id_from_qr}:{sub_index}")
                     
                     # 母票上車（一次性核銷所有人）
                     elif ticket_type == "mother":
-                        checked_count = _checkin_all_sub_tickets(booking_id_from_qr, "check_in_api")
+                        checked_count = _checkin_all_sub_tickets(booking_id_from_qr, values, hmap, "check_in_api")
                         log.info(f"[sub_ticket] Checked in all sub-tickets for {booking_id_from_qr}, count={checked_count}")
+                        # 觸發異步刷新快取
+                        if checked_count > 0:
+                            threading.Thread(target=_flush_checkin_cache, daemon=True).start()
                     
                     # 同步狀態到 Sheet
-                    _sync_mother_ticket_status_to_sheet(booking_id_from_qr, ws_main, hmap, rowno)
+                    _sync_mother_ticket_status_to_sheet(booking_id_from_qr, ws_main, hmap, rowno, values)
                     
                     # 更新最後操作時間
                     if "最後操作時間" in hmap:
@@ -2113,7 +2238,7 @@ def ops(req: OpsRequest):
                 raise HTTPException(400, "此訂單缺少信箱信息，無法分票")
             
             # 檢查是否已經分票
-            existing_sub_tickets = _get_sub_tickets(p.booking_id)
+            existing_sub_tickets = _get_sub_tickets_from_sheet(p.booking_id, values, hmap)
             is_re_split = len(existing_sub_tickets) > 0
             
             try:
@@ -2130,36 +2255,44 @@ def ops(req: OpsRequest):
                     if sum(p.ticket_split) != remaining_pax:
                         raise HTTPException(400, f"新分票總和 ({sum(p.ticket_split)}) 必須等於剩餘人數 ({remaining_pax})")
                     
-                    # 如果選擇1張票，相當於合併剩餘人數為一張票
-                    if len(p.ticket_split) == 1:
-                        # 刪除所有未上車的子票，為剩餘人數創建一張新子票
-                        if not _init_firebase():
-                            raise RuntimeError("firebase_init_failed")
-                        
-                        tickets_ref = db.reference(f"/tickets/{p.booking_id}")
-                        for ticket in existing_sub_tickets:
-                            if ticket.get("status") != "checked_in":
-                                sub_index = ticket.get("sub_ticket_index")
-                                if sub_index:
-                                    tickets_ref.child(str(sub_index)).delete()
-                                    log.info(f"[split_ticket] Deleted unchecked sub-ticket {p.booking_id}:{sub_index}")
-                        
-                        # 為剩餘人數創建一張新子票（從索引1開始，因為已核銷的票可能是索引1）
-                        # 找到最大已核銷票的索引
-                        max_checked_index = max([t.get("sub_ticket_index", 0) for t in checked_in_tickets], default=0)
-                        new_start_index = max_checked_index + 1
-                        _create_sub_tickets(p.booking_id, p.ticket_split, email, start_index=new_start_index)
-                        
-                        log.info(f"[split_ticket] Merged remaining {remaining_pax} pax into one ticket for {p.booking_id}")
-                    else:
-                        # 重新分票：保留已上車的子票，為剩餘人數創建新子票
-                        _re_split_tickets(
-                            p.booking_id, p.ticket_split, email
-                        )
-                        log.info(f"[split_ticket] Re-split booking {p.booking_id}: {checked_in_pax} checked in, {remaining_pax} remaining")
+                    # 重新分票：保留已上車的子票，為剩餘人數創建新子票
+                    new_sub_tickets, _, _ = _re_split_tickets(p.booking_id, p.ticket_split, email, values, hmap)
+                    log.info(f"[split_ticket] Re-split booking {p.booking_id}: {checked_in_pax} checked in, {remaining_pax} remaining")
                     
                     # 更新 QRCode編碼（JSON 格式，包含所有子票）
-                    all_sub_tickets_after = _get_sub_tickets(p.booking_id)
+                    # 保留已上車的子票，添加新子票
+                    import json
+                    qr_dict = {}
+                    
+                    # 先添加已上車的子票
+                    for t in checked_in_tickets:
+                        sub_index = t.get("sub_ticket_index")
+                        qr_content = t.get("qr_content", "")
+                        status = t.get("status", "not_checked_in")
+                        pax = t.get("sub_ticket_pax", 0)
+                        checked_at = t.get("checked_at")
+                        
+                        if sub_index and qr_content:
+                            qr_dict[str(sub_index)] = {
+                                "qr": qr_content,
+                                "status": status,
+                                "pax": pax,
+                                "checked_at": checked_at
+                            }
+                    
+                    # 再添加新子票
+                    for t in new_sub_tickets:
+                        sub_index = t.get("sub_index")
+                        qr_content = t.get("qr_content", "")
+                        if sub_index and qr_content:
+                            qr_dict[str(sub_index)] = {
+                                "qr": qr_content,
+                                "status": "not_checked_in",
+                                "pax": t.get("pax", 0),
+                                "checked_at": None
+                            }
+                    
+                    all_sub_tickets_after = checked_in_tickets + [{"sub_ticket_index": t.get("sub_index"), "sub_ticket_pax": t.get("pax", 0), "qr_content": t.get("qr_content", ""), "status": "not_checked_in"} for t in new_sub_tickets]
                     if "QRCode編碼" in hmap and all_sub_tickets_after:
                         import json
                         qr_dict = {}
@@ -2192,22 +2325,16 @@ def ops(req: OpsRequest):
                     if "QRCode編碼" in hmap and sub_tickets:
                         import json
                         qr_dict = {}
-                        # 從 Firebase 獲取完整信息（包含 status 和 checked_at）
-                        sub_ticket_full = _get_sub_tickets(p.booking_id)
-                        # 構建索引映射以提高查找效率
-                        sub_ticket_map = {st.get("sub_ticket_index"): st for st in sub_ticket_full}
                         
                         for t in sub_tickets:
                             sub_index = t.get("sub_index")
                             qr_content = t.get("qr_content", "")
                             if sub_index and qr_content:
-                                # 從映射中獲取完整信息，如果沒有則使用默認值
-                                st = sub_ticket_map.get(sub_index, {})
                                 qr_dict[str(sub_index)] = {
                                     "qr": qr_content,
-                                    "status": st.get("status", "not_checked_in"),
-                                    "pax": st.get("sub_ticket_pax", t.get("pax", 0)),
-                                    "checked_at": st.get("checked_in_at")
+                                    "status": "not_checked_in",
+                                    "pax": t.get("pax", 0),
+                                    "checked_at": None
                                 }
                         
                         if qr_dict:
@@ -2227,7 +2354,7 @@ def ops(req: OpsRequest):
                 # 重新分票後，已核銷的票保持不變，新票從下一個索引開始
                 
                 # 返回所有子票信息（包括已上車的舊子票和新子票）
-                all_sub_tickets = _get_sub_tickets(p.booking_id)
+                all_sub_tickets = _get_sub_tickets_from_sheet(p.booking_id, values, hmap)
                 
                 # 分票後不返回母票，只返回子票
                 return {
@@ -2982,8 +3109,8 @@ def api_driver_checkin(req: DriverCheckinRequest):
     sub_ticket_pax = 0
     
     if sub_index > 0:
-        # 子票核銷：先檢查是否已核銷
-        sub_tickets = _get_sub_tickets(booking_id)
+        # 子票核銷：從 Sheet JSON 讀取子票信息
+        sub_tickets = _get_sub_tickets_from_sheet(booking_id, values, hmap)
         target_ticket = None
         for t in sub_tickets:
             if t.get("sub_ticket_index") == sub_index:
@@ -2993,10 +3120,15 @@ def api_driver_checkin(req: DriverCheckinRequest):
         if not target_ticket:
             return DriverCheckinResponse(status="not_found", message="找不到對應的子票", booking_id=booking_id or None)
         
-        # 檢查是否已核銷
-        if target_ticket.get("status") == "checked_in":
+        # 檢查是否已核銷（檢查快取和 Sheet）
+        global CHECKIN_CACHE, CHECKIN_CACHE_LOCK
+        with CHECKIN_CACHE_LOCK:
+            cache_data = CHECKIN_CACHE.get(booking_id, {})
+            already_checked = sub_index in cache_data or target_ticket.get("status") == "checked_in"
+        
+        if already_checked:
             # 已核銷，返回當前狀態
-            status_text, checked_pax, total_pax = _calculate_mother_ticket_status(booking_id)
+            status_text, checked_pax, total_pax = _calculate_mother_ticket_status(booking_id, values, hmap)
             sub_ticket_pax = target_ticket.get("sub_ticket_pax", 0)
             return DriverCheckinResponse(
                 status="already_checked_in",
@@ -3012,54 +3144,32 @@ def api_driver_checkin(req: DriverCheckinRequest):
                 ride_status=status_text
             )
         
-        # 更新 Firebase（快速）
-        if not _update_sub_ticket_status(booking_id, sub_index, "driver"):
-            return DriverCheckinResponse(status="error", message="更新子票狀態失敗", booking_id=booking_id or None)
+        # 更新到內存快取（批量寫回）
+        if not _update_sub_ticket_status_in_cache(booking_id, sub_index, "driver"):
+            # 如果已經在快取中，返回已核銷
+            status_text, checked_pax, total_pax = _calculate_mother_ticket_status(booking_id, values, hmap)
+            sub_ticket_pax = target_ticket.get("sub_ticket_pax", 0)
+            return DriverCheckinResponse(
+                status="already_checked_in",
+                message="此子票已上車，不重複核銷",
+                booking_id=booking_id or None,
+                name=getv("姓名") or None,
+                pax=sub_ticket_pax,
+                station=getv("上車地點") or None,
+                main_datetime=main_dt.strftime("%Y/%m/%d %H:%M"),
+                sub_index=sub_index,
+                checked_pax=checked_pax,
+                total_pax=total_pax,
+                ride_status=status_text
+            )
         
-        # 計算總狀態
-        status_text, checked_pax, total_pax = _calculate_mother_ticket_status(booking_id)
+        # 計算總狀態（包含快取中的狀態）
+        status_text, checked_pax, total_pax = _calculate_mother_ticket_status(booking_id, values, hmap)
         ride_status = status_text
         sub_ticket_pax = target_ticket.get("sub_ticket_pax", 0)
         
-        # 更新 Sheet 的乘車狀態和 QRCode編碼（JSON）
-        updates["乘車狀態"] = ride_status
-        if "最後操作時間" in hmap:
-            updates["最後操作時間"] = _tz_now_str() + " 已上車(司機)"
-        
-        # 更新 QRCode編碼 JSON 中的子票狀態
-        import json
-        qr_cell = getv("QRCode編碼")
-        if qr_cell:
-            try:
-                qr_dict = json.loads(qr_cell)
-                if isinstance(qr_dict, dict) and str(sub_index) in qr_dict:
-                    sub_ticket_data = qr_dict[str(sub_index)]
-                    if isinstance(sub_ticket_data, dict):
-                        sub_ticket_data["status"] = "checked_in"
-                        sub_ticket_data["checked_at"] = _tz_now_str()
-                    qr_json_str = json.dumps(qr_dict, ensure_ascii=False)
-                    updates["QRCode編碼"] = qr_json_str
-            except (json.JSONDecodeError, ValueError, AttributeError) as e:
-                log.warning(f"[checkin] Failed to parse QRCode JSON for {booking_id}:{sub_index}: {e}")
-                # 如果解析失敗，嘗試重新構建 JSON（從 Firebase 獲取）
-                try:
-                    sub_tickets = _get_sub_tickets(booking_id)
-                    qr_dict = {}
-                    for t in sub_tickets:
-                        sub_idx = t.get("sub_ticket_index")
-                        if sub_idx:
-                            qr_dict[str(sub_idx)] = {
-                                "qr": t.get("qr_content", ""),
-                                "status": t.get("status", "not_checked_in"),
-                                "pax": t.get("sub_ticket_pax", 0),
-                                "checked_at": t.get("checked_in_at")
-                            }
-                    if qr_dict:
-                        qr_json_str = json.dumps(qr_dict, ensure_ascii=False)
-                        updates["QRCode編碼"] = qr_json_str
-                        log.info(f"[checkin] Rebuilt QRCode JSON for {booking_id} from Firebase")
-                except Exception as rebuild_err:
-                    log.error(f"[checkin] Failed to rebuild QRCode JSON for {booking_id}: {rebuild_err}")
+        # 觸發異步刷新快取（不阻塞響應）
+        threading.Thread(target=_flush_checkin_cache, daemon=True).start()
     else:
         # 舊格式（未分票）：直接更新 Sheet
         ride_status_current = getv("乘車狀態").strip()
