@@ -1836,7 +1836,7 @@ def ops(req: OpsRequest):
                 booking_id = rec.get("預約編號", "")
                 if booking_id:
                     try:
-                        sub_tickets = _get_sub_tickets_from_sheet(booking_id, values, hmap)
+                        sub_tickets = _get_sub_tickets_from_sheet(booking_id, all_values, hmap)
                         if sub_tickets:
                             # 生成子票編號後綴（A, B, C...）
                             def get_suffix(index: int) -> str:
@@ -1854,7 +1854,7 @@ def ops(req: OpsRequest):
                                 for t in sub_tickets
                             ]
                             # 更新乘車狀態（如果存在子票）
-                            status_text, _, _ = _calculate_mother_ticket_status(booking_id, values, hmap)
+                            status_text, _, _ = _calculate_mother_ticket_status(booking_id, all_values, hmap)
                             if status_text and status_text != "未上車":
                                 rec["乘車狀態"] = status_text
                     except Exception as e:
