@@ -2226,6 +2226,8 @@ def ops(req: OpsRequest):
 
         elif action == "split_ticket":
             p = SplitTicketPayload(**data)
+            # 獲取 Sheet 數據
+            values, hmap = _get_sheet_data_main()
             rownos = _find_rows_by_pred(ws_main, headers, HEADER_ROW_MAIN, lambda r: r.get("預約編號") == p.booking_id)
             if not rownos:
                 raise HTTPException(404, "找不到此預約編號")
