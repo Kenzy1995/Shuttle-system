@@ -2192,21 +2192,23 @@ def ops(req: OpsRequest):
                     if "QRCode編碼" in hmap and sub_tickets:
                         import json
                         qr_dict = {}
+                        # 從 Firebase 獲取完整信息（包含 status 和 checked_at）
+                        sub_ticket_full = _get_sub_tickets(p.booking_id)
+                        # 構建索引映射以提高查找效率
+                        sub_ticket_map = {st.get("sub_ticket_index"): st for st in sub_ticket_full}
+                        
                         for t in sub_tickets:
                             sub_index = t.get("sub_index")
                             qr_content = t.get("qr_content", "")
                             if sub_index and qr_content:
-                                # 從 Firebase 獲取完整信息
-                                sub_ticket_full = _get_sub_tickets(p.booking_id)
-                                for st in sub_ticket_full:
-                                    if st.get("sub_ticket_index") == sub_index:
-                                        qr_dict[str(sub_index)] = {
-                                            "qr": qr_content,
-                                            "status": st.get("status", "not_checked_in"),
-                                            "pax": st.get("sub_ticket_pax", 0),
-                                            "checked_at": st.get("checked_in_at")
-                                        }
-                                        break
+                                # 從映射中獲取完整信息，如果沒有則使用默認值
+                                st = sub_ticket_map.get(sub_index, {})
+                                qr_dict[str(sub_index)] = {
+                                    "qr": qr_content,
+                                    "status": st.get("status", "not_checked_in"),
+                                    "pax": st.get("sub_ticket_pax", t.get("pax", 0)),
+                                    "checked_at": st.get("checked_in_at")
+                                }
                         
                         if qr_dict:
                             qr_json_str = json.dumps(qr_dict, ensure_ascii=False)
@@ -2919,10 +2921,9 @@ def api_driver_checkin(req: DriverCheckinRequest):
     booking_id = qr_info["booking_id"]
     sub_index = qr_info.get("sub_index", 0)
     
-    # 查找 Sheet 中的預約
-    ws = open_ws(SHEET_NAME_MAIN)
-    values = _read_all_rows(ws)
-    hmap = header_map_main(ws, values)
+    # 查找 Sheet 中的預約（使用快取）
+    values, hmap = _get_sheet_data_main()
+    ws = open_ws(SHEET_NAME_MAIN)  # 仍需要 ws 對象用於更新
     if "QRCode編碼" not in hmap:
         raise HTTPException(500, "主表缺少『QRCode編碼』欄位")
     
@@ -3038,8 +3039,27 @@ def api_driver_checkin(req: DriverCheckinRequest):
                         sub_ticket_data["checked_at"] = _tz_now_str()
                     qr_json_str = json.dumps(qr_dict, ensure_ascii=False)
                     updates["QRCode編碼"] = qr_json_str
-            except (json.JSONDecodeError, ValueError, AttributeError):
-                pass  # 如果解析失敗，跳過 JSON 更新
+            except (json.JSONDecodeError, ValueError, AttributeError) as e:
+                log.warning(f"[checkin] Failed to parse QRCode JSON for {booking_id}:{sub_index}: {e}")
+                # 如果解析失敗，嘗試重新構建 JSON（從 Firebase 獲取）
+                try:
+                    sub_tickets = _get_sub_tickets(booking_id)
+                    qr_dict = {}
+                    for t in sub_tickets:
+                        sub_idx = t.get("sub_ticket_index")
+                        if sub_idx:
+                            qr_dict[str(sub_idx)] = {
+                                "qr": t.get("qr_content", ""),
+                                "status": t.get("status", "not_checked_in"),
+                                "pax": t.get("sub_ticket_pax", 0),
+                                "checked_at": t.get("checked_in_at")
+                            }
+                    if qr_dict:
+                        qr_json_str = json.dumps(qr_dict, ensure_ascii=False)
+                        updates["QRCode編碼"] = qr_json_str
+                        log.info(f"[checkin] Rebuilt QRCode JSON for {booking_id} from Firebase")
+                except Exception as rebuild_err:
+                    log.error(f"[checkin] Failed to rebuild QRCode JSON for {booking_id}: {rebuild_err}")
     else:
         # 舊格式（未分票）：直接更新 Sheet
         ride_status_current = getv("乘車狀態").strip()

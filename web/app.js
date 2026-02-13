@@ -2144,73 +2144,83 @@ async function confirmSplitTicket(bookingId, ticketSplit, isReSplit = false) {
       throw new Error(result.detail || result.message || "分票失敗");
     }
     
-    // 分票成功：重新查詢訂單以獲取完整更新數據
+    // 分票成功：使用 API 返回的數據，避免額外查詢
     showSuccessAnimation();
     
-    // 重新查詢訂單以獲取完整的分票數據
-    try {
-      const queryRes = await fetch(OPS_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          action: "query", 
-          data: { booking_id: bookingId } 
-        })
-      });
+    // 使用分票 API 返回的數據構建 ticket 對象
+    // API 已經返回了完整的 sub_tickets 數據，包括 qr_url
+    if (result.sub_tickets && result.sub_tickets.length > 0) {
+      // 從當前訂單數據獲取其他信息
+      const currentData = window.currentBookingData || {};
       
-      const queryData = await queryRes.json();
-      if (queryRes.ok && queryData && queryData.length > 0) {
-        const updatedTicket = queryData[0];
+      // 構建完整的 ticket 對象
+      const ticketData = {
+        bookingId: result.booking_id || bookingId,
+        date: currentData.date || "",
+        time: currentData.time || "",
+        direction: currentData.direction || "",
+        pickLocation: currentData.pickLocation || "",
+        dropLocation: currentData.dropLocation || "",
+        name: currentData.name || "",
+        phone: currentData.phone || "",
+        email: currentData.email || "",
+        passengers: currentData.passengers || 0,
+        qrUrl: "", // 分票後沒有單一 QR URL
+        // ========== 使用 API 返回的子票數據 ==========
+        sub_tickets: result.sub_tickets || [],
+        mother_ticket: result.mother_ticket || null
+      };
+      
+      // 更新全局變量
+      window.currentBookingData = ticketData;
+      
+      // 重新渲染票卷（顯示所有子票，支持切換）
+      mountTicketAndShow(ticketData);
+    } else {
+      // 如果 API 沒有返回子票數據，回退到重新查詢（向後兼容）
+      console.warn("[split_ticket] API did not return sub_tickets, falling back to query");
+      try {
+        const queryRes = await fetch(OPS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            action: "query", 
+            data: { booking_id: bookingId } 
+          })
+        });
         
-        // 調試：打印查詢結果
-        console.log("[split_ticket] Query result:", updatedTicket);
-        console.log("[split_ticket] sub_tickets:", updatedTicket.sub_tickets);
-        console.log("[split_ticket] mother_ticket:", updatedTicket.mother_ticket);
-        
-        // 構建完整的 ticket 對象（與 submitBooking 中的格式一致）
-        // 注意：查詢結果使用中文字段名（如 "日期", "班次" 等）
-        const ticketData = {
-          bookingId: updatedTicket["預約編號"] || updatedTicket.booking_id || bookingId,
-          date: updatedTicket["日期"] || updatedTicket.date || window.currentBookingData?.date || "",
-          time: updatedTicket["班次"] || updatedTicket.time || window.currentBookingData?.time || "",
-          direction: updatedTicket["往返"] || updatedTicket.direction || window.currentBookingData?.direction || "",
-          pickLocation: updatedTicket["上車地點"] || updatedTicket.pick || window.currentBookingData?.pickLocation || "",
-          dropLocation: updatedTicket["下車地點"] || updatedTicket.drop || window.currentBookingData?.dropLocation || "",
-          name: updatedTicket["姓名"] || updatedTicket.name || window.currentBookingData?.name || "",
-          phone: updatedTicket["手機"] || updatedTicket.phone || window.currentBookingData?.phone || "",
-          email: updatedTicket["信箱"] || updatedTicket.email || window.currentBookingData?.email || "",
-          passengers: parseInt(updatedTicket["預約人數"] || updatedTicket["確認人數"] || updatedTicket.pax || updatedTicket.passengers || window.currentBookingData?.passengers || "1"),
-          qrUrl: updatedTicket["QRCode編碼"] ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(updatedTicket["QRCode編碼"])}` : (updatedTicket.qr_url || window.currentBookingData?.qrUrl || ""),
-          // ========== 母子車票信息（從查詢結果獲取） ==========
-          sub_tickets: updatedTicket.sub_tickets || result.sub_tickets || [],
-          mother_ticket: updatedTicket.mother_ticket || result.mother_ticket || null
-        };
-        
-        // 調試：打印構建後的 ticketData
-        console.log("[split_ticket] Built ticketData:", ticketData);
-        console.log("[split_ticket] ticketData.sub_tickets:", ticketData.sub_tickets);
-        console.log("[split_ticket] ticketData.mother_ticket:", ticketData.mother_ticket);
-        
-        // 更新全局變量
-        window.currentBookingData = ticketData;
-        
-        // 重新渲染票卷（顯示所有子票和母票，支持切換）
-        mountTicketAndShow(ticketData);
-      } else {
-        // 如果查詢失敗，至少更新現有數據
-        if (window.currentBookingData) {
+        const queryData = await queryRes.json();
+        if (queryRes.ok && queryData && queryData.length > 0) {
+          const updatedTicket = queryData[0];
+          const currentData = window.currentBookingData || {};
+          
+          const ticketData = {
+            bookingId: updatedTicket["預約編號"] || bookingId,
+            date: updatedTicket["日期"] || currentData.date || "",
+            time: updatedTicket["班次"] || currentData.time || "",
+            direction: updatedTicket["往返"] || currentData.direction || "",
+            pickLocation: updatedTicket["上車地點"] || currentData.pickLocation || "",
+            dropLocation: updatedTicket["下車地點"] || currentData.dropLocation || "",
+            name: updatedTicket["姓名"] || currentData.name || "",
+            phone: updatedTicket["手機"] || currentData.phone || "",
+            email: updatedTicket["信箱"] || currentData.email || "",
+            passengers: parseInt(updatedTicket["預約人數"] || updatedTicket["確認人數"] || currentData.passengers || "1"),
+            qrUrl: "",
+            sub_tickets: updatedTicket.sub_tickets || [],
+            mother_ticket: updatedTicket.mother_ticket || null
+          };
+          
+          window.currentBookingData = ticketData;
+          mountTicketAndShow(ticketData);
+        }
+      } catch (queryErr) {
+        console.error("[split_ticket] Fallback query failed:", queryErr);
+        // 即使查詢失敗，也嘗試使用 API 返回的數據
+        if (window.currentBookingData && result.sub_tickets) {
           window.currentBookingData.sub_tickets = result.sub_tickets || [];
           window.currentBookingData.mother_ticket = result.mother_ticket || null;
           mountTicketAndShow(window.currentBookingData);
         }
-      }
-    } catch (queryErr) {
-      console.error("Failed to query updated ticket:", queryErr);
-      // 如果查詢失敗，至少更新現有數據
-      if (window.currentBookingData) {
-        window.currentBookingData.sub_tickets = result.sub_tickets || [];
-        window.currentBookingData.mother_ticket = result.mother_ticket || null;
-        mountTicketAndShow(window.currentBookingData);
       }
     }
   } catch (e) {
