@@ -1798,12 +1798,8 @@ function mountTicketAndShow(ticket) {
         </div>
       `;
     } else {
-      // 分票模式：顯示狀態和ABC按鈕
+      // 分票模式：顯示ABC按鈕（移除灰色底框）
       carouselHTML = `
-        <div class="ticket-status-summary" style="text-align:center;margin-bottom:20px;padding:12px;background:#f9f9f9;border-radius:8px;">
-          <strong>上車狀態：</strong>
-          <span class="status-text">${checkedPax}/${totalSubPax} 人已上車</span>
-        </div>
         <div class="ticket-carousel-indicators" style="display:flex;justify-content:center;margin-bottom:24px;gap:8px;">
       `;
       
@@ -1997,7 +1993,7 @@ function showSplitTicketDialog(ticket, isReSplit = false) {
       <label class="label">要分成幾張票卷？</label>
       <select id="splitTicketCount" class="select" onchange="updateSplitTicketInputs(${remainingPax})">
         ${Array.from({length: maxTickets}, (_, i) => i + 1)
-          .map(n => `<option value="${n}" ${n === (isReSplit ? 1 : 2) ? 'selected' : ''}>${n} 張</option>`)
+          .map(n => `<option value="${n}" ${n === (isReSplit ? 1 : 2) ? 'selected' : ''}>${n === 1 ? '1張(全部核銷)' : n + ' 張'}</option>`)
           .join('')}
       </select>
     </div>
@@ -2047,7 +2043,7 @@ function updateSplitTicketInputs(totalPax) {
     field.className = "field";
     const ticketLabel = String.fromCharCode(65 + idx); // A, B, C, D, E...
     field.innerHTML = `
-      <label class="label">子票 ${ticketLabel} 人數</label>
+      <label class="label">子票 ${ticketLabel} <span style="color:#666;font-size:0.9em;">(人數)</span></label>
       <input type="number" class="input split-pax-input" min="1" max="${totalPax}" value="${val}" data-index="${idx}" oninput="updateSplitTicketSummary(${totalPax})" />
     `;
     inputsContainer.appendChild(field);
@@ -2309,6 +2305,52 @@ function switchTicketTo(index) {
         const emailEl = getElement("ticketEmail");
         if (emailEl) emailEl.textContent = ticket.email || "";
       }
+    }
+  }
+}
+
+function switchQueryTicketTo(bookingId, index) {
+  const uniqueCarouselId = `ticketCarouselTrack_${bookingId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const track = getElement(uniqueCarouselId);
+  if (!track) return;
+  
+  const items = track.querySelectorAll(".ticket-carousel-item");
+  if (index < 0 || index >= items.length) return;
+  
+  // 獲取當前活動項
+  const currentActive = track.querySelector(".ticket-carousel-item.active");
+  const currentIdx = currentActive ? Array.from(items).indexOf(currentActive) : 0;
+  if (index === currentIdx) return;
+  
+  // 更新活動項
+  if (currentActive) currentActive.classList.remove("active");
+  items[index].classList.add("active");
+  
+  // 更新指示器（只更新該票卡的指示器）
+  const indicators = document.querySelector(`[data-booking-id="${bookingId}"]`);
+  if (indicators) {
+    const dots = indicators.querySelectorAll(".carousel-dot");
+    if (dots[currentIdx]) dots[currentIdx].classList.remove("active");
+    if (dots[index]) dots[index].classList.add("active");
+  }
+  
+  // 滑動動畫
+  track.style.transform = `translateX(-${index * 100}%)`;
+  
+  // ========== 同步更新下方資訊欄 ==========
+  if (window.queryTicketsData && window.queryTicketsData[bookingId] && window.queryTicketsData[bookingId][index]) {
+    const currentTicket = window.queryTicketsData[bookingId][index];
+    
+    // 更新預約編號（顯示完整編號，例如：26021307_A）
+    const bookingIdEl = document.getElementById(`ticketBookingIdDisplay_${bookingId}`);
+    if (bookingIdEl) {
+      bookingIdEl.textContent = currentTicket.booking_id || bookingId;
+    }
+    
+    // 更新人數
+    const paxEl = document.getElementById(`ticketPassengersDisplay_${bookingId}`);
+    if (paxEl) {
+      paxEl.textContent = String(currentTicket.pax || 0);
     }
   }
 }
@@ -2600,12 +2642,8 @@ function buildTicketCard(row, { mask = false } = {}) {
     if (!window.queryTicketsData) window.queryTicketsData = {};
     window.queryTicketsData[bookingId] = allTickets;
     
-    // 構建新的顯示結構：上方狀態 + ABC按鈕 + 下方完整車票
+    // 構建新的顯示結構：ABC按鈕 + 下方完整車票（移除灰色底框）
     let carouselHTML = `
-      <div class="ticket-status-summary" style="text-align:center;margin-bottom:20px;padding:12px;background:#f9f9f9;border-radius:8px;">
-        <strong>上車狀態：</strong>
-        <span class="status-text">${checkedPax}/${totalSubPax} 人已上車</span>
-      </div>
       <div class="ticket-carousel-indicators" data-booking-id="${bookingId}" style="display:flex;justify-content:center;margin-bottom:24px;gap:8px;">
     `;
     
@@ -2675,17 +2713,14 @@ function buildTicketCard(row, { mask = false } = {}) {
       <div class="ticket-content">
         ${qrSection}
         <div class="ticket-info">
-          <div class="ticket-field"><span class="ticket-label">${t("labelBookingId")}</span><span class="ticket-value">${sanitize(hasSubTickets ? bookingId + " (母票)" : bookingId)}</span></div>
+          <div class="ticket-field"><span class="ticket-label">${t("labelBookingId")}</span><span class="ticket-value" id="ticketBookingIdDisplay_${bookingId}">${sanitize(hasSubTickets && allTickets.length > 0 ? allTickets[0].booking_id : bookingId)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelDirection")}</span><span class="ticket-value">${sanitize(rbLabel)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelPick")}</span><span class="ticket-value">${sanitize(pick)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelDrop")}</span><span class="ticket-value">${sanitize(drop)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelName")}</span><span class="ticket-value">${sanitize(name)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelPhone")}</span><span class="ticket-value">${sanitize(phone)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelEmail")}</span><span class="ticket-value">${sanitize(email)}</span></div>
-          ${hasSubTickets ? subTickets.map(t => {
-            const subBookingId = t.booking_id || `${bookingId}_${String.fromCharCode(64 + t.sub_index)}`;
-            return `<div class="ticket-field"><span class="ticket-label">${subBookingId}</span><span class="ticket-value">${t.pax} 人</span></div>`;
-          }).join("") : `<div class="ticket-field"><span class="ticket-label">${t("labelPassengersShort")}</span><span class="ticket-value">${sanitize(String(pax))}</span></div>`}
+          <div class="ticket-field"><span class="ticket-label">${t("labelPassengersShort")}</span><span class="ticket-value" id="ticketPassengersDisplay_${bookingId}">${sanitize(hasSubTickets && allTickets.length > 0 ? String(allTickets[0].pax) : String(pax))}</span></div>
           ${hasSubTickets ? `<div class="ticket-field"><span class="ticket-label">上車狀態</span><span class="ticket-value">${checkedPax}/${totalSubPax} 人已上車</span></div>` : ""}
         </div>
       </div>
@@ -2793,9 +2828,16 @@ async function queryOrders() {
   const qBookIdEl = getElement("qBookId");
   const qPhoneEl = getElement("qPhone");
   const qEmailEl = getElement("qEmail");
-  const id = (qBookIdEl ? qBookIdEl.value : "").trim();
+  let id = (qBookIdEl ? qBookIdEl.value : "").trim();
   const phone = (qPhoneEl ? qPhoneEl.value : "").trim();
   const email = (qEmailEl ? qEmailEl.value : "").trim();
+  
+  // 如果搜索的是子票編號（包含下劃線），提取基礎預約編號
+  // 例如：26021315_B -> 26021315
+  if (id && id.includes("_")) {
+    id = id.split("_")[0];
+  }
+  
   const queryHint = getElement("queryHint");
   if (!id && !phone && !email) {
     if (queryHint) shake(queryHint);
