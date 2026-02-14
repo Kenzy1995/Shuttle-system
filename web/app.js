@@ -1843,7 +1843,7 @@ function mountTicketAndShow(ticket) {
       allTickets.push({
         type: "sub",
         booking_id: subBookingId,
-        original_booking_id: ticket.bookingId,
+        original_booking_id: ticket.bookingId, // 保存原始 bookingId，用於顯示
         sub_index: t.sub_index,
         pax: t.pax || 0,
         qr_url: qrUrl,
@@ -1859,13 +1859,13 @@ function mountTicketAndShow(ticket) {
     // 構建顯示結構
     let carouselHTML = "";
     
-    // 如果是單一票卷，不顯示狀態和ABC按鈕（就像最初預約時一樣）
-    if (allTickets.length === 1 && allTickets[0].type === "single") {
+    // 如果是單一票卷（只有1張子票），不顯示ABC按鈕（就像最初預約時一樣）
+    if (allTickets.length === 1) {
       // 單一票卷：直接顯示QR Code，不顯示ABC按鈕，但顯示乘車狀態
       const tkt = allTickets[0];
       const qrUrlToUse = tkt.qr_url || (tkt.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(tkt.qr_content)}` : "");
       // 判斷乘車狀態
-      let rideStatus = "not_checked_in";
+      let rideStatus = tkt.status || "not_checked_in";
       if (ticket.ride_status) {
         rideStatus = ticket.ride_status.includes("上車") ? "checked_in" : "not_checked_in";
       } else if (ticket.乘車狀態) {
@@ -1953,10 +1953,14 @@ function mountTicketAndShow(ticket) {
     if (allTickets.length > 0) {
       const firstTicket = allTickets[0];
       
-      // 更新預約編號
+      // 更新預約編號（單一票卷時使用原始 bookingId，不帶後綴）
       const bookingIdEl = getElement("ticketBookingId");
       if (bookingIdEl) {
-        bookingIdEl.textContent = firstTicket.booking_id || ticket.bookingId || "";
+        // 如果是單一票卷，使用原始 bookingId；否則使用子票的 booking_id
+        const displayBookingId = (allTickets.length === 1) 
+          ? ticket.bookingId 
+          : (firstTicket.booking_id || ticket.bookingId || "");
+        bookingIdEl.textContent = displayBookingId;
       }
       
       // 更新人數
@@ -2404,11 +2408,18 @@ function switchTicketTo(index) {
   // ========== 同步更新下方資訊欄 ==========
   if (window.allTicketsData && window.allTicketsData[index]) {
     const currentTicket = window.allTicketsData[index];
+    const allTickets = window.allTicketsData;
+    const ticketData = window.currentBookingData || {};
     
-    // 更新預約編號（顯示完整編號，例如：26021307_A）
+    // 更新預約編號：只有1張票時顯示原始 bookingId，多張票時顯示完整編號（例如：26021307_A）
     const bookingIdEl = getElement("ticketBookingId");
     if (bookingIdEl) {
-      bookingIdEl.textContent = currentTicket.booking_id || "";
+      // 只有1張票時顯示原始 bookingId，多張票時顯示完整編號（例如：26021307_A）
+      const ticketData = window.currentBookingData || {};
+      const displayBookingId = (allTickets.length === 1) 
+        ? (ticketData.bookingId || currentTicket.original_booking_id || "")
+        : (currentTicket.booking_id || "");
+      bookingIdEl.textContent = displayBookingId;
     }
     
     // 更新人數
@@ -2480,11 +2491,15 @@ function switchQueryTicketTo(bookingId, index) {
   // ========== 同步更新下方資訊欄 ==========
   if (window.queryTicketsData && window.queryTicketsData[bookingId] && window.queryTicketsData[bookingId][index]) {
     const currentTicket = window.queryTicketsData[bookingId][index];
+    const allTickets = window.queryTicketsData[bookingId];
     
-    // 更新預約編號（顯示完整編號，例如：26021307_A）
+    // 更新預約編號：只有1張票時顯示原始 bookingId，多張票時顯示完整編號（例如：26021307_A）
     const bookingIdEl = document.getElementById(`ticketBookingIdDisplay_${bookingId}`);
     if (bookingIdEl) {
-      bookingIdEl.textContent = currentTicket.booking_id || bookingId;
+      const displayBookingId = (allTickets.length === 1) 
+        ? bookingId 
+        : (currentTicket.booking_id || bookingId);
+      bookingIdEl.textContent = displayBookingId;
     }
     
     // 更新人數
@@ -2742,8 +2757,32 @@ function buildTicketCard(row, { mask = false } = {}) {
   let allTickets = []; // 定義在外部，確保在整個函數中可用
   if (statusCode === "cancelled") {
     qrSection = `<div class="ticket-qr"><img src="/images/qr-placeholder.png" alt="QR placeholder" /></div>`;
-  } else if (hasSubTickets) {
-    // 分票模式：只顯示子票（不顯示母票）
+  } else if (hasSubTickets && subTickets.length === 1) {
+    // 單一子票模式：視為單一票卷，不顯示 ABC 按鈕，預約編號不帶後綴
+    const singleSubTicket = subTickets[0];
+    const qrUrlToUse = singleSubTicket.qr_url || (singleSubTicket.qr_content ? `${QR_ORIGIN}/api/qr/${encodeURIComponent(singleSubTicket.qr_content)}` : "");
+    const statusBadge = singleSubTicket.status === "checked_in" 
+      ? `<div class="sub-ticket-status checked-in" style="margin-top:12px;">✓ 已上車</div>`
+      : `<div class="sub-ticket-status not-checked-in" style="margin-top:12px;">未上車</div>`;
+    
+    qrSection = `
+      <div class="ticket-qr multi-ticket" data-booking-id="${bookingId}">
+        <div class="ticket-carousel-container" style="position:relative;">
+          <div class="ticket-carousel-track" id="ticketCarouselTrack_${bookingId.replace(/[^a-zA-Z0-9]/g, '_')}" style="display:flex;transition:transform 0.3s ease;">
+            <div class="ticket-carousel-item active" data-ticket-index="0" style="flex:0 0 100%;width:100%;box-sizing:border-box;padding:0 10px;">
+              <div class="sub-ticket-qr-item" style="background:#fff;padding:20px;border-radius:12px;text-align:center;">
+                <div class="sub-ticket-qr" style="margin:16px 0;">
+                  <img src="${sanitize(qrUrlToUse)}" alt="QR Code" style="width:200px;height:200px;border-radius:8px;border:1px solid #ddd;object-fit:contain;" onerror="this.src='${QR_ORIGIN}/api/qr/error'; console.error('QR load failed:', '${sanitize(qrUrlToUse)}');" />
+                </div>
+                ${statusBadge}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  } else if (hasSubTickets && subTickets.length > 1) {
+    // 多子票模式：只顯示子票（不顯示母票）
     // 構建所有票卷（只顯示子票）
     
     // 排序：已上車的在前，未上車的在後
@@ -2765,6 +2804,7 @@ function buildTicketCard(row, { mask = false } = {}) {
       allTickets.push({
         type: "sub",
         booking_id: subBookingId,
+        original_booking_id: bookingId, // 保存原始 bookingId，用於顯示
         sub_index: t.sub_index,
         pax: t.pax || 0,
         qr_url: qrUrl,
@@ -2814,10 +2854,10 @@ function buildTicketCard(row, { mask = false } = {}) {
       carouselHTML += `
         <div class="ticket-carousel-item ${isActive}" data-ticket-index="${idx}" style="flex:0 0 100%;width:100%;box-sizing:border-box;padding:0 10px;">
             <div class="sub-ticket-qr-item${checkedInClass}" style="background:#fff;padding:20px;border-radius:12px;text-align:center;">
-            ${statusBadge}
             <div class="sub-ticket-qr" style="margin:16px 0;">
               <img src="${sanitize(qrUrlToUse)}" alt="票卷 ${tkt.label}" style="width:200px;height:200px;border-radius:8px;border:1px solid #ddd;object-fit:contain;" onerror="this.src='${QR_ORIGIN}/api/qr/error'; console.error('QR load failed:', '${sanitize(qrUrlToUse)}');" />
             </div>
+            ${statusBadge}
           </div>
         </div>
       `;
@@ -2853,7 +2893,7 @@ function buildTicketCard(row, { mask = false } = {}) {
       <div class="ticket-content">
         ${qrSection}
         <div class="ticket-info">
-          <div class="ticket-field"><span class="ticket-label">${t("labelBookingId")}</span><span class="ticket-value" id="ticketBookingIdDisplay_${bookingId}">${sanitize(hasSubTickets && allTickets.length > 0 ? allTickets[0].booking_id : bookingId)}</span></div>
+          <div class="ticket-field"><span class="ticket-label">${t("labelBookingId")}</span><span class="ticket-value" id="ticketBookingIdDisplay_${bookingId}">${sanitize(hasSubTickets && subTickets.length === 1 ? bookingId : (hasSubTickets && allTickets.length > 0 ? allTickets[0].booking_id : bookingId))}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelDirection")}</span><span class="ticket-value">${sanitize(rbLabel)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelPick")}</span><span class="ticket-value">${sanitize(pick)}</span></div>
           <div class="ticket-field"><span class="ticket-label">${t("labelDrop")}</span><span class="ticket-value">${sanitize(drop)}</span></div>
