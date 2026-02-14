@@ -1769,7 +1769,7 @@ function mountTicketAndShow(ticket) {
         <div class="ticket-carousel-container" style="position:relative;">
           <div class="ticket-carousel-track" id="ticketCarouselTrack" style="display:flex;transition:transform 0.3s ease;">
             <div class="ticket-carousel-item active" data-ticket-index="0" style="flex:0 0 100%;width:100%;box-sizing:border-box;padding:0 10px;">
-              <div class="sub-ticket-qr-item" style="background:#fff;padding:20px;border-radius:12px;border:1px solid #e5e7eb;text-align:center;">
+              <div class="sub-ticket-qr-item" style="background:#fff;padding:20px;border-radius:12px;text-align:center;">
                 <div class="sub-ticket-qr" style="margin:16px 0;">
                   <img src="${qrUrlToUse}" alt="QR Code" style="width:200px;height:200px;border-radius:8px;border:1px solid #ddd;object-fit:contain;" onerror="this.src='${QR_ORIGIN}/api/qr/error'; console.error('QR load failed:', '${qrUrlToUse}');" />
                 </div>
@@ -1781,6 +1781,9 @@ function mountTicketAndShow(ticket) {
           </div>
         </div>
       `;
+      // 清除舊的內容（包括 ABC 按鈕）
+      qrContainer.innerHTML = "";
+      // 設置新的內容
       qrContainer.innerHTML = singleTicketHTML;
       qrContainer.className = "ticket-qr multi-ticket";
     }
@@ -1875,7 +1878,7 @@ function mountTicketAndShow(ticket) {
         <div class="ticket-carousel-container" style="position:relative;">
           <div class="ticket-carousel-track" id="ticketCarouselTrack" style="display:flex;transition:transform 0.3s ease;">
             <div class="ticket-carousel-item active" data-ticket-index="0" style="flex:0 0 100%;width:100%;box-sizing:border-box;padding:0 10px;">
-              <div class="sub-ticket-qr-item" style="background:#fff;padding:20px;border-radius:12px;border:1px solid #e5e7eb;text-align:center;">
+              <div class="sub-ticket-qr-item" style="background:#fff;padding:20px;border-radius:12px;text-align:center;">
                 <div class="sub-ticket-qr" style="margin:16px 0;">
                   <img src="${qrUrlToUse}" alt="QR Code" style="width:200px;height:200px;border-radius:8px;border:1px solid #ddd;object-fit:contain;" onerror="this.src='${QR_ORIGIN}/api/qr/error'; console.error('QR load failed:', '${qrUrlToUse}');" />
                 </div>
@@ -1917,7 +1920,7 @@ function mountTicketAndShow(ticket) {
         
         carouselHTML += `
           <div class="ticket-carousel-item ${isActive}" data-ticket-index="${idx}" style="flex:0 0 100%;width:100%;box-sizing:border-box;padding:0 10px;">
-            <div class="sub-ticket-qr-item${checkedInClass}" style="background:#fff;padding:20px;border-radius:12px;border:1px solid #e5e7eb;text-align:center;">
+            <div class="sub-ticket-qr-item${checkedInClass}" style="background:#fff;padding:20px;border-radius:12px;text-align:center;">
               <div class="sub-ticket-qr" style="margin:16px 0;">
                 <img src="${qrUrlToUse}" alt="票卷 ${tkt.label}" style="width:200px;height:200px;border-radius:8px;border:1px solid #ddd;object-fit:contain;" onerror="this.src='${QR_ORIGIN}/api/qr/error'; console.error('QR load failed:', '${qrUrlToUse}');" />
               </div>
@@ -1934,6 +1937,9 @@ function mountTicketAndShow(ticket) {
     }
     
     if (qrContainer) {
+      // 清除舊的內容（包括 ABC 按鈕）
+      qrContainer.innerHTML = "";
+      // 設置新的內容
       qrContainer.innerHTML = carouselHTML;
       qrContainer.className = "ticket-qr multi-ticket";
     }
@@ -2018,7 +2024,7 @@ function mountTicketAndShow(ticket) {
         <div class="ticket-carousel-container" style="position:relative;">
           <div class="ticket-carousel-track" id="ticketCarouselTrack" style="display:flex;transition:transform 0.3s ease;">
             <div class="ticket-carousel-item active" data-ticket-index="0" style="flex:0 0 100%;width:100%;box-sizing:border-box;padding:0 10px;">
-              <div class="sub-ticket-qr-item" style="background:#fff;padding:20px;border-radius:12px;border:1px solid #e5e7eb;text-align:center;">
+              <div class="sub-ticket-qr-item" style="background:#fff;padding:20px;border-radius:12px;text-align:center;">
                 <div class="sub-ticket-qr" style="margin:16px 0;">
                   <img id="ticketQrImg" src="${ticket.qrUrl || ""}" alt="QR Code" style="width:200px;height:200px;border-radius:8px;border:1px solid #ddd;object-fit:contain;" />
                 </div>
@@ -2028,6 +2034,9 @@ function mountTicketAndShow(ticket) {
           </div>
         </div>
       `;
+      // 清除舊的內容（包括 ABC 按鈕）
+      qrContainer.innerHTML = "";
+      // 設置新的內容
       qrContainer.innerHTML = singleTicketHTML;
       qrContainer.className = "ticket-qr multi-ticket";
     }
@@ -2035,15 +2044,19 @@ function mountTicketAndShow(ticket) {
     // 添加分票按鈕
     const actionsContainer = getElement("ticketActionsContainer");
     if (actionsContainer && ticket.passengers > 1) {
-      // 檢查是否已有分票按鈕
-      if (!actionsContainer.querySelector(".split-ticket-btn")) {
-        const splitBtn = document.createElement("button");
-        splitBtn.className = "button split-ticket-btn";
-        // 如果已分票，顯示「重新分票」；否則顯示「分票」
-        splitBtn.textContent = hasSubTickets ? "重新分票" : "分票";
-        splitBtn.onclick = () => showSplitTicketDialog(ticket, hasSubTickets);
-        actionsContainer.insertBefore(splitBtn, actionsContainer.firstChild);
+      // 移除舊的分票按鈕（如果存在）
+      const oldSplitBtn = actionsContainer.querySelector(".split-ticket-btn");
+      if (oldSplitBtn) {
+        oldSplitBtn.remove();
       }
+      
+      // 添加新的分票按鈕
+      const splitBtn = document.createElement("button");
+      splitBtn.className = "button split-ticket-btn";
+      // 如果已分票，顯示「重新分票」；否則顯示「分票」
+      splitBtn.textContent = hasSubTickets ? "重新分票" : "分票";
+      splitBtn.onclick = () => showSplitTicketDialog(ticket, hasSubTickets);
+      actionsContainer.insertBefore(splitBtn, actionsContainer.firstChild);
     }
   }
 
@@ -2263,6 +2276,11 @@ async function confirmSplitTicket(bookingId, ticketSplit, isReSplit = false) {
       // 從當前訂單數據獲取其他信息
       const currentData = window.currentBookingData || {};
       
+      // 如果重新分票回到1張票，視為單一票卷（不顯示 ABC 按鈕）
+      // 將 sub_tickets 設為空數組，使用子票的 QR URL 作為主 QR URL
+      const isSingleTicket = result.sub_tickets.length === 1;
+      const singleSubTicket = isSingleTicket ? result.sub_tickets[0] : null;
+      
       // 構建完整的 ticket 對象
       const ticketData = {
         bookingId: result.booking_id || bookingId,
@@ -2275,16 +2293,18 @@ async function confirmSplitTicket(bookingId, ticketSplit, isReSplit = false) {
         phone: currentData.phone || "",
         email: currentData.email || "",
         passengers: currentData.passengers || 0,
-        qrUrl: "", // 分票後沒有單一 QR URL
+        // 如果只有1張子票，使用子票的 QR URL 作為主 QR URL（視為單一票卷）
+        qrUrl: isSingleTicket ? (singleSubTicket.qr_url || "") : "",
         // ========== 使用 API 返回的子票數據 ==========
-        sub_tickets: result.sub_tickets || [],
+        // 如果只有1張子票，設為空數組，讓系統視為單一票卷（不顯示 ABC 按鈕）
+        sub_tickets: isSingleTicket ? [] : (result.sub_tickets || []),
         mother_ticket: result.mother_ticket || null
       };
       
       // 更新全局變量
       window.currentBookingData = ticketData;
       
-      // 重新渲染票卷（顯示所有子票，支持切換）
+      // 重新渲染票卷（立即更新 UI，不依賴刷新）
       mountTicketAndShow(ticketData);
     } else {
       // 如果 API 沒有返回子票數據，回退到重新查詢（向後兼容）
@@ -2793,7 +2813,7 @@ function buildTicketCard(row, { mask = false } = {}) {
       
       carouselHTML += `
         <div class="ticket-carousel-item ${isActive}" data-ticket-index="${idx}" style="flex:0 0 100%;width:100%;box-sizing:border-box;padding:0 10px;">
-          <div class="sub-ticket-qr-item${checkedInClass}" style="background:#fff;padding:20px;border-radius:12px;border:1px solid #e5e7eb;text-align:center;">
+            <div class="sub-ticket-qr-item${checkedInClass}" style="background:#fff;padding:20px;border-radius:12px;text-align:center;">
             ${statusBadge}
             <div class="sub-ticket-qr" style="margin:16px 0;">
               <img src="${sanitize(qrUrlToUse)}" alt="票卷 ${tkt.label}" style="width:200px;height:200px;border-radius:8px;border:1px solid #ddd;object-fit:contain;" onerror="this.src='${QR_ORIGIN}/api/qr/error'; console.error('QR load failed:', '${sanitize(qrUrlToUse)}');" />
